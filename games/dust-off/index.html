@@ -582,7 +582,7 @@ function updateLoose(dt, turb, beamOn) {
     if (p.x > L.ch.x + L.ch.w - 4) { p.x = L.ch.x + L.ch.w - 4; p.vx = -Math.abs(p.vx) * 0.4; }
 
     // lost out of the top
-    if (p.y < -14) {
+    if (p.y < L.topH - 14) {   // on a phone they are gone once under the bar
       if (p.type.flagged) { /* counted at the end of the subject */ }
       loose.splice(i, 1);
     }
