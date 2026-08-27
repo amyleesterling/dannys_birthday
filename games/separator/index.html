@@ -172,6 +172,7 @@ let stat = null;
 let shake = 0;
 
 const pointer = { x: 0, y: 0, down: false, inside: false };
+const pointers = new Map();      // id to {x, y, onBoost}
 const keys = {};
 
 const MAX_STRIKES = 3;
@@ -228,21 +229,43 @@ function layout() {
   canvas.height = Math.round(rect.height * dpr);
   W = rect.width; H = rect.height;
 
-  const wide = W >= 1120;
-  const padL = wide ? 208 : 168;
-  const padR = wide ? 244 : 186;
-  L = {
-    left:  { x: 0, w: padL },
-    right: { x: W - padR, w: padR },
-    ch:    { x: padL, y: 0, w: W - padL - padR, h: H },
-    hud:   H < 660 ? 0.9 : 1,
-  };
+  const narrow = W < 900;
+  L = { narrow };
+
+  if (narrow) {
+    L.left  = { x: 0, w: 0 };
+    L.right = { x: W, w: 0 };
+    L.ch    = { x: 0, y: 0, w: W, h: H };
+    L.topH  = 112;
+    L.hud   = clamp(W / 300, 1.2, 1.75);
+    L.dialH = 92;
+  } else {
+    const padL = W >= 1180 ? 272 : 236;
+    const padR = W >= 1180 ? 312 : 258;
+    L.left  = { x: 0, w: padL };
+    L.right = { x: W - padR, w: padR };
+    L.ch    = { x: padL, y: 0, w: W - padL - padR, h: H };
+    L.topH  = 0;
+    L.hud   = clamp(H / 660, 1.1, 1.45);
+    L.dialH = 78;
+  }
   L.ch.cx = L.ch.x + L.ch.w / 2;
 
-  L.dialH = 62;
-  L.dial = { x: L.ch.x + 16, y: L.ch.h - L.dialH - 10, w: L.ch.w - 32, h: L.dialH };
-  L.surfaceY = L.ch.h * 0.19;
-  L.bedY = L.dial.y - 22;
+  // on a phone the boost button sits at the right hand end of the dial row,
+  // so tuning and boosting are both under a thumb
+  const btnW = narrow ? 98 : 0;
+  L.dial = {
+    x: L.ch.x + 16,
+    y: H - L.dialH - 12,
+    w: L.ch.w - 32 - btnW,
+    h: L.dialH,
+  };
+  L.btn = narrow
+    ? { x: L.ch.x + L.ch.w - btnW / 2 - 14, y: L.dial.y + L.dialH / 2, r: 40 }
+    : null;
+
+  L.surfaceY = narrow ? L.topH + 34 : H * 0.18;
+  L.bedY = L.dial.y - 26;
   L.zone = { x: L.ch.x + L.ch.w * 0.32, w: L.ch.w * 0.30 };
   L.skim = L.ch.x + L.ch.w * 0.80;
 }
@@ -341,19 +364,40 @@ function endBatch() {
 
 // ---------------------------------------------------------------- input
 
+function pos(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+function onBoost(p) {
+  return !!L.btn && Math.hypot(p.x - L.btn.x, p.y - L.btn.y) < L.btn.r + 8;
+}
+
 canvas.addEventListener('pointerdown', e => {
-  canvas.setPointerCapture(e.pointerId);
-  move(e);
+  const p = pos(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.inside = true;
   audio.init();
+  if (state === 'title' || state === 'over') { pointers.clear(); startRun(); return; }
+  if (state === 'report') { pointers.clear(); batch++; startBatch(batch); state = 'play'; return; }
+  pointers.set(e.pointerId, { x: p.x, y: p.y, onBoost: onBoost(p) });
   pointer.down = true;
-  if (state === 'title' || state === 'over') { startRun(); return; }
-  if (state === 'report') { batch++; startBatch(batch); state = 'play'; return; }
-  tuneFromPointer();
+  if (!onBoost(p)) tuneAt(p);
 });
-canvas.addEventListener('pointermove', e => { move(e); if (pointer.down) tuneFromPointer(); });
-canvas.addEventListener('pointerup', () => { pointer.down = false; });
-canvas.addEventListener('pointercancel', () => { pointer.down = false; });
-canvas.addEventListener('pointerleave', () => { pointer.inside = false; pointer.down = false; });
+canvas.addEventListener('pointermove', e => {
+  const p = pos(e);
+  pointer.x = p.x; pointer.y = p.y; pointer.inside = true;
+  const rec = pointers.get(e.pointerId);
+  if (rec) { rec.x = p.x; rec.y = p.y; if (!rec.onBoost) tuneAt(p); }
+});
+const lift = e => {
+  pointers.delete(e.pointerId);
+  pointer.down = pointers.size > 0;
+};
+canvas.addEventListener('pointerup', lift);
+canvas.addEventListener('pointercancel', lift);
+canvas.addEventListener('pointerleave', e => {
+  lift(e);
+  if (e.pointerType === 'mouse') pointer.inside = false;
+});
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
   audio.init();
@@ -361,16 +405,11 @@ canvas.addEventListener('wheel', e => {
   freq = clamp(freq * Math.exp(step), F_MIN, F_MAX);
 }, { passive: false });
 
-function move(e) {
-  const r = canvas.getBoundingClientRect();
-  pointer.x = e.clientX - r.left;
-  pointer.y = e.clientY - r.top;
-  pointer.inside = true;
-}
-function tuneFromPointer() {
+// dragging anywhere on or just above the dial tunes it
+function tuneAt(p) {
   if (state !== 'play') return;
-  if (pointer.y < L.dial.y - 14 || pointer.x < L.dial.x || pointer.x > L.dial.x + L.dial.w) return;
-  freq = clamp(xToF(pointer.x), F_MIN, F_MAX);
+  if (p.y < L.dial.y - 18 || p.x < L.dial.x || p.x > L.dial.x + L.dial.w) return;
+  freq = clamp(xToF(p.x), F_MIN, F_MAX);
 }
 
 window.addEventListener('keydown', e => {
@@ -408,7 +447,7 @@ function update(dt) {
   const fine = keys.shift ? 0.25 : 1;
   if (keys.arrowleft  || keys.a) freq = clamp(freq * Math.exp(-0.9 * dt * fine), F_MIN, F_MAX);
   if (keys.arrowright || keys.d) freq = clamp(freq * Math.exp( 0.9 * dt * fine), F_MIN, F_MAX);
-  boost = !!keys.space;
+  boost = !!keys.space || [...pointers.values()].some(p => p.onBoost);
 
   audio.setHum(60 + freq * 1.7, 0.012 + (boost ? 0.016 : 0));
 
@@ -520,7 +559,7 @@ function draw(time) {
   if (state === 'title')  drawTitle();
   if (state === 'report') drawReport();
   if (state === 'over')   drawOver();
-  if (state === 'play' && pointer.inside) drawCursor();
+  if (state === 'play' && pointer.inside && !L.narrow) drawCursor();
 }
 
 function drawChute(time) {
@@ -721,65 +760,78 @@ function drawDial(time) {
   ctx.lineWidth = 1;
   ctx.strokeRect(d.x + 0.5, d.y + 0.5, d.w - 1, d.h - 1);
 
-  const bandY = d.y + 20, bandH = 16;
+  const nameSize = 11 * L.hud;
+  const bandY = d.y + nameSize + 12;
+  const bandH = L.narrow ? 24 : 20;
 
-  // the target bands, each drawn from its own diameter
+  // each band is drawn from that mineral's own diameter, never a second number
   for (const key of TARGETS) {
     const m = MINERAL[key];
     const fc = optimalMHz(m.d);
     const half = fc * BAND_FRAC;
     const x0 = fToX(fc - half), x1 = fToX(fc + half);
     ctx.fillStyle = m.color;
-    ctx.globalAlpha = 0.24;
+    ctx.globalAlpha = 0.26;
     ctx.fillRect(x0, bandY, Math.max(2, x1 - x0), bandH);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = m.color;
     ctx.fillRect(fToX(fc) - 0.5, bandY, 1, bandH);
-    ctx.font = (8.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+    ctx.font = nameSize + 'px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(m.name, fToX(fc), bandY - 5);
+    ctx.fillText(m.name, fToX(fc), bandY - 6);
     ctx.textAlign = 'left';
   }
 
-  // ticks
   ctx.strokeStyle = COL.rule;
-  ctx.fillStyle = COL.faint;
-  ctx.font = (8.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.fillStyle = COL.dim;
+  ctx.font = (10.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.textAlign = 'center';
   for (const f of [10, 20, 50, 100, 200, 300]) {
     const x = fToX(f);
     ctx.beginPath(); ctx.moveTo(x, bandY + bandH); ctx.lineTo(x, bandY + bandH + 4); ctx.stroke();
-    ctx.fillText(String(f), x, bandY + bandH + 14);
+    ctx.fillText(String(f), x, bandY + bandH + 17);
   }
   ctx.textAlign = 'left';
 
-  // response window around the tuned point
   const half = freq * BAND_FRAC * (boost ? BOOST_BAND : 1);
-  const wx0 = fToX(freq - half), wx1 = fToX(freq + half);
-  ctx.fillStyle = boost ? 'rgba(255,122,60,0.20)' : 'rgba(255,182,72,0.13)';
-  ctx.fillRect(wx0, bandY - 2, Math.max(2, wx1 - wx0), bandH + 4);
+  ctx.fillStyle = boost ? 'rgba(255,122,60,0.22)' : 'rgba(255,182,72,0.14)';
+  ctx.fillRect(fToX(freq - half), bandY - 3,
+               Math.max(2, fToX(freq + half) - fToX(freq - half)), bandH + 6);
 
-  // needle
   const nx = fToX(freq);
   ctx.strokeStyle = boost ? COL.hot : COL.amber;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath(); ctx.moveTo(nx, d.y + 6); ctx.lineTo(nx, d.y + d.h - 6); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(nx, d.y + 5); ctx.lineTo(nx, d.y + d.h - 5); ctx.stroke();
   ctx.fillStyle = boost ? COL.hot : COL.amber;
   ctx.beginPath();
-  ctx.moveTo(nx, d.y + 6); ctx.lineTo(nx - 4, d.y + 1); ctx.lineTo(nx + 4, d.y + 1);
+  ctx.moveTo(nx, d.y + 8); ctx.lineTo(nx - 6, d.y + 1); ctx.lineTo(nx + 6, d.y + 1);
   ctx.closePath(); ctx.fill();
 
-  // readout, and the unit stays lower case on purpose
-  ctx.font = (13 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  // the unit stays lower case on purpose, MHz is not MHZ
+  ctx.font = (16 * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.fillStyle = COL.text;
   ctx.textAlign = 'left';
-  ctx.fillText(freq.toFixed(1) + ' MHz', d.x + 6, d.y + d.h - 6);
-  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
-  ctx.fillStyle = boost ? COL.hot : COL.faint;
-  ctx.textAlign = 'right';
-  ctx.fillText(boost ? 'FIELD BOOSTED, SELECTIVITY DOWN' : 'SPACE TO BOOST THE FIELD',
-               d.x + d.w - 6, d.y + d.h - 6);
-  ctx.textAlign = 'left';
+  ctx.fillText(freq.toFixed(1) + ' MHz', d.x + 8, d.y + d.h - 8);
+  if (!L.narrow) {
+    ctx.font = (11 * L.hud) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = boost ? COL.hot : COL.dim;
+    ctx.textAlign = 'right';
+    ctx.fillText(boost ? 'FIELD BOOSTED, SELECTIVITY DOWN' : 'HOLD SPACE TO BOOST THE FIELD',
+                 d.x + d.w - 8, d.y + d.h - 8);
+    ctx.textAlign = 'left';
+  }
+
+  if (L.btn) {
+    const b = L.btn;
+    ctx.fillStyle = boost ? 'rgba(255,122,60,0.20)' : 'rgba(10,14,15,0.85)';
+    ctx.strokeStyle = boost ? COL.hot : 'rgba(255,182,72,0.55)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = boost ? COL.hot : COL.amber;
+    ctx.font = '700 ' + (14 * L.hud) + 'px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('BOOST', b.x, b.y + 5);
+    ctx.textAlign = 'left';
+  }
 }
 
 function drawCursor() {
@@ -794,9 +846,9 @@ function drawCursor() {
 
 // ---------------------------------------------------------------- panels
 
-function label(t, x, y) {
+function label(t, x, y, size) {
   ctx.fillStyle = COL.faint;
-  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.font = ((size || 11) * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText(t, x, y);
 }
 function value(t, x, y, size, color) {
@@ -813,8 +865,18 @@ function bar(x, y, w, h, frac, color) {
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
+function grades() {
+  if (!stat) return { grade: 0, recovery: 0 };
+  const collected = stat.recovered + stat.waste;
+  return {
+    grade: collected ? stat.recovered / collected : 0,
+    recovery: stat.targets ? stat.recovered / stat.targets : 0,
+  };
+}
 
 function drawPanels(time) {
+  if (L.narrow) { drawBars(time); return; }
+
   ctx.fillStyle = COL.panel;
   ctx.fillRect(0, 0, L.left.w, H);
   ctx.fillRect(L.right.x, 0, L.right.w, H);
@@ -825,174 +887,193 @@ function drawPanels(time) {
   ctx.moveTo(L.right.x + 0.5, 0); ctx.lineTo(L.right.x + 0.5, H);
   ctx.stroke();
 
-  const x = 18, bw = L.left.w - 36;
-  let y = 34;
+  const x = 20, bw = L.left.w - 40;
+  let y = 40;
   ctx.textAlign = 'left';
-  value('SEPARATOR', x, y, 17, COL.amber); y += 15;
-  label('RADIOFREQUENCY PARTICLE', x, y); y += 12;
-  label('SEPARATOR', x, y); y += 26;
-  ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(L.left.w - 18, y - 12); ctx.stroke();
+  label('RADIOFREQUENCY PARTICLE SEP.', x, y, 11); y += 30;
 
-  label('VALUE RECOVERED', x, y); y += 24;
-  value(String(score).padStart(6, '0'), x, y, 24, COL.text); y += 28;
+  label('VALUE RECOVERED', x, y); y += 32;
+  value(String(score).padStart(6, '0'), x, y, 30, COL.text); y += 34;
 
-  label('BATCH', x, y); y += 21;
-  value(String(batch).padStart(2, '0'), x, y, 19, COL.text); y += 28;
+  label('BATCH', x, y); y += 27;
+  value(String(batch).padStart(2, '0'), x, y, 22, COL.text); y += 32;
 
-  label('GENERATOR POWER', x, y); y += 12;
-  bar(x, y, bw, 8, power / 100, power < 25 ? COL.red : COL.amber); y += 28;
+  label('GENERATOR POWER', x, y); y += 15;
+  bar(x, y, bw, 10, power / 100, power < 25 ? COL.red : COL.amber); y += 32;
+
+  const gr = grades();
+  label('GRADE', x, y); y += 15;
+  bar(x, y, bw, 9, gr.grade, gr.grade >= 0.70 ? COL.teal : COL.red); y += 20;
+  value(Math.round(gr.grade * 100) + ' %, need 70', x, y, 13, COL.dim); y += 28;
+
+  label('RECOVERY', x, y); y += 15;
+  bar(x, y, bw, 9, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.amber); y += 20;
+  value(Math.round(gr.recovery * 100) + ' %, need 55', x, y, 13, COL.dim); y += 34;
 
   if (stat) {
-    const collected = stat.recovered + stat.waste;
-    const grade = collected ? stat.recovered / collected : 0;
-    const recovery = stat.targets ? stat.recovered / stat.targets : 0;
-
-    label('GRADE', x, y); y += 12;
-    bar(x, y, bw, 7, grade, grade >= 0.70 ? COL.teal : COL.red); y += 12;
-    value(Math.round(grade * 100) + ' %, need 70', x, y, 10, COL.dim); y += 22;
-
-    label('RECOVERY', x, y); y += 12;
-    bar(x, y, bw, 7, recovery, recovery >= 0.55 ? COL.teal : COL.amber); y += 12;
-    value(Math.round(recovery * 100) + ' %, need 55', x, y, 10, COL.dim); y += 26;
-
-    label('CONCENTRATE', x, y); y += 16;
-    value(stat.recovered + ' ore', x, y, 12, COL.text); y += 14;
-    value(stat.waste + ' gangue', x, y, 12, stat.waste ? COL.red : COL.faint); y += 14;
-    value(stat.tails + ' to tailings', x, y, 12, COL.dim); y += 26;
+    label('CONCENTRATE', x, y); y += 24;
+    value(stat.recovered + ' ore', x, y, 15, COL.text); y += 21;
+    value(stat.waste + ' gangue', x, y, 15, stat.waste ? COL.red : COL.faint); y += 21;
+    value(stat.tails + ' to tailings', x, y, 15, COL.dim); y += 34;
   }
 
-  label('FAILED BATCHES', x, y); y += 18;
+  label('FAILED BATCHES', x, y); y += 24;
   for (let i = 0; i < MAX_STRIKES; i++) {
+    ctx.lineWidth = 1.5;
     ctx.strokeStyle = i < strikes ? COL.red : COL.rule;
     ctx.fillStyle = COL.red;
-    ctx.beginPath(); ctx.arc(x + 7 + i * 22, y, 6, 0, TAU);
+    ctx.beginPath(); ctx.arc(x + 9 + i * 26, y, 9, 0, TAU);
     if (i < strikes) ctx.fill();
     ctx.stroke();
   }
 
-  // ---- right panel, the assay table
-  const rx = L.right.x + 18;
-  let ry = 34;
-  value('ASSAY', rx, ry, 12, COL.amber); ry += 14;
-  label('TUNING FROM DIAMETER', rx, ry); ry += 20;
+  // ---- right panel, the assay
+  const rx = L.right.x + 20;
+  let ry = 40;
+  value('ASSAY', rx, ry, 16, COL.amber); ry += 19;
+  label('TUNING FROM DIAMETER', rx, ry, 11); ry += 26;
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
-  ry += 8;
+  ctx.beginPath(); ctx.moveTo(rx, ry - 11); ctx.lineTo(W - 20, ry - 11); ctx.stroke();
+  ry += 10;
 
-  label('MINERAL', rx, ry);
-  ctx.textAlign = 'right'; label('mm', W - 74, ry); label('optimum', W - 18, ry); ctx.textAlign = 'left';
-  ry += 16;
+  label('MINERAL', rx, ry, 11);
+  ctx.textAlign = 'right';
+  label('mm', W - 96, ry, 11); label('optimum', W - 20, ry, 11);
+  ctx.textAlign = 'left';
+  ry += 22;
 
   for (const key of TARGETS) {
     const m = MINERAL[key];
     const fc = optimalMHz(m.d);
-    const onBand = Math.abs(freq - fc) < fc * BAND_FRAC * (boost ? BOOST_BAND : 1);
+    const on = Math.abs(freq - fc) < fc * BAND_FRAC * (boost ? BOOST_BAND : 1);
     ctx.fillStyle = m.color;
-    ctx.beginPath(); ctx.arc(rx + 4, ry - 4, 4, 0, TAU); ctx.fill();
-    value(m.name, rx + 15, ry, 10.5, onBand ? COL.text : COL.dim);
+    ctx.beginPath(); ctx.arc(rx + 5, ry - 5, 5, 0, TAU); ctx.fill();
+    value(m.name, rx + 18, ry, 13.5, on ? COL.text : COL.dim);
     ctx.textAlign = 'right';
-    value(m.d.toFixed(2), W - 74, ry, 10.5, COL.dim);
-    value(fc.toFixed(0) + ' MHz', W - 18, ry, 10.5, onBand ? COL.amber : COL.dim);
+    value(m.d.toFixed(2), W - 96, ry, 13.5, COL.dim);
+    value(fc.toFixed(0) + ' MHz', W - 20, ry, 13.5, on ? COL.amber : COL.dim);
     ctx.textAlign = 'left';
-    ry += 20;
+    ry += 25;
   }
-  ry += 6;
+  ry += 8;
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rx, ry - 11); ctx.lineTo(W - 20, ry - 11); ctx.stroke();
   ry += 8;
   for (const key of ['quartz', 'shale']) {
     const m = MINERAL[key];
     ctx.fillStyle = m.color;
-    ctx.beginPath(); ctx.arc(rx + 4, ry - 4, 4, 0, TAU); ctx.fill();
-    value(m.name, rx + 15, ry, 10.5, COL.dim);
+    ctx.beginPath(); ctx.arc(rx + 5, ry - 5, 5, 0, TAU); ctx.fill();
+    value(m.name, rx + 18, ry, 13.5, COL.dim);
     ctx.textAlign = 'right';
-    value('any', W - 74, ry, 10.5, COL.dim);
-    value('follows size', W - 18, ry, 10.5, COL.faint);
+    value('follows size', W - 20, ry, 13.5, COL.faint);
     ctx.textAlign = 'left';
-    ry += 20;
+    ry += 25;
   }
 
-  ry += 18;
-  const noteLines = [
+  ry += 22;
+  const note = [
     'Skin depth falls with the square',
     'root of frequency, so a bigger',
-    'grain tunes lower. Every number',
-    'above comes off one diameter,',
-    'by one formula.',
+    'grain tunes lower. Every figure',
+    'above comes off one diameter by',
+    'one formula.',
     '',
-    'Gangue has no band of its own.',
-    'It heats whenever its size',
-    'happens to match your dial, and',
-    'boosting widens the window.',
+    'Gangue has no band. It heats when',
+    'its size happens to match your',
+    'dial, and boosting widens that.',
   ];
-  for (const ln of noteLines) { value(ln, rx, ry, 9.5, COL.faint); ry += 13; }
-
+  for (const ln of note) {
+    if (ry > H - 20) break;
+    value(ln, rx, ry, 12, COL.faint); ry += 17;
   }
+}
 
-function overlay() {
-  ctx.fillStyle = 'rgba(7,9,10,0.91)';
-  ctx.fillRect(L.ch.x, 0, L.ch.w, L.ch.h);
+function drawBars(time) {
+  const pad = 15;
+  ctx.fillStyle = 'rgba(7,9,10,0.90)';
+  ctx.fillRect(0, 0, W, L.topH);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, L.topH + 0.5); ctx.lineTo(W, L.topH + 0.5); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  label('RECOVERED', pad, 26, 12);
+  value(String(score).padStart(6, '0'), pad, 56, 26, COL.text);
+
+  ctx.textAlign = 'right';
+  label('BATCH ' + String(batch).padStart(2, '0'), W - pad, 26, 12);
+  ctx.fillStyle = COL.red;
+  for (let i = 0; i < strikes; i++) {
+    ctx.beginPath(); ctx.arc(W - pad - 9 - i * 24, 48, 8, 0, TAU); ctx.fill();
+  }
+  ctx.textAlign = 'left';
+
+  const gr = grades();
+  const gap = 10;
+  const bwid = (W - pad * 2 - gap * 2) / 3;
+  const by = L.topH - 20;
+  label('GRADE', pad, by - 7, 12);
+  label('RECOVERY', pad + bwid + gap, by - 7, 12);
+  label('POWER', pad + (bwid + gap) * 2, by - 7, 12);
+  bar(pad, by, bwid, 10, gr.grade, gr.grade >= 0.70 ? COL.teal : COL.red);
+  bar(pad + bwid + gap, by, bwid, 10, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.amber);
+  bar(pad + (bwid + gap) * 2, by, bwid, 10, power / 100, power < 25 ? COL.red : COL.amber);
+}
+
+function card(title, titleColor, sub, rows, footer) {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(7,9,10,0.93)';
+  ctx.fillRect(c.x, 0, c.w, H);
+  ctx.textAlign = 'center';
+
+  const k = Math.min(L.hud, H / 560, c.w / 430);
+  const rowH = 30 * k, subH = 20 * k;
+  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
+  let y = Math.max(46 * k, (H - blockH) / 2);
+
+  value(title, c.cx, y, Math.min(44, c.w * 0.09) * k, titleColor); y += 28 * k;
+  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
+  for (const r of rows) {
+    value(r[0], c.cx, y, 15 * k, COL.teal); y += rowH * 0.66;
+    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
+  }
+  y += 16 * k;
+  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  value(footer, c.cx, y, 17 * k, COL.amber);
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
 }
 
 function drawTitle() {
-  const c = L.ch;
-  overlay();
-  ctx.textAlign = 'center';
-  let y = c.h * 0.22;
-  value('SEPARATOR', c.cx, y, Math.min(52, c.w * 0.085), COL.amber); y += 26;
-  value('TUNE THE FIELD TO THE GRAIN', c.cx, y, 12, COL.dim); y += 48;
-  const lines = [
-    ['SCROLL TO TUNE', 'two fingers on the trackpad, or the arrow keys, or drag the dial'],
+  const touch = L.narrow;
+  card('SEPARATOR', COL.amber, 'TUNE THE FIELD TO THE GRAIN', [
+    [touch ? 'DRAG THE DIAL' : 'SCROLL TO TUNE',
+     touch ? 'the coloured bands are the minerals worth having'
+           : 'two fingers on the trackpad, the arrow keys, or drag the dial'],
     ['SIZE IS THE CLUE', 'a big grain wants a low frequency, a fine one wants a high one'],
-    ['HOLD SPACE TO BOOST', 'heats faster, widens the window, and lifts rock you did not want'],
-    ['WATCH THE GRADE', 'gangue in the concentrate costs more than ore in the tailings'],
-    ['CLEAR THE BATCH', 'seventy percent grade and fifty five percent recovery, or it fails'],
-  ];
-  for (const ln of lines) {
-    value(ln[0], c.cx, y, 12, COL.teal); y += 15;
-    value(ln[1], c.cx, y, 11, COL.dim); y += 27;
-  }
-  y += 8;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value('CLICK TO START THE FEED', c.cx, y, 14, COL.amber);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+    [touch ? 'HOLD BOOST' : 'HOLD SPACE TO BOOST',
+     'heats faster, widens the window, and lifts rock you did not want'],
+    ['WATCH THE GRADE', 'rock in the concentrate costs more than ore in the tailings'],
+    ['CLEAR THE BATCH', 'seventy percent grade and fifty five percent recovery'],
+  ], touch ? 'TAP TO START THE FEED' : 'CLICK TO START THE FEED');
 }
 
 function drawReport() {
-  const c = L.ch;
-  overlay();
   const r = stat.report;
-  ctx.textAlign = 'center';
-  let y = c.h * 0.30;
-  value(r.pass ? 'BATCH CLEARED' : 'BATCH REJECTED', c.cx, y, 34, r.pass ? COL.teal : COL.red);
-  y += 46;
-  value('GRADE      ' + Math.round(r.grade * 100) + ' %', c.cx, y, 15,
-        r.grade >= 0.70 ? COL.text : COL.red); y += 22;
-  value('RECOVERY   ' + Math.round(r.recovery * 100) + ' %', c.cx, y, 15,
-        r.recovery >= 0.55 ? COL.text : COL.red); y += 22;
-  value('ORE        ' + stat.recovered + ' of ' + stat.targets, c.cx, y, 12, COL.dim); y += 18;
-  value('GANGUE     ' + stat.waste, c.cx, y, 12, COL.dim); y += 44;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value('CLICK FOR THE NEXT BATCH', c.cx, y, 14, COL.amber);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+  card(r.pass ? 'BATCH CLEARED' : 'BATCH REJECTED', r.pass ? COL.teal : COL.red,
+       r.pass ? 'THAT ONE GOES TO THE SMELTER' : 'THE ASSAY OFFICE SENT IT BACK', [
+    ['GRADE', Math.round(r.grade * 100) + ' %'],
+    ['RECOVERY', Math.round(r.recovery * 100) + ' %'],
+    ['ORE', stat.recovered + ' of ' + stat.targets],
+    ['GANGUE', String(stat.waste)],
+  ], L.narrow ? 'TAP FOR THE NEXT BATCH' : 'CLICK FOR THE NEXT BATCH');
 }
 
 function drawOver() {
-  const c = L.ch;
-  overlay();
-  ctx.textAlign = 'center';
-  let y = c.h * 0.36;
-  value('PLANT SHUT DOWN', c.cx, y, 36, COL.red); y += 26;
-  value('THREE BATCHES REJECTED', c.cx, y, 12, COL.dim); y += 52;
-  value('VALUE RECOVERED  ' + String(score).padStart(6, '0'), c.cx, y, 18, COL.text); y += 24;
-  value('BATCHES RUN  ' + batch, c.cx, y, 12, COL.dim); y += 48;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value('CLICK TO RUN THE PLANT AGAIN', c.cx, y, 14, COL.amber);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+  card('PLANT SHUT DOWN', COL.red, 'THREE BATCHES REJECTED', [
+    ['VALUE RECOVERED', String(score).padStart(6, '0')],
+    ['BATCHES RUN', String(batch)],
+  ], L.narrow ? 'TAP TO RUN IT AGAIN' : 'CLICK TO RUN IT AGAIN');
 }
 
 // ---------------------------------------------------------------- loop

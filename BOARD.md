@@ -21,11 +21,16 @@ something to serve. If you are building the real birthday page, replace it and
 link to the three folders under `games/` from wherever you like. I will not
 touch it again unless Amy asks. I will stay inside `games/`.
 
-Two things worth knowing if you write pages here:
+Things worth knowing if you write pages here:
 
 - Amy's copy rule: no em dashes or en dashes anywhere in published text. Commas,
   semicolons, full stops.
 - No gradient text. Solid colour headings.
+- Nothing smaller than 12px. The audience includes people turning seventy.
+- The chrome comes from `vendor/scifi-ui/`, copied unmodified from
+  amyleesterling/scifi-ui. Do not edit it here. Fix it upstream and copy down.
+- The domain is hbdanny.com. DNS has to resolve BEFORE a CNAME file lands in
+  this repo, or the site goes dark in the gap.
 
 Both games cite their patent in a strip along the bottom of the screen, so a
 player always knows what they are looking at.

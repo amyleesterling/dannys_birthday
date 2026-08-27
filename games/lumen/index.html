@@ -148,6 +148,9 @@ let dev = null, cam = { x: 0, y: 0 };
 let fx = [], shake = 0, sinceBeep = 0;
 
 const pointer = { x: 0, y: 0, down: false, inside: false };
+const pointers = new Map();          // id to {x, y, onBtn}
+const keys = {};
+let anchored = false;
 
 // ---------------------------------------------------------------- audio
 
@@ -188,15 +191,28 @@ function layout() {
   canvas.height = Math.round(rect.height * dpr);
   W = rect.width; H = rect.height;
 
-  const wide = W >= 1120;
-  const padL = wide ? 208 : 168;
-  const padR = wide ? 244 : 186;
-  L = {
-    left:  { x: 0, w: padL },
-    right: { x: W - padR, w: padR },
-    ch:    { x: padL, y: 0, w: W - padL - padR, h: H },
-    hud:   H < 660 ? 0.9 : 1,
-  };
+  const narrow = W < 900;
+  L = { narrow };
+
+  if (narrow) {
+    L.left  = { x: 0, w: 0 };
+    L.right = { x: W, w: 0 };
+    L.ch    = { x: 0, y: 0, w: W, h: H };
+    L.topH  = 108;
+    L.hud   = clamp(W / 300, 1.2, 1.8);
+    L.btn   = { x: W - 74, y: H - 78, r: 50 };
+    L.map   = { x: W - 136, y: L.topH + 12, w: 124, h: 124 };
+  } else {
+    const padL = W >= 1180 ? 272 : 236;
+    const padR = W >= 1180 ? 304 : 252;
+    L.left  = { x: 0, w: padL };
+    L.right = { x: W - padR, w: padR };
+    L.ch    = { x: padL, y: 0, w: W - padL - padR, h: H };
+    L.topH  = 0;
+    L.hud   = clamp(H / 660, 1.1, 1.45);
+    L.btn   = null;
+    L.map   = null;
+  }
   L.ch.cx = L.ch.x + L.ch.w / 2;
   L.ch.cy = L.ch.h / 2;
 }
@@ -331,28 +347,48 @@ function die(reason) {
 
 // ---------------------------------------------------------------- input
 
-canvas.addEventListener('pointerdown', e => {
-  canvas.setPointerCapture(e.pointerId);
-  move(e);
-  audio.init();
-  pointer.down = true;
-  if (state !== 'play') startRun();
-});
-canvas.addEventListener('pointermove', move);
-canvas.addEventListener('pointerup', () => { pointer.down = false; });
-canvas.addEventListener('pointercancel', () => { pointer.down = false; });
-canvas.addEventListener('pointerleave', () => { pointer.inside = false; pointer.down = false; });
-function move(e) {
+function pos(e) {
   const r = canvas.getBoundingClientRect();
-  pointer.x = e.clientX - r.left;
-  pointer.y = e.clientY - r.top;
-  pointer.inside = true;
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
+function onBtn(p) {
+  return !!L.btn && Math.hypot(p.x - L.btn.x, p.y - L.btn.y) < L.btn.r + 8;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  const p = pos(e);
+  audio.init();
+  if (state !== 'play') { pointers.clear(); startRun(); return; }
+  pointers.set(e.pointerId, { x: p.x, y: p.y, onBtn: onBtn(p) });
+  if (!onBtn(p)) { pointer.x = p.x; pointer.y = p.y; pointer.inside = true; }
+});
+canvas.addEventListener('pointermove', e => {
+  const p = pos(e);
+  const rec = pointers.get(e.pointerId);
+  if (rec) {
+    rec.x = p.x; rec.y = p.y;
+    if (!rec.onBtn) { pointer.x = p.x; pointer.y = p.y; pointer.inside = true; }
+  } else if (e.pointerType === 'mouse') {
+    // a hovering mouse still steers, which is how it works on a laptop
+    pointer.x = p.x; pointer.y = p.y; pointer.inside = true;
+  }
+});
+const lift = e => pointers.delete(e.pointerId);
+canvas.addEventListener('pointerup', lift);
+canvas.addEventListener('pointercancel', lift);
+canvas.addEventListener('pointerleave', e => {
+  lift(e);
+  if (e.pointerType === 'mouse' && !L.narrow) pointer.inside = false;
+});
+
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  keys[k] = true;
+  if (e.key === ' ') e.preventDefault();
   if (k === 'r') { audio.init(); startRun(); }
   if (k === 'm') { audio.init(); audio.muted = !audio.muted; }
 });
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 window.addEventListener('resize', layout);
 
 const toScreen = (x, y) => ({ x: x - cam.x + L.ch.cx, y: y - cam.y + L.ch.cy });
@@ -371,10 +407,16 @@ function update(dt) {
     fx[i].t += dt;
     if (fx[i].t > fx[i].dur) fx.splice(i, 1);
   }
-  if (state !== 'play') return;
+  if (state !== 'play') { anchored = false; return; }
 
   const flowSpeed = 46 + level * 9;
-  const anchored = pointer.down && pointer.inside;
+  const held = [...pointers.values()];
+  const onButton = held.some(p => p.onBtn);
+  const offButton = held.some(p => !p.onBtn);
+  // On a phone a dragging finger must steer, not anchor, so only the button
+  // anchors there. On a laptop, holding the mouse anywhere still anchors.
+  anchored = !!keys[' '] || onButton || (!L.narrow && offButton);
+  pointer.down = anchored;
 
   // Steering. The device drives toward the cursor and the distance sets the
   // throttle, so parking the cursor on the device holds it still.
@@ -576,10 +618,11 @@ function draw(time) {
   }
   ctx.restore();
 
+  drawTouch(time);
   drawPanels(time);
   if (state === 'title') drawTitle();
   if (state === 'over') drawOver();
-  if (state === 'play' && pointer.inside) drawCursor();
+  if (state === 'play' && pointer.inside && !L.narrow) drawCursor();
 }
 
 function drawCells() {
@@ -720,7 +763,7 @@ function drawDevice(time, p) {
   ctx.beginPath(); ctx.arc(4.5, 0, 1.9, 0, TAU); ctx.fill();
   ctx.restore();
 
-  if (pointer.down && pointer.inside && state === 'play') {
+  if (anchored && state === 'play') {
     ctx.strokeStyle = 'rgba(53,224,208,0.5)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
@@ -748,9 +791,29 @@ function drawCursor() {
 
 // ---------------------------------------------------------------- panels
 
-function label(t, x, y) {
+// One reading, one source. The dial needle, the strength bar, the distance
+// figure and the arrow on the field all come from this, so they cannot drift
+// apart and tell the player two different stories.
+function sensor(time) {
+  const active = lesions.filter(l => !l.cleared);
+  if (state !== 'play' || !active.length || !dev) return null;
+  let best = null, bd = 1e9;
+  for (const l of active) {
+    const d = Math.hypot(l.x - dev.x, l.y - dev.y);
+    if (d < bd) { bd = d; best = l; }
+  }
+  const strength = clamp(1 - bd / 1800, 0, 1);
+  const noise = (1 - strength) * 0.55 * Math.sin(time * 1.7 + best.ph * 5);
+  return {
+    dist: bd, strength,
+    angle: Math.atan2(best.y - dev.y, best.x - dev.x) + noise,
+  };
+}
+
+
+function label(t, x, y, size) {
   ctx.fillStyle = COL.faint;
-  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.font = ((size || 11) * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText(t, x, y);
 }
 function value(t, x, y, size, color) {
@@ -768,7 +831,45 @@ function bar(x, y, w, h, frac, color) {
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
 
+function drawMap(mx, my, mw, mh) {
+  ctx.fillStyle = 'rgba(10,4,6,0.92)';
+  ctx.fillRect(mx, my, mw, mh);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(mx + 0.5, my + 0.5, mw - 1, mh - 1);
+  if (!bounds || !dev) return;
+
+  const sc = Math.min(mw / (bounds.w + 60), mh / (bounds.h + 60));
+  const ox = mx + mw / 2 - ((bounds.minx + bounds.maxx) / 2) * sc;
+  const oy = my + mh / 2 - ((bounds.miny + bounds.maxy) / 2) * sc;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
+  ctx.strokeStyle = '#6b2530';
+  ctx.lineCap = 'round';
+  for (const seg of segs) {
+    if (!seg.seen) continue;
+    ctx.lineWidth = Math.max(0.8, (seg.ra + seg.rb) * 0.5 * sc);
+    ctx.beginPath();
+    ctx.moveTo(ox + seg.ax * sc, oy + seg.ay * sc);
+    ctx.lineTo(ox + seg.bx * sc, oy + seg.by * sc);
+    ctx.stroke();
+  }
+  for (const l of lesions) {
+    if (!l.cleared && Math.hypot(l.x - dev.x, l.y - dev.y) > LAMP_R) continue;
+    ctx.fillStyle = l.cleared ? COL.teal : COL.amber;
+    ctx.beginPath(); ctx.arc(ox + l.x * sc, oy + l.y * sc, 3.4, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = COL.text;
+  ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 2.8, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,213,213,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 6.5, 0, TAU); ctx.stroke();
+  ctx.restore();
+}
+
 function drawPanels(time) {
+  if (L.narrow) { drawBars(time); return; }
+
   ctx.fillStyle = COL.panel;
   ctx.fillRect(0, 0, L.left.w, H);
   ctx.fillRect(L.right.x, 0, L.right.w, H);
@@ -779,29 +880,28 @@ function drawPanels(time) {
   ctx.moveTo(L.right.x + 0.5, 0); ctx.lineTo(L.right.x + 0.5, H);
   ctx.stroke();
 
-  const x = 18, bw = L.left.w - 36;
-  let y = 34;
+  const x = 20, bw = L.left.w - 40;
+  let y = 40;
   ctx.textAlign = 'left';
-  value('LUMEN', x, y, 17, COL.teal); y += 15;
-  label('LUMEN TRAVELING DEVICE', x, y); y += 28;
-  ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(L.left.w - 18, y - 12); ctx.stroke();
+  label('LUMEN TRAVELING DEVICE', x, y, 11); y += 30;
 
-  label('SCORE', x, y); y += 24;
-  value(String(score).padStart(6, '0'), x, y, 24, COL.text); y += 28;
+  label('SCORE', x, y); y += 32;
+  value(String(score).padStart(6, '0'), x, y, 30, COL.text); y += 34;
 
-  label('VESSEL BED', x, y); y += 21;
-  value(String(level).padStart(2, '0'), x, y, 19, COL.text); y += 28;
+  label('VESSEL BED', x, y); y += 27;
+  value(String(level).padStart(2, '0'), x, y, 22, COL.text); y += 32;
 
-  label('HULL INTEGRITY', x, y); y += 12;
-  bar(x, y, bw, 8, integrity / 100, integrity < 30 ? COL.red : COL.teal);
-  y += 22;
-  label('POWER CELL', x, y); y += 12;
-  bar(x, y, bw, 8, power / 100, power < 25 ? COL.amber : '#7a9c6a');
-  y += 30;
+  label('HULL INTEGRITY', x, y); y += 15;
+  bar(x, y, bw, 10, integrity / 100, integrity < 30 ? COL.red : COL.teal);
+  y += 28;
+  label('POWER CELL', x, y); y += 15;
+  bar(x, y, bw, 10, power / 100, power < 25 ? COL.amber : '#7a9c6a');
+  y += 34;
 
-  label('CONDITION SENSOR', x, y); y += 14;
-  const cx = x + bw / 2, cy = y + 42, rr = 38;
+  label('CONDITION SENSOR', x, y); y += 16;
+  const rr = Math.min(46, bw / 2 - 8);
+  const cx = x + bw / 2, cy = y + rr + 4;
+  const sn = sensor(time);
   ctx.strokeStyle = COL.rule;
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.stroke();
@@ -810,141 +910,174 @@ function drawPanels(time) {
   ctx.moveTo(cx - rr, cy); ctx.lineTo(cx + rr, cy);
   ctx.moveTo(cx, cy - rr); ctx.lineTo(cx, cy + rr);
   ctx.stroke();
-
-  let strength = 0, dist = 0;
-  const active = lesions.filter(l => !l.cleared);
-  if (state === 'play' && active.length && dev) {
-    let best = null, bd = 1e9;
-    for (const l of active) {
-      const d = Math.hypot(l.x - dev.x, l.y - dev.y);
-      if (d < bd) { bd = d; best = l; }
-    }
-    dist = bd;
-    strength = clamp(1 - bd / 1800, 0, 1);
-    // the bearing wanders while the signal is weak
-    const noise = (1 - strength) * 0.55 * Math.sin(time * 1.7 + best.ph * 5);
-    const a = Math.atan2(best.y - dev.y, best.x - dev.x) + noise;
+  if (sn) {
     ctx.strokeStyle = COL.amber;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(a) * rr * 0.86, cy + Math.sin(a) * rr * 0.86);
+    ctx.lineTo(cx + Math.cos(sn.angle) * rr * 0.86, cy + Math.sin(sn.angle) * rr * 0.86);
     ctx.stroke();
     ctx.fillStyle = COL.amber;
-    ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
   }
-  y = cy + rr + 20;
-  label('SIGNAL', x, y); y += 11;
-  bar(x, y, bw, 6, strength, COL.amber); y += 20;
-  value(state === 'play' ? Math.round(dist) + ' UNITS' : 'NO CONTACT', x, y, 11, COL.dim);
-  y += 26;
-  label('LESIONS CLEARED', x, y); y += 18;
-  const total = lesions.length;
+  y = cy + rr + 24;
+  label('SIGNAL', x, y); y += 13;
+  bar(x, y, bw, 8, sn ? sn.strength : 0, COL.amber); y += 24;
+  value(sn ? Math.round(sn.dist) + ' UNITS' : 'NO CONTACT', x, y, 14, COL.dim);
+  y += 32;
+
+  label('LESIONS CLEARED', x, y); y += 26;
   const done = lesions.filter(l => l.cleared).length;
-  value(done + ' / ' + total, x, y, 15, COL.text);
+  value(done + ' / ' + lesions.length, x, y, 20, COL.text);
 
-  // right panel, the survey map
-  const rx = L.right.x + 18, rw = L.right.w - 36;
-  let ry = 34;
-  value('LUMEN SURVEY', rx, ry, 12, COL.teal); ry += 14;
-  label('MAPPED BY TRAVEL', rx, ry); ry += 20;
+  // ---- right panel, the survey map
+  const rx = L.right.x + 20, rw = L.right.w - 40;
+  let ry = 40;
+  value('LUMEN SURVEY', rx, ry, 16, COL.teal); ry += 19;
+  label('MAPPED BY TRAVEL', rx, ry, 11); ry += 26;
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(rx, ry - 11); ctx.lineTo(W - 20, ry - 11); ctx.stroke();
 
-  const mh = Math.min(rw, H * 0.40);
-  const mx = rx, my = ry + 8;
-  ctx.fillStyle = '#0a0406';
-  ctx.fillRect(mx, my, rw, mh);
-  ctx.strokeStyle = COL.rule;
-  ctx.strokeRect(mx + 0.5, my + 0.5, rw - 1, mh - 1);
+  const mh = Math.min(rw, H * 0.36);
+  drawMap(rx, ry + 8, rw, mh);
 
-  if (bounds && dev) {
-    const sc = Math.min(rw / (bounds.w + 60), mh / (bounds.h + 60));
-    const ox = mx + rw / 2 - ((bounds.minx + bounds.maxx) / 2) * sc;
-    const oy = my + mh / 2 - ((bounds.miny + bounds.maxy) / 2) * sc;
-    ctx.save();
-    ctx.beginPath(); ctx.rect(mx, my, rw, mh); ctx.clip();
-    ctx.strokeStyle = '#6b2530';
-    ctx.lineCap = 'round';
-    for (const s of segs) {
-      if (!s.seen) continue;
-      ctx.lineWidth = Math.max(0.8, (s.ra + s.rb) * 0.5 * sc);
-      ctx.beginPath();
-      ctx.moveTo(ox + s.ax * sc, oy + s.ay * sc);
-      ctx.lineTo(ox + s.bx * sc, oy + s.by * sc);
-      ctx.stroke();
-    }
-    for (const l of lesions) {
-      if (!l.cleared && Math.hypot(l.x - dev.x, l.y - dev.y) > LAMP_R) continue;
-      ctx.fillStyle = l.cleared ? COL.teal : COL.amber;
-      ctx.beginPath(); ctx.arc(ox + l.x * sc, oy + l.y * sc, 3.2, 0, TAU); ctx.fill();
-    }
-    ctx.fillStyle = COL.text;
-    ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 2.6, 0, TAU); ctx.fill();
-    ctx.strokeStyle = 'rgba(230,213,213,0.4)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 6, 0, TAU); ctx.stroke();
-    ctx.restore();
-  }
-
-  ry = my + mh + 24;
-  const mapped = segs.length ? Math.round(segs.filter(s => s.seen).length / segs.length * 100) : 0;
-  label('MAPPED', rx, ry);
-  ctx.textAlign = 'right'; value(mapped + ' %', W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
-  ry += 18;
-  label('FLOW', rx, ry);
-  ctx.textAlign = 'right'; value((46 + level * 9) + ' U/S', W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
-  ry += 18;
-  label('SEGMENTS', rx, ry);
-  ctx.textAlign = 'right'; value(String(segs.length), W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
-
-  ry += 32;
-  label('ACTIVE PORTION', rx, ry); ry += 15;
-  value('ANCHOR', rx, ry, 10.5, pointer.down ? COL.teal : COL.faint); ry += 14;
-  value('EMIT', rx, ry, 10.5, dev && dev.emit ? COL.amber : COL.faint);
-
-  }
-
-function drawTitle() {
-  const c = L.ch;
-  ctx.fillStyle = 'rgba(7,4,5,0.90)';
-  ctx.fillRect(c.x, 0, c.w, c.h);
-  ctx.textAlign = 'center';
-  let y = c.h * 0.24;
-  value('LUMEN', c.cx, y, Math.min(58, c.w * 0.10), COL.teal); y += 28;
-  value('A SELF PROPELLING DEVICE IN A VESSEL BED', c.cx, y, 12, COL.dim); y += 50;
-  const lines = [
-    ['MOVE THE CURSOR', 'the device drives toward it, and the distance is the throttle'],
-    ['HOLD THE BUTTON', 'the wheels grip the wall and you hold station against the flow'],
-    ['FIND THE PLAQUE', 'the sensor gives a bearing, and it lies while you are far away'],
-    ['HOLD ON TARGET', 'get close, the ring lights up, then hold and it burns the lesion'],
-    ['MIND THE WALL', 'scraping the lumen costs hull, and clots in the flow cost more'],
+  ry = ry + 8 + mh + 30;
+  const mapped = segs.length ? Math.round(segs.filter(g => g.seen).length / segs.length * 100) : 0;
+  const rows = [
+    ['MAPPED', mapped + ' %'],
+    ['FLOW', (46 + level * 9) + ' U/S'],
+    ['SEGMENTS', String(segs.length)],
   ];
-  for (const ln of lines) {
-    value(ln[0], c.cx, y, 12, COL.amber); y += 15;
-    value(ln[1], c.cx, y, 11, COL.dim); y += 27;
+  rows.forEach((r, i) => {
+    label(r[0], rx, ry + i * 26);
+    ctx.textAlign = 'right'; value(r[1], W - 20, ry + i * 26, 15, COL.text); ctx.textAlign = 'left';
+  });
+  ry += rows.length * 26 + 22;
+
+  label('ACTIVE PORTION', rx, ry); ry += 22;
+  value('ANCHOR', rx, ry, 14, anchored ? COL.teal : COL.faint); ry += 20;
+  value('EMIT', rx, ry, 14, dev && dev.emit ? COL.amber : COL.faint);
+}
+
+// phone layout
+function drawBars(time) {
+  const pad = 15;
+  ctx.fillStyle = 'rgba(7,4,5,0.90)';
+  ctx.fillRect(0, 0, W, L.topH);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, L.topH + 0.5); ctx.lineTo(W, L.topH + 0.5); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  label('SCORE', pad, 26, 12);
+  value(String(score).padStart(6, '0'), pad, 56, 26, COL.text);
+
+  const done = lesions.filter(l => l.cleared).length;
+  ctx.textAlign = 'right';
+  label('BED ' + String(level).padStart(2, '0'), W - pad, 26, 12);
+  value(done + ' / ' + lesions.length + ' CLEARED', W - pad, 54, 15, COL.text);
+  ctx.textAlign = 'left';
+
+  const sn = sensor(time);
+  const gap = 10;
+  const bwid = (W - pad * 2 - gap * 2) / 3;
+  const by = L.topH - 20;
+  label('HULL', pad, by - 7, 12);
+  label('POWER', pad + bwid + gap, by - 7, 12);
+  label('SIGNAL', pad + (bwid + gap) * 2, by - 7, 12);
+  bar(pad, by, bwid, 10, integrity / 100, integrity < 30 ? COL.red : COL.teal);
+  bar(pad + bwid + gap, by, bwid, 10, power / 100, power < 25 ? COL.amber : '#7a9c6a');
+  bar(pad + (bwid + gap) * 2, by, bwid, 10, sn ? sn.strength : 0, COL.amber);
+
+  drawMap(L.map.x, L.map.y, L.map.w, L.map.h);
+}
+
+// the thumb control, and the bearing drawn on the field where the dial cannot go
+function drawTouch(time) {
+  if (state !== 'play') return;
+
+  if (L.narrow && dev) {
+    const sn = sensor(time);
+    const p = toScreen(dev.x, dev.y);
+    if (sn) {
+      const r = 54;
+      ctx.strokeStyle = 'rgba(255,182,72,0.30)';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
+      const ax = p.x + Math.cos(sn.angle) * r, ay = p.y + Math.sin(sn.angle) * r;
+      ctx.save();
+      ctx.translate(ax, ay); ctx.rotate(sn.angle);
+      ctx.fillStyle = COL.amber;
+      ctx.beginPath();
+      ctx.moveTo(11, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      ctx.fillStyle = COL.amber;
+      ctx.font = (13 * L.hud) + 'px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(Math.round(sn.dist) + '', p.x + Math.cos(sn.angle) * (r + 26),
+                                              p.y + Math.sin(sn.angle) * (r + 26));
+      ctx.textAlign = 'left';
+    }
   }
-  y += 8;
+
+  if (!L.btn) return;
+  const b = L.btn;
+  const lit = anchored;
+  const emit = dev && dev.emit;
+  ctx.fillStyle = lit ? 'rgba(53,224,208,0.16)' : 'rgba(7,4,5,0.72)';
+  ctx.strokeStyle = emit ? COL.amber : (lit ? COL.teal : 'rgba(53,224,208,0.5)');
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = emit ? COL.amber : (lit ? COL.teal : COL.dim);
+  ctx.font = '700 ' + (14 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(emit ? 'BURN' : 'HOLD', b.x, b.y + 5);
+  ctx.textAlign = 'left';
+}
+
+function card(title, titleColor, sub, rows, footer) {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(7,4,5,0.93)';
+  ctx.fillRect(c.x, 0, c.w, H);
+  ctx.textAlign = 'center';
+
+  const k = Math.min(L.hud, H / 560, c.w / 430);
+  const rowH = 30 * k, subH = 20 * k;
+  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
+  let y = Math.max(46 * k, (H - blockH) / 2);
+
+  value(title, c.cx, y, Math.min(46, c.w * 0.095) * k, titleColor); y += 28 * k;
+  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
+  for (const r of rows) {
+    value(r[0], c.cx, y, 15 * k, COL.amber); y += rowH * 0.66;
+    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
+  }
+  y += 16 * k;
   ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value('CLICK TO DEPLOY', c.cx, y, 14, COL.teal);
+  value(footer, c.cx, y, 17 * k, COL.teal);
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
 }
 
+function drawTitle() {
+  const touch = L.narrow;
+  card('LUMEN', COL.teal, 'A SELF PROPELLING DEVICE IN A VESSEL BED', [
+    [touch ? 'DRAG TO DRIVE' : 'MOVE THE CURSOR',
+     'the device heads for it, and the distance is the throttle'],
+    [touch ? 'HOLD THE BIG BUTTON' : 'HOLD THE BUTTON',
+     'the wheels grip the wall and you hold station against the flow'],
+    ['FIND THE PLAQUE', 'the sensor gives a bearing, and it fibs while you are far off'],
+    ['HOLD ON TARGET', 'get close, the ring lights up, then hold and it burns away'],
+    ['MIND THE WALL', 'scraping the lumen costs hull, and clots cost more'],
+  ], touch ? 'TAP TO DEPLOY' : 'CLICK TO DEPLOY');
+}
+
 function drawOver() {
-  const c = L.ch;
-  ctx.fillStyle = 'rgba(7,4,5,0.92)';
-  ctx.fillRect(c.x, 0, c.w, c.h);
-  ctx.textAlign = 'center';
-  let y = c.h * 0.36;
-  value('DEVICE LOST', c.cx, y, 40, COL.red); y += 26;
-  value(dev && dev.deadReason ? dev.deadReason : '', c.cx, y, 12, COL.dim); y += 54;
-  value('SCORE  ' + String(score).padStart(6, '0'), c.cx, y, 20, COL.text); y += 26;
-  value('VESSEL BEDS CLEARED  ' + (level - 1), c.cx, y, 12, COL.dim); y += 50;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value('CLICK TO DEPLOY AGAIN', c.cx, y, 14, COL.teal);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+  card('DEVICE LOST', COL.red, dev && dev.deadReason ? dev.deadReason : '', [
+    ['SCORE', String(score).padStart(6, '0')],
+    ['VESSEL BEDS CLEARED', String(level - 1)],
+  ], L.narrow ? 'TAP TO DEPLOY AGAIN' : 'CLICK TO DEPLOY AGAIN');
 }
 
 // ---------------------------------------------------------------- loop

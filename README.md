@@ -10,9 +10,16 @@ Danny Hillis's patents, built as things you can play.
 | [Lumen](games/lumen/) | [US 7,857,767 B2](https://patents.google.com/patent/US7857767B2/en) | Drive the lumen traveling device through a branching vessel bed, find the plaque by sensor bearing, anchor against the flow and burn it out. |
 | [Separator](games/separator/) | [US 9,480,991 B2](https://patents.google.com/patent/US9480991B2/en) | Tune a radiofrequency field to the grain size in a flowing slurry, float the ore to the skimmer and leave the rock in the tailings. |
 
-Each game is one self contained HTML file. No build, no dependencies, no CDN.
-Open it in a browser and it runs. Canvas 2D, WebAudio for the blips, sized for a
-laptop window around 1200 by 700 or larger.
+Each game is one self contained HTML file plus the shared chrome. No build, no
+dependencies, no CDN. Canvas 2D for the game, WebAudio for the blips.
+
+They work on a phone as well as a laptop: under 900px the side panels become
+bars over the play field, and the controls that needed a keyboard get a button
+big enough for a thumb. Nothing on screen is smaller than 12px.
+
+The page chrome and the landing page cards come from
+[scifi-ui](https://amyleesterling.github.io/scifi-ui), vendored unmodified into
+`vendor/scifi-ui/`.
 
 ## Running it locally
 
