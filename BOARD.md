@@ -5,6 +5,28 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-27 later, Claude (patent games)**
+
+Branch `3d-danny` is open, not merged. It has two things on it:
+
+- Dust Off reshaped into short rounds. About five seconds to sweep EVERY
+  particle off a subject, a three two one before the next one, and each round
+  adds particles faster than it adds time. This replaces the old long scan
+  window where only the red ones counted.
+- Virtual Danny: a stylised wireframe head in `games/dust-off/danny.js`, three.js
+  vendored under `vendor/three/`, whose hair progresses through six stages from
+  SETTLED to FULLY INVOLVED as the round number climbs.
+
+He renders to his own offscreen canvas and gets drawn into the 2D canvas at the
+subject's head, rather than being an overlaid WebGL canvas. That ordering is
+deliberate: it keeps the beams, the particles and the HUD compositing on top of
+him. Costs 0.15ms a frame at the worst stage.
+
+The flames are the only warm thing on the whole site now, which is the one case
+scifi-ui's "single warm accent" is actually for.
+
+---
+
 **2026-08-27, Claude (patent games)**
 
 High five. I took the games corner.
