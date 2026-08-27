@@ -1030,7 +1030,36 @@ function drawTouch(time) {
   ctx.textAlign = 'left';
 }
 
-const OVERLAY = 'rgba(7,4,5,0.94)';
+const OVERLAY = 'rgba(7,4,5,0.975)';
+
+// Measure before drawing. A centred string that does not fit gets shrunk, down
+// to a floor of 12px, below which it is not worth reading.
+function fitCentered(text, cx, y, maxW, size, color) {
+  const mono = 'px ui-monospace, Menlo, monospace';
+  let f = size * L.hud;
+  ctx.font = f + mono;
+  const w = ctx.measureText(text).width;
+  if (w > maxW) { f = Math.max(12, f * maxW / w); ctx.font = f + mono; }
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, cx, y);
+  ctx.textAlign = 'left';
+  return f;
+}
+
+function wrapToWidth(text, maxW, font) {
+  ctx.font = font;
+  const words = text.split(' ');
+  const out = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; }
+    else { line = t; }
+  }
+  if (line) out.push(line);
+  return out;
+}
 
 function card(title, titleColor, sub, lines, button, accent) {
   const c = L.ch;
@@ -1038,20 +1067,27 @@ function card(title, titleColor, sub, lines, button, accent) {
   ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
 
-  // absolute sizes, so the card cannot compound with the HUD scale
   const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
+  const mono = 'px ui-monospace, Menlo, monospace';
+  const maxW = c.w - 36;
   const put = (t, y, size, color, weight) => {
     ctx.fillStyle = color;
-    ctx.font = (weight ? weight + ' ' : '') + (size * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.font = (weight ? weight + ' ' : '') + (size * k) + mono;
     ctx.fillText(t, c.cx, y);
   };
 
-  const bw = Math.min(c.w * 0.62, 280 * k), bh = 56 * k;
-  const block = 46 * k + 26 * k + bh + 44 * k + lines.length * 27 * k;
-  let y = Math.max(44 * k, (H - block) / 2) + 34 * k;
+  // wrap first, so the block height knows how tall it really is
+  const bodyFont = (14 * k) + mono;
+  const wrapped = [];
+  for (const t of lines) for (const w of wrapToWidth(t, maxW, bodyFont)) wrapped.push(w);
 
-  put(title, y, Math.min(44, c.w * 0.1), titleColor, '600'); y += 24 * k;
-  put(sub, y, 13, COL.dim); y += 30 * k;
+  const bw = Math.min(c.w * 0.72, 280 * k), bh = 56 * k;
+  const block = 46 * k + 26 * k + bh + 44 * k + wrapped.length * 24 * k;
+  let y = Math.max(40 * k, (H - block) / 2) + 34 * k;
+
+  const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
+  put(title, y, tSize, titleColor, '600'); y += 24 * k;
+  fitCentered(sub, c.cx, y, maxW, 13 * k / Math.max(L.hud, 0.001), COL.dim); y += 30 * k;
 
   const bx = c.cx - bw / 2;
   const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
@@ -1060,10 +1096,11 @@ function card(title, titleColor, sub, lines, button, accent) {
   ctx.strokeStyle = accent;
   ctx.lineWidth = 2;
   ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
+  ctx.textAlign = 'center';
   put(button, y + bh / 2 + 7 * k, 19, accent, '700');
   y += bh + 40 * k;
 
-  for (const t of lines) { put(t, y, 14, COL.dim); y += 27 * k; }
+  for (const t of wrapped) { put(t, y, 14, COL.dim); y += 24 * k; }
   ctx.textAlign = 'left';
 }
 

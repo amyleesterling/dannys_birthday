@@ -265,12 +265,12 @@ function layout() {
     L.left  = { x: 0, w: 0 };
     L.right = { x: W, w: 0 };
     L.ch    = { x: 0, y: 0, w: W, h: H };
-    L.topH  = 168;
+    L.topH  = 198;
     L.botH  = 64;
     L.hud   = clamp(W / 300, 1.2, 1.8);
     L.floorY = H * 0.82;
     L.figH   = clamp(H * 0.44, 180, 420);
-    L.clock  = { cx: W / 2, cy: 86, r: 52 };
+    L.clock  = { cx: W / 2, cy: 84, r: 50 };
   } else {
     const padL = W >= 1180 ? 272 : 236;
     const padR = W >= 1180 ? 304 : 252;
@@ -291,8 +291,8 @@ function layout() {
   // the point you aim at, which is where the intensity finally gets high
   // enough to lift anything. Two photon, or four, since it is a birthday.
   const inset = L.ch.x + (narrow ? 17 : 30);
-  const hiY = (narrow ? L.topH + 30 : 0) + H * (narrow ? 0.10 : 0.10);
-  const loY = hiY + H * 0.11;
+  const hiY = narrow ? L.topH + 32 : H * 0.10;
+  const loY = hiY + H * (narrow ? 0.09 : 0.11);
   L.emitters = [
     { x: inset, y: hiY, s: 1 },
     { x: inset, y: loY, s: 1 },
@@ -841,38 +841,62 @@ function drawLaser(time) {
   const flash = laser.beamT;
   if (!beamOn && flash <= 0) return;
 
+  // scifi-ui .holosweep: a 14px band of --holo-beam at .55, glowing, carried
+  // across on a 820ms cubic-bezier(.16, 1, .3, 1). Same band, same period,
+  // running along the beam instead of down a panel.
+  const BEAM = '178,216,248';
+  const sweep = easeOut(((performance.now() % 820) / 820));
+
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const e of L.emitters) {
     const dx = pointer.x - e.x, dy = pointer.y - e.y;
     const len = Math.hypot(dx, dy) || 1;
-    // each beam runs past the focus, so you can see all four cross
-    const ox = e.x + dx / len * (len + 110), oy = e.y + dy / len * (len + 110);
+
+    // the beam stops where you are aiming. It does not carry on past.
     if (beamOn) {
-      ctx.strokeStyle = 'rgba(126,224,255,0.20)';
-      ctx.lineWidth = 2.2;
-      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ox, oy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(126,224,255,0.14)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+
+      const band = 26 / len / 2;
+      const g = ctx.createLinearGradient(e.x, e.y, pointer.x, pointer.y);
+      const a = clamp(sweep - band, 0, 1), m = clamp(sweep, 0, 1), b = clamp(sweep + band, 0, 1);
+      g.addColorStop(0, 'rgba(' + BEAM + ',0)');
+      if (a > 0) g.addColorStop(a, 'rgba(' + BEAM + ',0)');
+      g.addColorStop(m, 'rgba(' + BEAM + ',0.55)');
+      if (b < 1) g.addColorStop(b, 'rgba(' + BEAM + ',0)');
+      g.addColorStop(1, 'rgba(' + BEAM + ',0)');
+      // the wide pass is the drop shadow the CSS version gets for free
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 7;
+      ctx.globalAlpha = 0.35;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
     }
+
     if (flash > 0) {
-      ctx.strokeStyle = 'rgba(190,240,255,' + flash * 0.8 + ')';
-      ctx.lineWidth = 1 + flash * 3;
-      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ox, oy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(190,240,255,' + flash * 0.75 + ')';
+      ctx.lineWidth = 1 + flash * 2.6;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
     }
   }
 
-  // the focus, the only place the four beams add up to anything
-  const focus = beamOn ? 0.75 : flash;
-  const fr = beamOn ? BEAM_RADIUS * 0.8 : PULSE_RADIUS * (0.7 + flash * 0.6);
+  // the focus, kept small and dim enough that it does not wash the chamber out
+  const focus = beamOn ? 0.30 : flash * 0.7;
+  const fr = beamOn ? PULSE_RADIUS * 0.9 : PULSE_RADIUS * (0.5 + flash * 0.5);
   const gr = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, fr);
-  gr.addColorStop(0, 'rgba(226,250,255,' + 0.55 * focus + ')');
-  gr.addColorStop(0.35, 'rgba(126,224,255,' + 0.17 * focus + ')');
+  gr.addColorStop(0, 'rgba(214,244,255,' + 0.5 * focus + ')');
+  gr.addColorStop(0.4, 'rgba(126,224,255,' + 0.12 * focus + ')');
   gr.addColorStop(1, 'rgba(126,224,255,0)');
   ctx.fillStyle = gr;
   ctx.beginPath(); ctx.arc(pointer.x, pointer.y, fr, 0, TAU); ctx.fill();
   ctx.restore();
 
   if (beamOn) {
-    ctx.strokeStyle = 'rgba(126,224,255,0.30)';
+    ctx.strokeStyle = 'rgba(126,224,255,0.22)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(pointer.x, pointer.y, BEAM_RADIUS, 0, TAU); ctx.stroke();
   }
@@ -1055,14 +1079,18 @@ function drawGoal(time) {
   ctx.textAlign = 'center';
   const left = subject.parts.filter(p => p.type.flagged).length +
                loose.filter(p => p.type.flagged).length;
+  const maxW = c.w - 28;
   if (left > 0) {
-    value(left + ' RED LEFT ON THIS SUBJECT, THOSE ARE THE ONES THAT COUNT',
-          c.cx, y, 15, COL.red);
+    fitCentered(L.narrow ? left + ' RED LEFT, GET THEM ALL'
+                         : left + ' RED LEFT ON THIS SUBJECT, THOSE ARE THE ONES THAT COUNT',
+                c.cx, y, maxW, 15, COL.red);
   } else {
-    value('ALL RED RECOVERED, SWEEP THE REST FOR POINTS', c.cx, y, 15, COL.teal);
+    fitCentered(L.narrow ? 'ALL RED RECOVERED' : 'ALL RED RECOVERED, SWEEP THE REST FOR POINTS',
+                c.cx, y, maxW, 15, COL.teal);
   }
-  value('TAP THE BODY TO KNOCK PARTICLES OFF, THEN HOLD AND DRAG THEM TO THE INTAKE',
-        c.cx, y + 21, 12, COL.dim);
+  fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
+                       : 'TAP THE BODY TO KNOCK PARTICLES OFF, THEN HOLD AND DRAG TO THE INTAKE',
+              c.cx, y + 21, maxW, 12, COL.dim);
   ctx.textAlign = 'left';
 }
 
@@ -1179,10 +1207,10 @@ function drawBars(time) {
   ctx.textAlign = 'left';
   strikeDots(W - pad - 58, 50, 8);
 
-  bar(pad, L.topH - 20, W - pad * 2, 10, laser.heat / 100, heatColor());
-  ctx.textAlign = 'center';
-  label(laser.lock > 0 ? 'OVERHEAT. COOLING.' : 'EMITTER HEAT', W / 2, L.topH - 27, 12);
-  ctx.textAlign = 'left';
+  // the heat bar sits on its own row with the label beside it, not over it
+  const hy = L.topH - 20;
+  label(laser.lock > 0 ? 'COOLING' : 'HEAT', pad, hy + 9, 12);
+  bar(pad + 60, hy, W - pad - 60 - pad, 10, laser.heat / 100, heatColor());
 
   // bottom bar: what the analyser last saw, and how much you are keeping
   const by = H - L.botH;
@@ -1210,7 +1238,36 @@ function drawBars(time) {
   ctx.textAlign = 'left';
 }
 
-const OVERLAY = 'rgba(4,7,10,0.93)';
+const OVERLAY = 'rgba(4,7,10,0.975)';
+
+// Measure before drawing. A centred string that does not fit gets shrunk, down
+// to a floor of 12px, below which it is not worth reading.
+function fitCentered(text, cx, y, maxW, size, color) {
+  const mono = 'px ui-monospace, Menlo, monospace';
+  let f = size * L.hud;
+  ctx.font = f + mono;
+  const w = ctx.measureText(text).width;
+  if (w > maxW) { f = Math.max(12, f * maxW / w); ctx.font = f + mono; }
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, cx, y);
+  ctx.textAlign = 'left';
+  return f;
+}
+
+function wrapToWidth(text, maxW, font) {
+  ctx.font = font;
+  const words = text.split(' ');
+  const out = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; }
+    else { line = t; }
+  }
+  if (line) out.push(line);
+  return out;
+}
 
 function card(title, titleColor, sub, lines, button, accent) {
   const c = L.ch;
@@ -1218,20 +1275,27 @@ function card(title, titleColor, sub, lines, button, accent) {
   ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
 
-  // absolute sizes, so the card cannot compound with the HUD scale
   const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
+  const mono = 'px ui-monospace, Menlo, monospace';
+  const maxW = c.w - 36;
   const put = (t, y, size, color, weight) => {
     ctx.fillStyle = color;
-    ctx.font = (weight ? weight + ' ' : '') + (size * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.font = (weight ? weight + ' ' : '') + (size * k) + mono;
     ctx.fillText(t, c.cx, y);
   };
 
-  const bw = Math.min(c.w * 0.62, 280 * k), bh = 56 * k;
-  const block = 46 * k + 26 * k + bh + 44 * k + lines.length * 27 * k;
-  let y = Math.max(44 * k, (H - block) / 2) + 34 * k;
+  // wrap first, so the block height knows how tall it really is
+  const bodyFont = (14 * k) + mono;
+  const wrapped = [];
+  for (const t of lines) for (const w of wrapToWidth(t, maxW, bodyFont)) wrapped.push(w);
 
-  put(title, y, Math.min(44, c.w * 0.1), titleColor, '600'); y += 24 * k;
-  put(sub, y, 13, COL.dim); y += 30 * k;
+  const bw = Math.min(c.w * 0.72, 280 * k), bh = 56 * k;
+  const block = 46 * k + 26 * k + bh + 44 * k + wrapped.length * 24 * k;
+  let y = Math.max(40 * k, (H - block) / 2) + 34 * k;
+
+  const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
+  put(title, y, tSize, titleColor, '600'); y += 24 * k;
+  fitCentered(sub, c.cx, y, maxW, 13 * k / Math.max(L.hud, 0.001), COL.dim); y += 30 * k;
 
   const bx = c.cx - bw / 2;
   const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
@@ -1240,17 +1304,18 @@ function card(title, titleColor, sub, lines, button, accent) {
   ctx.strokeStyle = accent;
   ctx.lineWidth = 2;
   ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
+  ctx.textAlign = 'center';
   put(button, y + bh / 2 + 7 * k, 19, accent, '700');
   y += bh + 40 * k;
 
-  for (const t of lines) { put(t, y, 14, COL.dim); y += 27 * k; }
+  for (const t of wrapped) { put(t, y, 14, COL.dim); y += 24 * k; }
   ctx.textAlign = 'left';
 }
 
 function drawTitle() {
   card('DUST OFF', COL.teal, 'LASER PARTICLE RECOVERY', [
     'Tap the body. Four beams cross there and knock particles loose.',
-    'Then hold and drag, and sweep them down into the intake.',
+    'Hold and drag to sweep them into the intake.',
     'The red ones are the job. Everything else is points.',
   ], 'PLAY NOW', COL.teal);
 }
