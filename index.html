@@ -4,133 +4,142 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Patents you can play</title>
+<link rel="stylesheet" href="vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="vendor/scifi-ui/panel-surface.css">
 <style>
   :root {
-    --bg: #080b0e;
-    --panel: #0e1319;
-    --rule: #1b2830;
-    --text: #d8e6e8;
-    --dim: #7b969c;
-    --faint: #4a6067;
-    --teal: #35e0d0;
-    --red: #ff6b78;
-    --amber: #ffb648;
+    --ink: rgb(var(--holo-ink));
+    --dim: rgb(var(--holo-dim));
+    --line: rgb(var(--holo-line) / .22);
+    --warm: rgb(var(--holo-warm));
+    --cyan: rgb(var(--holo-cyan));
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
-    background: var(--bg); color: var(--text);
+    background: #05070c;
+    color: var(--ink);
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.55;
+    line-height: 1.6;
+    font-size: 16px;
   }
-  .wrap { max-width: 940px; margin: 0 auto; padding: 64px 28px 80px; }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 44px 20px 72px; }
 
-  header { border-bottom: 1px solid var(--rule); padding-bottom: 26px; margin-bottom: 40px; }
-  h1 { font-size: 28px; margin: 0 0 10px; letter-spacing: .01em; color: var(--teal); font-weight: 600; }
-  .sub { color: var(--dim); font-size: 13px; margin: 0; max-width: 62ch; }
+  .ribbon {
+    display: inline-block;
+    border: 1px solid rgb(var(--holo-warm) / .55);
+    color: var(--warm);
+    font-size: 13px; letter-spacing: .12em;
+    padding: 7px 15px;
+    margin-bottom: 24px;
+  }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 30px; margin-bottom: 38px; }
+  h1 {
+    font-size: 36px; margin: 0 0 16px; letter-spacing: .01em;
+    color: var(--cyan); font-weight: 600;
+  }
+  .sub { color: var(--dim); font-size: 16px; margin: 0 0 14px; max-width: 62ch; }
+  .sub:last-child { margin-bottom: 0; }
 
-  .cards { display: grid; gap: 22px; grid-template-columns: 1fr; }
-  @media (min-width: 700px) { .cards { grid-template-columns: 1fr 1fr; } }
+  .cards { display: grid; gap: 18px; grid-template-columns: 1fr; }
+  @media (min-width: 720px) { .cards { grid-template-columns: 1fr 1fr; } }
   @media (min-width: 1040px) { .cards { grid-template-columns: repeat(3, 1fr); } }
 
-  .card {
-    background: var(--panel);
-    border: 1px solid var(--rule);
-    border-top-width: 3px;
-    padding: 22px 22px 20px;
-    display: flex; flex-direction: column;
-    text-decoration: none; color: inherit;
-    transition: border-color .16s ease, transform .16s ease;
+  .card { padding: 24px; display: flex; flex-direction: column; text-decoration: none; }
+  .card .pat { font-size: 13px; letter-spacing: .1em; color: rgb(var(--holo-dim) / .8); }
+  .card .name { font-size: 27px; margin: 12px 0 6px; font-weight: 600; color: var(--cyan); }
+  .card .tag { font-size: 14px; color: var(--dim); margin: 0 0 18px; }
+  .card .body { font-size: 15px; color: var(--dim); margin: 0 0 24px; flex: 1; }
+  .card .body strong { color: var(--ink); font-weight: 600; }
+  .card .go {
+    font-size: 14px; letter-spacing: .14em; align-self: flex-start;
+    color: var(--ink); border: 1px solid rgb(var(--holo-cyan) / .3);
+    padding: 12px 22px;
   }
-  .card:hover { border-color: #2e4650; transform: translateY(-2px); }
-  .card.dust { border-top-color: var(--teal); }
-  .card.lumen { border-top-color: var(--red); }
-  .card.sep { border-top-color: var(--amber); }
+  .card:hover .go { border-color: rgb(var(--holo-cyan) / .7); }
 
-  .pat { font-size: 10.5px; letter-spacing: .12em; color: var(--faint); text-transform: uppercase; }
-  .name { font-size: 22px; margin: 12px 0 4px; color: var(--text); font-weight: 600; }
-  .card.dust .name { color: var(--teal); }
-  .card.lumen .name { color: var(--red); }
-  .card.sep .name { color: var(--amber); }
-  .tag { font-size: 11.5px; color: var(--dim); margin: 0 0 16px; }
-  .body { font-size: 12.5px; color: var(--dim); margin: 0 0 20px; flex: 1; }
-  .body strong { color: var(--text); font-weight: 600; }
-  .play {
-    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
-    color: var(--text); border: 1px solid var(--rule); padding: 9px 16px;
-    align-self: flex-start;
+  .cite { margin-top: 50px; border-top: 1px solid var(--line); padding-top: 26px; }
+  .cite h2 { font-size: 14px; letter-spacing: .14em; color: rgb(var(--holo-dim) / .85); margin: 0 0 16px; font-weight: 600; }
+  .cite p { font-size: 14px; color: var(--dim); margin: 0 0 14px; }
+  .cite a:hover { color: var(--cyan); }
+  .note { font-size: 15px; color: var(--dim); margin-top: 26px; max-width: 70ch; }
+  .signoff {
+    margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line);
+    font-size: 19px; color: var(--warm);
   }
-  .card:hover .play { border-color: #2e4650; }
-
-  .cite { margin-top: 46px; border-top: 1px solid var(--rule); padding-top: 22px; }
-  .cite h2 { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 14px; font-weight: 600; }
-  .cite p { font-size: 11.5px; color: var(--dim); margin: 0 0 12px; }
-  .cite a { color: var(--dim); }
-  .cite a:hover { color: var(--text); }
-  .note { font-size: 11.5px; color: var(--faint); margin-top: 22px; max-width: 66ch; }
+  .built { margin-top: 14px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
+    <div class="ribbon">TO CELEBRATE DANNY HILLIS'S 70TH BIRTHDAY</div>
     <h1>Patents you can play</h1>
     <p class="sub">
-      Three of Danny Hillis's patents, read closely and then built as things you can
-      actually operate. The mechanics come from the claims, not from the vibe of the drawings.
+      Three of Danny's patents, read all the way down to the claims and then built into
+      things you can actually operate. He has rather a lot of patents. It seemed a shame
+      that so few of them were playable.
+    </p>
+    <p class="sub">
+      Pick a machine. Push its buttons. Nobody from the patent office is watching.
     </p>
   </header>
 
   <div class="cards">
 
-    <a class="card dust" href="games/dust-off/">
+    <a class="card holocard" href="games/dust-off/">
+      <span class="holocard-trace"></span>
       <div class="pat">US 9,134,205 B2 &middot; 2015</div>
       <div class="name">Dust Off</div>
       <p class="tag">System and method for removing surface particles from an object</p>
       <p class="body">
-        The airport puffer booth. An image sensor picks a spot on a person, a jet knocks
-        particles loose, and capture jets herd them into a collector for analysis.
-        <strong>Here the air jets are lasers.</strong> Tap the subject to ablate a patch,
-        then hold the beam and steer the loose particles down into the intake before they
-        float out of the chamber. Miss a flagged one and the subject walks uncleared.
+        The airport puffer booth. A sensor picks a spot on a person, a jet knocks particles
+        loose, and capture jets herd them into a collector for analysis.
+        <strong>We replaced the air jets with lasers</strong>, because it is a birthday.
+        Tap the subject, sweep the loose particles down into the intake, and try not to let
+        the red ones drift off. The clock in the corner is the ten thousand year one.
       </p>
-      <span class="play">Play</span>
+      <span class="go">PLAY</span>
     </a>
 
-    <a class="card lumen" href="games/lumen/">
+    <a class="card holocard" href="games/lumen/">
+      <span class="holocard-trace"></span>
       <div class="pat">US 7,857,767 B2 &middot; 2010</div>
       <div class="name">Lumen</div>
       <p class="tag">Lumen traveling device</p>
       <p class="body">
         A self propelling microrobot with wall gripping wheels, a sensor for a condition of
-        interest, and an active portion that responds to it. <strong>You drive it.</strong>
-        Steer through a branching vessel bed you can only see by lamplight, follow a sensor
-        bearing that lies while you are far away, anchor against the flow, and burn out the
-        plaque before the power cell runs down.
+        interest, and an active portion that does something about it.
+        <strong>You are the motion control circuitry.</strong> Drive through a branching
+        vessel bed lit only by your own lamp, chase a sensor bearing that fibs when you are
+        far away, dig the wheels in against the current, and burn the plaque out.
       </p>
-      <span class="play">Play</span>
+      <span class="go">PLAY</span>
     </a>
 
-    <a class="card sep" href="games/separator/">
+    <a class="card holocard" href="games/separator/">
+      <span class="holocard-trace"></span>
       <div class="pat">US 9,480,991 B2 &middot; 2016</div>
       <div class="name">Separator</div>
       <p class="tag">Radiofrequency particle separator</p>
       <p class="body">
         A radiofrequency field heats mineral grains until the water around them boils, and
-        the vapour pocket floats the grain up to a skimmer. Frequency sets the skin depth,
-        and separation works when the skin depth lands at about a tenth of the grain,
-        so <strong>a big grain tunes low and a fine one tunes high.</strong> Ride the dial
-        across the feed. Waste rock has no band of its own; it lifts whenever its size
-        happens to match yours.
+        the bubble carries the grain up to a skimmer. Frequency sets the skin depth, and it
+        wants to land at about a tenth of the grain, so
+        <strong>a big grain tunes low and a fine one tunes high.</strong>
+        Ride the dial across the feed. The rock has no band of its own, and lifts whenever
+        its size happens to match yours, which it will, at the worst moment.
       </p>
-      <span class="play">Play</span>
+      <span class="go">PLAY</span>
     </a>
 
   </div>
 
   <div class="cite">
-    <h2>Sources</h2>
+    <h2>THE ACTUAL PATENTS</h2>
     <p>
       <a href="https://patents.google.com/patent/US9134205B2/en">US 9,134,205 B2</a>,
       system and method for removing surface particles from an object.
@@ -148,13 +157,24 @@
       Baym, Briggs, Gilbert, Hillis, Hyde, Ishikawa, Kare, Myhrvold, Myhrvold, Pan,
       Tegreene, Whitmer, Wood, Wood. Elwha LLC, granted 1 November 2016.
     </p>
+
     <p class="note">
-      These are games, not implementations. All three take the arrangement of parts described in
-      the claims and turn it into something you operate; none of them simulates the physics
-      the patents actually rely on. Dust Off swaps the fluid jets for lasers on purpose, and
-      Separator's frequencies are invented numbers that obey a real relation from the patent.
-      All three are best on a laptop with a mouse or trackpad, and all three want a window
-      about 1200 pixels wide or more.
+      These are games, not implementations. We read the claims, borrowed the arrangement of
+      parts, and then did whatever was more fun. Dust Off swaps the fluid jets for lasers,
+      which the specification nowhere authorises and we are not sorry about. Separator's
+      frequencies are invented numbers, although the relation they obey, skin depth falling
+      with the square root of frequency so a bigger grain tunes lower, is the real one off
+      the page. Nothing here simulates the physics. If you are planning to build a mining
+      plant from this website, that is between you and your investors.
+    </p>
+    <p class="note">
+      They run on a phone, and they are happier still on a laptop with a trackpad.
+    </p>
+
+    <p class="signoff">Happy birthday, Danny.</p>
+    <p class="built">
+      Chrome and panels from
+      <a href="https://amyleesterling.github.io/scifi-ui">scifi-ui</a>.
     </p>
   </div>
 

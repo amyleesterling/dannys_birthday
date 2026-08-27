@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Separator</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -17,11 +19,90 @@
     font-size: 10px; letter-spacing: .09em; color: #4e5a55; pointer-events: none;
     white-space: nowrap;
   }
+
+  /* ---- page chrome, from scifi-ui ------------------------------------- */
+  html, body { height: 100%; height: 100dvh; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  .gamebar {
+    flex: 0 0 auto;
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px;
+    border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+  .gamebar-pat {
+    font-size: 15px; letter-spacing: .06em;
+    color: rgb(var(--holo-warm, 232 169 58));
+    border-bottom: 1px solid rgb(var(--holo-warm, 232 169 58) / .35);
+    white-space: nowrap;
+  }
+  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-warm, 232 169 58)); }
+  .gamebar-title {
+    flex: 1 1 auto; min-width: 0;
+    font-size: 13.5px; color: rgb(var(--holo-dim, 154 162 177) / .85);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gamebar button {
+    font: inherit; font-size: 13px; letter-spacing: .12em;
+    background: none; cursor: pointer; align-self: center; white-space: nowrap;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 8px 13px;
+  }
+  .gamebar button:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+
+  .stage { flex: 1 1 auto; position: relative; min-height: 0; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  @media (max-width: 820px) {
+    .gamebar { gap: 10px; padding: 9px 11px; }
+    .gamebar-title { display: none; }
+    .gamebar-name { font-size: 17px; }
+    .gamebar-pat { font-size: 14px; }
+    .gamebar-back { padding: 8px 10px; font-size: 12px; }
+    .gamebar button { padding: 9px 11px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="hint">R restart &nbsp;&nbsp; M sound</div>
+<header class="gamebar holopanel" style="--bar-accent: 255 182 72;">
+  <a class="gamebar-back" href="../../">ALL GAMES</a>
+  <span class="gamebar-name">SEPARATOR</span>
+  <a class="gamebar-pat" href="https://patents.google.com/patent/US9480991B2/en" target="_blank" rel="noopener">US 9,480,991 B2</a>
+  <span class="gamebar-title">Radiofrequency particle separator</span>
+  <button type="button" data-key="r">RESTART</button>
+  <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
+</header>
+<div class="stage"><canvas id="c"></canvas></div>
+<script>
+// The bar talks to the game the same way a keyboard does, so the game needs no
+// hook of its own and the two stay independent.
+document.querySelectorAll('.gamebar button').forEach(b => {
+  b.addEventListener('click', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key }));
+    if (b.id === 'sndbtn') {
+      b.dataset.off = b.dataset.off ? '' : '1';
+      b.textContent = b.dataset.off ? 'SOUND OFF' : 'SOUND ON';
+    }
+    b.blur();
+  });
+});
+</script>
+
 <script>
 (() => {
 'use strict';
@@ -153,7 +234,7 @@ function layout() {
   L = {
     left:  { x: 0, w: padL },
     right: { x: W - padR, w: padR },
-    ch:    { x: padL, y: 0, w: W - padL - padR, h: H - 26 },
+    ch:    { x: padL, y: 0, w: W - padL - padR, h: H },
     hud:   H < 660 ? 0.9 : 1,
   };
   L.ch.cx = L.ch.x + L.ch.w / 2;
@@ -847,17 +928,7 @@ function drawPanels(time) {
   ];
   for (const ln of noteLines) { value(ln, rx, ry, 9.5, COL.faint); ry += 13; }
 
-  // credit strip
-  ctx.fillStyle = COL.panel;
-  ctx.fillRect(L.ch.x, H - 26, L.ch.w, 26);
-  ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(L.ch.x, H - 26.5); ctx.lineTo(L.ch.x + L.ch.w, H - 26.5); ctx.stroke();
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#4e5a55';
-  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
-  ctx.fillText('After US 9,480,991 B2, radiofrequency particle separator. Baym, Briggs, Gilbert, Hillis, Hyde, Ishikawa, Kare, Myhrvold, Myhrvold, Pan, Tegreene, Whitmer, Wood, Wood. Elwha LLC, 2016. The frequencies are invented, the relation is not.', L.ch.cx, H - 9);
-  ctx.textAlign = 'left';
-}
+  }
 
 function overlay() {
   ctx.fillStyle = 'rgba(7,9,10,0.91)';
@@ -936,7 +1007,7 @@ function step(now) {
 function frame(now) { step(now); requestAnimationFrame(frame); }
 // Some embedded webviews throttle requestAnimationFrame to nothing. If frames
 // stop arriving, keep the loop alive on a timer.
-setInterval(() => { if (performance.now() - last > 250) step(performance.now()); }, 100);
+setInterval(() => { if (performance.now() - last > 40) step(performance.now()); }, 16);
 
 layout();
 startBatch(1);

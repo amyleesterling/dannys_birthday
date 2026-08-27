@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dust Off</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -17,11 +19,90 @@
     font-size: 10px; letter-spacing: .09em; color: #3d5d63; pointer-events: none;
     text-align: center; white-space: nowrap;
   }
+
+  /* ---- page chrome, from scifi-ui ------------------------------------- */
+  html, body { height: 100%; height: 100dvh; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+
+  .gamebar {
+    flex: 0 0 auto;
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px;
+    border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+  .gamebar-pat {
+    font-size: 15px; letter-spacing: .06em;
+    color: rgb(var(--holo-warm, 232 169 58));
+    border-bottom: 1px solid rgb(var(--holo-warm, 232 169 58) / .35);
+    white-space: nowrap;
+  }
+  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-warm, 232 169 58)); }
+  .gamebar-title {
+    flex: 1 1 auto; min-width: 0;
+    font-size: 13.5px; color: rgb(var(--holo-dim, 154 162 177) / .85);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gamebar button {
+    font: inherit; font-size: 13px; letter-spacing: .12em;
+    background: none; cursor: pointer; align-self: center; white-space: nowrap;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 8px 13px;
+  }
+  .gamebar button:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+
+  .stage { flex: 1 1 auto; position: relative; min-height: 0; }
+  .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  @media (max-width: 820px) {
+    .gamebar { gap: 10px; padding: 9px 11px; }
+    .gamebar-title { display: none; }
+    .gamebar-name { font-size: 17px; }
+    .gamebar-pat { font-size: 14px; }
+    .gamebar-back { padding: 8px 10px; font-size: 12px; }
+    .gamebar button { padding: 9px 11px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="hint">R restart &nbsp;&nbsp; M sound</div>
+<header class="gamebar holopanel" style="--bar-accent: 126 224 255;">
+  <a class="gamebar-back" href="../../">ALL GAMES</a>
+  <span class="gamebar-name">DUST OFF</span>
+  <a class="gamebar-pat" href="https://patents.google.com/patent/US9134205B2/en" target="_blank" rel="noopener">US 9,134,205 B2</a>
+  <span class="gamebar-title">System and method for removing surface particles from an object</span>
+  <button type="button" data-key="r">RESTART</button>
+  <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
+</header>
+<div class="stage"><canvas id="c"></canvas></div>
+<script>
+// The bar talks to the game the same way a keyboard does, so the game needs no
+// hook of its own and the two stay independent.
+document.querySelectorAll('.gamebar button').forEach(b => {
+  b.addEventListener('click', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key }));
+    if (b.id === 'sndbtn') {
+      b.dataset.off = b.dataset.off ? '' : '1';
+      b.textContent = b.dataset.off ? 'SOUND OFF' : 'SOUND ON';
+    }
+    b.blur();
+  });
+});
+</script>
+
 <script>
 (() => {
 'use strict';
@@ -170,30 +251,45 @@ const pointer = { x: 0, y: 0, down: false, inside: false };
 
 function layout() {
   const rect = canvas.getBoundingClientRect();
-  W = Math.max(720, rect.width);
-  H = Math.max(480, rect.height);
   dpr = Math.min(2, window.devicePixelRatio || 1);
   canvas.width = Math.round(rect.width * dpr);
   canvas.height = Math.round(rect.height * dpr);
   W = rect.width; H = rect.height;
 
-  const wide = W >= 1120;
-  const padL = wide ? 208 : 168;
-  const padR = wide ? 244 : 186;
-  L = {
-    wide,
-    left:  { x: 0, y: 0, w: padL, h: H },
-    right: { x: W - padR, y: 0, w: padR, h: H },
-    ch:    { x: padL, y: 0, w: W - padL - padR, h: H - 26 },
-  };
+  const narrow = W < 900;
+  L = { narrow };
+
+  if (narrow) {
+    // on a phone the side panels become bars laid over the chamber
+    L.left  = { x: 0, w: 0 };
+    L.right = { x: W, w: 0 };
+    L.ch    = { x: 0, y: 0, w: W, h: H };
+    L.topH  = 112;
+    L.botH  = 68;
+    L.hud   = clamp(W / 300, 1.2, 1.8);
+    L.floorY = H * 0.78;
+    L.figH   = clamp(H * 0.52, 200, 460);
+  } else {
+    const padL = W >= 1180 ? 272 : 236;
+    const padR = W >= 1180 ? 304 : 252;
+    L.left  = { x: 0, w: padL };
+    L.right = { x: W - padR, w: padR };
+    L.ch    = { x: padL, y: 0, w: W - padL - padR, h: H };
+    L.topH  = 0; L.botH = 0;
+    L.hud   = clamp(H / 660, 1.1, 1.45);
+    L.floorY = H * 0.86;
+    L.figH   = clamp(H * 0.74, 280, 620);
+  }
+
   L.ch.cx = L.ch.x + L.ch.w / 2;
-  L.floorY = L.ch.h * 0.87;
-  L.figH = clamp(L.ch.h * 0.76, 280, 620);
   L.figScale = L.figH / 185;
-  L.intake = { w: Math.min(460, L.ch.w * 0.56), h: 24, y: L.floorY + 8 };
-  // the outlets ride vertical rails on the two side walls, as in the drawings
-  L.rail = { top: L.ch.h * 0.10, bot: L.floorY - 30, lx: L.ch.x + 26, rx: L.ch.x + L.ch.w - 26 };
-  L.hud = H < 660 ? 0.9 : 1;
+  L.intake = { w: Math.min(480, L.ch.w * (narrow ? 0.76 : 0.56)), h: 24, y: L.floorY + 8 };
+  L.rail = {
+    top: H * (narrow ? 0.20 : 0.09),
+    bot: L.floorY - 30,
+    lx: L.ch.x + (narrow ? 15 : 26),
+    rx: L.ch.x + L.ch.w - (narrow ? 15 : 26),
+  };
 }
 
 // ---------------------------------------------------------------- subject
@@ -816,22 +912,51 @@ function drawCursor() {
 
 // ---------------------------------------------------------------- panels
 
-function label(text, x, y) {
+function label(text, x, y, size) {
   ctx.fillStyle = COL.dim;
-  ctx.font = `${9.5 * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.font = ((size || 11) * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText(text, x, y);
 }
 function value(text, x, y, size, color) {
   ctx.fillStyle = color || COL.text;
-  ctx.font = `${size * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.font = (size * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText(text, x, y);
+}
+function bar(x, y, w, h, frac, color) {
+  ctx.fillStyle = '#0d1418';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w * clamp(frac, 0, 1), h);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + .5, y + .5, w - 1, h - 1);
+}
+function strikeDots(x, y, r) {
+  for (let i = 0; i < MAX_MISSES; i++) {
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = i < misses ? COL.red : COL.rule;
+    ctx.fillStyle = COL.red;
+    ctx.beginPath(); ctx.arc(x + r + i * (r * 2 + 9), y, r, 0, TAU);
+    if (i < misses) ctx.fill();
+    ctx.stroke();
+  }
+}
+function heatColor() {
+  return laser.lock > 0 ? COL.red : (laser.heat > 75 ? COL.amber : COL.teal);
+}
+function scanFrac() {
+  const tLeft = subject && subject.phase === 'scan' ? subject.scanLeft
+              : (subject ? subject.scanTime : 0);
+  return { tLeft, frac: subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0 };
 }
 
 function drawPanels(time) {
+  if (L.narrow) { drawBars(time); return; }
+
   const lp = L.left, rp = L.right;
   ctx.fillStyle = COL.panel;
-  ctx.fillRect(lp.x, lp.y, lp.w, lp.h);
-  ctx.fillRect(rp.x, rp.y, rp.w, rp.h);
+  ctx.fillRect(0, 0, lp.w, H);
+  ctx.fillRect(rp.x, 0, rp.w, H);
   ctx.strokeStyle = COL.rule;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -839,175 +964,192 @@ function drawPanels(time) {
   ctx.moveTo(rp.x + .5, 0); ctx.lineTo(rp.x + .5, H);
   ctx.stroke();
 
-  const x = 18;
-  let y = 34;
-
+  const x = 20, bw = lp.w - 40;
+  let y = 40;
   ctx.textAlign = 'left';
-  value('DUST OFF', x, y, 17, COL.teal); y += 15;
-  label('PARTICLE RECOVERY UNIT 04', x, y); y += 30;
+  label('PARTICLE RECOVERY UNIT 04', x, y, 11); y += 30;
 
-  ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(lp.w - 18, y - 12); ctx.stroke();
+  label('SCORE', x, y); y += 32;
+  value(String(score).padStart(6, '0'), x, y, 31, COL.text); y += 36;
 
-  label('SCORE', x, y); y += 24;
-  value(String(score).padStart(6, '0'), x, y, 26, COL.text); y += 30;
+  label('SHIFT', x, y); y += 27;
+  value(String(shift).padStart(2, '0'), x, y, 22, COL.text); y += 34;
 
-  label('SHIFT', x, y); y += 22;
-  value(String(shift).padStart(2, '0'), x, y, 20, COL.text); y += 28;
-
-  // heat bar
-  label('EMITTER HEAT', x, y); y += 12;
-  const bw = lp.w - 36, bh = 8;
-  ctx.fillStyle = '#0d1418';
-  ctx.fillRect(x, y, bw, bh);
-  const hot = laser.heat / 100;
-  ctx.fillStyle = laser.lock > 0 ? COL.red : (hot > 0.75 ? COL.amber : COL.teal);
-  ctx.fillRect(x, y, bw * hot, bh);
-  ctx.strokeStyle = COL.rule;
-  ctx.strokeRect(x + .5, y + .5, bw - 1, bh - 1);
-  y += bh + 14;
-  if (laser.lock > 0) { value('OVERHEAT. COOLING.', x, y, 10, COL.red); }
+  label('EMITTER HEAT', x, y); y += 15;
+  bar(x, y, bw, 10, laser.heat / 100, heatColor());
+  y += 26;
+  if (laser.lock > 0) value('OVERHEAT. COOLING.', x, y, 13, COL.red);
   y += 24;
 
-  // scan window, kept on a long now dial
-  label('SCAN WINDOW', x, y); y += 10;
-  const tLeft = subject && subject.phase === 'scan' ? subject.scanLeft : (subject ? subject.scanTime : 0);
-  const tFrac = subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0;
-  const dialR = Math.min(44, bw / 2 - 6);
-  drawLongNow(x + bw / 2, y + dialR + 2, dialR, tFrac, time);
-  y += dialR * 2 + 20;
-  value(tLeft.toFixed(1) + ' s', x, y, 14, COL.dim);
+  // the scan window, kept on a Clock of the Long Now dial
+  label('SCAN WINDOW', x, y); y += 12;
+  const sc = scanFrac();
+  const dialR = Math.min(50, bw / 2 - 6);
+  drawLongNow(x + bw / 2, y + dialR + 4, dialR, sc.frac, time);
+  y += dialR * 2 + 28;
+  value(sc.tLeft.toFixed(1) + ' s', x, y, 17, COL.text);
   ctx.textAlign = 'right';
-  value('0' + year, x + bw, y, 14, COL.amber);
+  value('0' + year, x + bw, y, 17, COL.amber);
   ctx.textAlign = 'left';
-  y += 13;
-  label('LEFT', x, y);
-  ctx.textAlign = 'right'; label('LONG NOW YEAR', x + bw, y); ctx.textAlign = 'left';
-  y += 30;
+  y += 17;
+  label('LEFT', x, y, 11);
+  ctx.textAlign = 'right'; label('LONG NOW YEAR', x + bw, y, 11); ctx.textAlign = 'left';
+  y += 40;
 
-  // strikes
-  label('FLAGGED LOST', x, y); y += 18;
-  for (let i = 0; i < MAX_MISSES; i++) {
-    ctx.strokeStyle = i < misses ? COL.red : COL.rule;
-    ctx.fillStyle = i < misses ? COL.red : 'transparent';
-    ctx.beginPath(); ctx.arc(x + 7 + i * 22, y, 6, 0, TAU);
-    if (i < misses) ctx.fill();
-    ctx.stroke();
-  }
-  y += 34;
+  label('FLAGGED LOST', x, y); y += 24;
+  strikeDots(x, y, 9);
+  y += 42;
 
-  label('SUBJECT', x, y); y += 18;
-  value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 14, COL.text);
+  label('SUBJECT', x, y); y += 24;
+  value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 17, COL.text);
 
   // ---- right panel, the analysis feed
-  const rx = rp.x + 18;
-  let ry = 34;
-  value('ANALYSIS FEED', rx, ry, 12, COL.teal); ry += 14;
-  label('CAPTURE MECHANISM 1', rx, ry); ry += 22;
+  const rx = rp.x + 20;
+  let ry = 40;
+  value('ANALYSIS FEED', rx, ry, 16, COL.teal); ry += 19;
+  label('CAPTURE MECHANISM 1', rx, ry, 11); ry += 28;
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
-  ry += 10;
+  ctx.beginPath(); ctx.moveTo(rx, ry - 11); ctx.lineTo(W - 20, ry - 11); ctx.stroke();
+  ry += 8;
 
-  if (feed.length === 0) {
-    label('AWAITING SAMPLE', rx, ry);
-  }
+  if (feed.length === 0) label('AWAITING SAMPLE', rx, ry);
   for (const f of feed) {
-    const fade = clamp(1 - (f.age - 8) / 6, 0.25, 1);
-    ctx.globalAlpha = fade;
-    if (f.warn) {
-      ctx.fillStyle = COL.red;
-      ctx.fillRect(rx, ry - 8, 6, 6);
-      value(f.text, rx + 14, ry, 10.5, COL.red);
-    } else if (f.ok) {
-      ctx.fillStyle = COL.teal;
-      ctx.fillRect(rx, ry - 8, 6, 6);
-      value(f.text, rx + 14, ry, 10.5, COL.teal);
+    if (ry > H - 140) break;
+    ctx.globalAlpha = clamp(1 - (f.age - 8) / 6, 0.3, 1);
+    if (f.warn || f.ok) {
+      const col = f.warn ? COL.red : COL.teal;
+      ctx.fillStyle = col;
+      ctx.fillRect(rx, ry - 10, 8, 8);
+      value(f.text, rx + 18, ry, 14, col);
     } else {
       ctx.fillStyle = f.type.color;
-      ctx.beginPath(); ctx.arc(rx + 3, ry - 4, 3.2, 0, TAU); ctx.fill();
-      value(f.type.name, rx + 14, ry, 10.5, f.type.flagged ? COL.red : COL.text);
-      ctx.textAlign = 'right';
-      value(f.n > 1 ? '×' + f.n : '', W - 18, ry, 10.5, COL.dim);
-      ctx.textAlign = 'left';
-      if (f.type.flagged) { ry += 13; value('FLAGGED FOR ANALYSIS', rx + 14, ry, 9, COL.red); }
+      ctx.beginPath(); ctx.arc(rx + 4, ry - 5, 4.5, 0, TAU); ctx.fill();
+      value(f.type.name, rx + 18, ry, 14, f.type.flagged ? COL.red : COL.text);
+      if (f.n > 1) {
+        ctx.textAlign = 'right';
+        value('x' + f.n, W - 20, ry, 14, COL.dim);
+        ctx.textAlign = 'left';
+      }
+      if (f.type.flagged) { ry += 17; value('FLAGGED FOR ANALYSIS', rx + 18, ry, 11.5, COL.red); }
     }
-    ry += 22;
+    ry += 28;
     ctx.globalAlpha = 1;
   }
 
-  // running totals at the foot of the feed
-  const fy = H - 92;
+  const fy = H - 108;
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(rx, fy - 18); ctx.lineTo(W - 18, fy - 18); ctx.stroke();
-  label('DISLODGED', rx, fy);
-  ctx.textAlign = 'right'; value(String(released), W - 18, fy, 11, COL.text); ctx.textAlign = 'left';
-  label('CAPTURED', rx, fy + 18);
-  ctx.textAlign = 'right'; value(String(captured), W - 18, fy + 18, 11, COL.text); ctx.textAlign = 'left';
-  label('RECOVERY', rx, fy + 36);
+  ctx.beginPath(); ctx.moveTo(rx, fy - 22); ctx.lineTo(W - 20, fy - 22); ctx.stroke();
   const rate = released > 0 ? Math.round(captured / released * 100) : 0;
+  const rows = [
+    ['DISLODGED', String(released), COL.text],
+    ['CAPTURED', String(captured), COL.text],
+    ['RECOVERY', rate + ' %', rate >= 60 ? COL.teal : COL.amber],
+  ];
+  rows.forEach((r, i) => {
+    label(r[0], rx, fy + i * 26);
+    ctx.textAlign = 'right'; value(r[1], W - 20, fy + i * 26, 15, r[2]); ctx.textAlign = 'left';
+  });
+}
+
+// phone layout: two bars laid over the chamber, nothing smaller than 12px
+function drawBars(time) {
+  const pad = 15;
+  ctx.fillStyle = 'rgba(6,10,13,0.90)';
+  ctx.fillRect(0, 0, W, L.topH);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, L.topH + .5); ctx.lineTo(W, L.topH + .5); ctx.stroke();
+
+  ctx.textAlign = 'left';
+  label('SCORE', pad, 26, 12);
+  value(String(score).padStart(6, '0'), pad, 58, 27, COL.text);
+
+  const sc = scanFrac();
+  const dialR = 32;
+  const dx = clamp(W * 0.60, 170, W - 108);
+  drawLongNow(dx, 48, dialR, sc.frac, time);
+  value(sc.tLeft.toFixed(0) + ' s', dx + dialR + 10, 46, 20, COL.text);
+  value('0' + year, dx + dialR + 10, 68, 15, COL.amber);
+
   ctx.textAlign = 'right';
-  value(rate + ' %', W - 18, fy + 36, 11, rate >= 60 ? COL.teal : COL.amber);
+  label('SHIFT ' + String(shift).padStart(2, '0'), W - pad, 26, 12);
+  ctx.textAlign = 'left';
+  strikeDots(W - pad - 58, 50, 8);
+
+  bar(pad, L.topH - 20, W - pad * 2, 10, laser.heat / 100, heatColor());
+  ctx.textAlign = 'center';
+  label(laser.lock > 0 ? 'OVERHEAT. COOLING.' : 'EMITTER HEAT', W / 2, L.topH - 27, 12);
   ctx.textAlign = 'left';
 
-  // credit strip
-  ctx.fillStyle = COL.panel;
-  ctx.fillRect(L.ch.x, H - 26, L.ch.w, 26);
+  // bottom bar: what the analyser last saw, and how much you are keeping
+  const by = H - L.botH;
+  ctx.fillStyle = 'rgba(6,10,13,0.90)';
+  ctx.fillRect(0, by, W, L.botH);
   ctx.strokeStyle = COL.rule;
-  ctx.beginPath(); ctx.moveTo(L.ch.x, H - 26.5); ctx.lineTo(L.ch.x + L.ch.w, H - 26.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, by + .5); ctx.lineTo(W, by + .5); ctx.stroke();
+
+  const top = feed[0];
+  label('ANALYSIS', pad, by + 24, 12);
+  if (!top) {
+    value('AWAITING SAMPLE', pad, by + 50, 15, COL.dim);
+  } else if (top.warn || top.ok) {
+    value(top.text, pad, by + 50, 15, top.warn ? COL.red : COL.teal);
+  } else {
+    ctx.fillStyle = top.type.color;
+    ctx.beginPath(); ctx.arc(pad + 5, by + 45, 5, 0, TAU); ctx.fill();
+    value(top.type.name + (top.n > 1 ? ' x' + top.n : ''), pad + 19, by + 50, 15,
+          top.type.flagged ? COL.red : COL.text);
+  }
+  const rate = released > 0 ? Math.round(captured / released * 100) : 0;
+  ctx.textAlign = 'right';
+  label('RECOVERY', W - pad, by + 24, 12);
+  value(rate + ' %', W - pad, by + 50, 20, rate >= 60 ? COL.teal : COL.amber);
+  ctx.textAlign = 'left';
+}
+
+function card(title, titleColor, sub, rows, footer) {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(4,7,10,0.92)';
+  ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#375a60';
-  ctx.font = `${9.5 * L.hud}px ui-monospace, Menlo, monospace`;
-  ctx.fillText(
-    'After US 9,134,205 B2, system and method for removing surface particles from an object. Hillis, Hyde, Kare, Ishikawa, Wood. Elwha LLC, 2015. Air jets replaced with lasers.',
-    L.ch.cx, H - 9);
+
+  const k = Math.min(L.hud, H / 560, c.w / 430);
+  const rowH = 30 * k, subH = 20 * k;
+  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
+  let y = Math.max(46 * k, (H - blockH) / 2);
+
+  value(title, c.cx, y, Math.min(46, c.w * 0.095) * k, titleColor); y += 28 * k;
+  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
+
+  for (const r of rows) {
+    value(r[0], c.cx, y, 15 * k, COL.amber); y += rowH * 0.66;
+    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
+  }
+  y += 16 * k;
+  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  value(footer, c.cx, y, 17 * k, COL.teal);
+  ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
 }
 
 function drawTitle() {
-  const c = L.ch;
-  ctx.fillStyle = 'rgba(4,7,10,0.88)';
-  ctx.fillRect(c.x, 0, c.w, c.h);
-  ctx.textAlign = 'center';
-  let y = c.h * 0.30;
-  value('DUST OFF', c.cx, y, Math.min(58, c.w * 0.09), COL.teal); y += 30;
-  value('LASER PARTICLE RECOVERY', c.cx, y, 13, COL.dim); y += 56;
-
-  const lines = [
-    ['TAP THE SUBJECT', 'both wall outlets fire and the pulse throws particles loose'],
-    ['HOLD AND DRAG', 'the beams push loose particles, sweep them down into the intake'],
+  card('DUST OFF', COL.teal, 'LASER PARTICLE RECOVERY', [
+    ['TAP THE SUBJECT', 'both wall outlets fire and the pulse knocks particles loose'],
+    ['HOLD AND DRAG', 'the beams push them, sweep them down into the intake'],
     ['WATCH THE HEAT', 'the outlets lock out at 100 and take 1.6 seconds to cool'],
     ['RED IS FLAGGED', 'let one leave the chamber and the subject walks uncleared'],
-    ['THE DIAL IS A CLOCK', 'it keeps long now time, so the year carries a leading zero'],
-  ];
-  for (const [k, v] of lines) {
-    value(k, c.cx, y, 12, COL.amber); y += 15;
-    value(v, c.cx, y, 11, COL.dim); y += 30;
-  }
-  y += 8;
-  const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  ctx.globalAlpha = blink;
-  value('CLICK TO BEGIN THE SHIFT', c.cx, y, 14, COL.teal);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+    ['THE DIAL IS A CLOCK', 'it keeps long now time, so the year has a leading zero'],
+  ], 'TAP TO BEGIN THE SHIFT');
 }
 
 function drawOver() {
-  const c = L.ch;
-  ctx.fillStyle = 'rgba(4,7,10,0.90)';
-  ctx.fillRect(c.x, 0, c.w, c.h);
-  ctx.textAlign = 'center';
-  let y = c.h * 0.36;
-  value('SHIFT ENDED', c.cx, y, 40, COL.red); y += 26;
-  value('THREE SUBJECTS LEFT UNCLEARED', c.cx, y, 12, COL.dim); y += 54;
-  value('SCORE  ' + String(score).padStart(6, '0'), c.cx, y, 20, COL.text); y += 26;
-  value('SUBJECTS PROCESSED  ' + shift, c.cx, y, 12, COL.dim); y += 18;
   const rate = released > 0 ? Math.round(captured / released * 100) : 0;
-  value('RECOVERY RATE  ' + rate + ' %', c.cx, y, 12, COL.dim); y += 50;
-  const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  ctx.globalAlpha = blink;
-  value('CLICK TO RUN IT AGAIN', c.cx, y, 14, COL.teal);
-  ctx.globalAlpha = 1;
-  ctx.textAlign = 'left';
+  card('SHIFT ENDED', COL.red, 'THREE SUBJECTS LEFT UNCLEARED', [
+    ['SCORE', String(score).padStart(6, '0')],
+    ['SUBJECTS PROCESSED', String(shift)],
+    ['RECOVERY RATE', rate + ' %'],
+    ['LONG NOW YEAR', '0' + year],
+  ], 'TAP TO RUN IT AGAIN');
 }
 
 // ---------------------------------------------------------------- loop
@@ -1022,7 +1164,7 @@ function step(now) {
 function frame(now) { step(now); requestAnimationFrame(frame); }
 // Some embedded webviews throttle requestAnimationFrame to nothing. If frames
 // stop arriving, keep the loop alive on a timer.
-setInterval(() => { if (performance.now() - last > 250) step(performance.now()); }, 100);
+setInterval(() => { if (performance.now() - last > 40) step(performance.now()); }, 16);
 
 layout();
 subject = null;
