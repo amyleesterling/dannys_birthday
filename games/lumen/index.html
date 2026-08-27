@@ -46,11 +46,11 @@
   }
   .gamebar-pat {
     font-size: 15px; letter-spacing: .06em;
-    color: rgb(var(--holo-warm, 232 169 58));
-    border-bottom: 1px solid rgb(var(--holo-warm, 232 169 58) / .35);
+    color: rgb(var(--holo-cyan, 126 224 255) / .85);
+    border-bottom: 1px solid rgb(var(--holo-cyan, 126 224 255) / .35);
     white-space: nowrap;
   }
-  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-warm, 232 169 58)); }
+  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-cyan, 126 224 255) / .85); }
   .gamebar-title {
     flex: 1 1 auto; min-width: 0;
     font-size: 13.5px; color: rgb(var(--holo-dim, 154 162 177) / .85);
@@ -121,7 +121,7 @@ const COL = {
   dim:     '#8a5c63',
   faint:   '#5c383e',
   teal:    '#35e0d0',
-  amber:   '#ffb648',
+  cyan:    '#7ee0ff',   // --holo-cyan, the working accent
   red:     '#ff4d5e',
   wallDim: '#2c1016',
   lumDim:  '#150609',
@@ -453,7 +453,7 @@ function update(dt) {
     dev.vx -= nx * into * 1.4;
     dev.vy -= ny * into * 1.4;
     integrity -= (10 + into * 0.06) * dt + over * 0.05;
-    if (Math.random() < dt * 9) { audio.scrape(); shake = Math.max(shake, 2); }
+    if (Math.random() < dt * 9) audio.scrape();
   }
 
   power -= (1.5 + (anchored ? 6.5 : 0)) * dt;
@@ -483,8 +483,7 @@ function update(dt) {
       if (l.hp <= 0) {
         l.cleared = true;
         score += 600;
-        shake = Math.max(shake, 6);
-        audio.clear();
+            audio.clear();
         fx.push({ k: 'burst', x: l.x, y: l.y, t: 0, dur: 0.6, r: l.r });
       }
     }
@@ -521,8 +520,7 @@ function update(dt) {
         dev.vx += (dev.x - c.x) * inv * 190;
         dev.vy += (dev.y - c.y) * inv * 190;
         integrity -= 11;
-        shake = Math.max(shake, 5);
-        audio.hit();
+            audio.hit();
         const s = segs[(Math.random() * Math.min(6, segs.length)) | 0];
         c.x = lerp(s.ax, s.bx, 0.5); c.y = lerp(s.ay, s.by, 0.5);
       }
@@ -579,14 +577,10 @@ function draw(time) {
   ctx.fillStyle = COL.bg;
   ctx.fillRect(0, 0, W, H);
 
-  const sx = shake > 0.05 ? rand(-shake, shake) : 0;
-  const sy = shake > 0.05 ? rand(-shake, shake) : 0;
-
   ctx.save();
   ctx.beginPath();
   ctx.rect(L.ch.x, L.ch.y, L.ch.w, L.ch.h);
   ctx.clip();
-  ctx.translate(sx, sy);
 
   if (tissue) {
     ctx.save();
@@ -658,7 +652,7 @@ function drawLesions(time) {
     const hp = clamp(l.hp / 100, 0, 1);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(255,182,72,' + (0.10 + pulse * 0.10) + ')';
+    ctx.fillStyle = 'rgba(126,224,255,' + (0.10 + pulse * 0.10) + ')';
     ctx.beginPath(); ctx.arc(p.x, p.y, l.r * 2.4, 0, TAU); ctx.fill();
     ctx.restore();
     ctx.fillStyle = '#c9a24a';
@@ -676,14 +670,14 @@ function drawLesions(time) {
     // burn progress, and the prompt that says how
     if (l.inRange || l.close) {
       const on = l.inRange;
-      ctx.strokeStyle = on ? COL.amber : 'rgba(255,182,72,0.35)';
+      ctx.strokeStyle = on ? COL.cyan : 'rgba(126,224,255,0.35)';
       ctx.lineWidth = on ? 2 : 1;
       ctx.setLineDash(on ? [] : [5, 5]);
       ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
       ctx.setLineDash([]);
     }
     if (hp < 1) {
-      ctx.strokeStyle = COL.amber;
+      ctx.strokeStyle = COL.cyan;
       ctx.lineWidth = 4;
       ctx.beginPath();
       ctx.arc(p.x, p.y, l.r * 1.9 + 8, -Math.PI / 2, -Math.PI / 2 + (1 - hp) * TAU);
@@ -692,7 +686,7 @@ function drawLesions(time) {
     if (l.inRange && state === 'play') {
       const blink = 0.6 + 0.4 * Math.sin(time * 7);
       ctx.globalAlpha = pointer.down ? 1 : blink;
-      ctx.fillStyle = COL.amber;
+      ctx.fillStyle = COL.cyan;
       ctx.font = '700 15px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'center';
       ctx.fillText(pointer.down ? 'BURNING' : 'HOLD TO BURN', p.x, p.y - l.r * 1.9 - 22);
@@ -709,10 +703,10 @@ function drawFx() {
     const p = toScreen(f.x, f.y);
     const k = f.t / f.dur;
     if (f.k === 'spark') {
-      ctx.fillStyle = 'rgba(255,232,170,' + (1 - k) + ')';
+      ctx.fillStyle = 'rgba(214,246,255,' + (1 - k) + ')';
       ctx.beginPath(); ctx.arc(p.x, p.y - k * 14, 2.2 * (1 - k) + 0.6, 0, TAU); ctx.fill();
     } else {
-      ctx.strokeStyle = 'rgba(255,200,120,' + (1 - k) * 0.9 + ')';
+      ctx.strokeStyle = 'rgba(140,225,255,' + (1 - k) * 0.9 + ')';
       ctx.lineWidth = 3 * (1 - k) + 0.5;
       ctx.beginPath(); ctx.arc(p.x, p.y, f.r + 90 * k, 0, TAU); ctx.stroke();
     }
@@ -751,7 +745,7 @@ function drawDevice(time, p) {
   }
 
   ctx.fillStyle = '#0f1c20';
-  ctx.strokeStyle = dev.emit ? COL.amber : COL.teal;
+  ctx.strokeStyle = dev.emit ? COL.cyan : COL.teal;
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   ctx.moveTo(9, 0);
@@ -759,7 +753,7 @@ function drawDevice(time, p) {
   ctx.lineTo(-8, 4.4); ctx.lineTo(2, 5.4);
   ctx.closePath(); ctx.fill(); ctx.stroke();
 
-  ctx.fillStyle = dev.emit ? COL.amber : COL.teal;
+  ctx.fillStyle = dev.emit ? COL.cyan : COL.teal;
   ctx.beginPath(); ctx.arc(4.5, 0, 1.9, 0, TAU); ctx.fill();
   ctx.restore();
 
@@ -770,7 +764,7 @@ function drawDevice(time, p) {
     ctx.beginPath(); ctx.arc(p.x, p.y, 15 + Math.sin(time * 9) * 1.5, 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
     if (dev.emit) {
-      ctx.strokeStyle = 'rgba(255,182,72,0.55)';
+      ctx.strokeStyle = 'rgba(126,224,255,0.55)';
       ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
     }
   }
@@ -856,7 +850,7 @@ function drawMap(mx, my, mw, mh) {
   }
   for (const l of lesions) {
     if (!l.cleared && Math.hypot(l.x - dev.x, l.y - dev.y) > LAMP_R) continue;
-    ctx.fillStyle = l.cleared ? COL.teal : COL.amber;
+    ctx.fillStyle = l.cleared ? COL.teal : COL.cyan;
     ctx.beginPath(); ctx.arc(ox + l.x * sc, oy + l.y * sc, 3.4, 0, TAU); ctx.fill();
   }
   ctx.fillStyle = COL.text;
@@ -895,7 +889,7 @@ function drawPanels(time) {
   bar(x, y, bw, 10, integrity / 100, integrity < 30 ? COL.red : COL.teal);
   y += 28;
   label('POWER CELL', x, y); y += 15;
-  bar(x, y, bw, 10, power / 100, power < 25 ? COL.amber : '#7a9c6a');
+  bar(x, y, bw, 10, power / 100, power < 25 ? COL.cyan : '#7a9c6a');
   y += 34;
 
   label('CONDITION SENSOR', x, y); y += 16;
@@ -911,18 +905,18 @@ function drawPanels(time) {
   ctx.moveTo(cx, cy - rr); ctx.lineTo(cx, cy + rr);
   ctx.stroke();
   if (sn) {
-    ctx.strokeStyle = COL.amber;
+    ctx.strokeStyle = COL.cyan;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.lineTo(cx + Math.cos(sn.angle) * rr * 0.86, cy + Math.sin(sn.angle) * rr * 0.86);
     ctx.stroke();
-    ctx.fillStyle = COL.amber;
+    ctx.fillStyle = COL.cyan;
     ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU); ctx.fill();
   }
   y = cy + rr + 24;
   label('SIGNAL', x, y); y += 13;
-  bar(x, y, bw, 8, sn ? sn.strength : 0, COL.amber); y += 24;
+  bar(x, y, bw, 8, sn ? sn.strength : 0, COL.cyan); y += 24;
   value(sn ? Math.round(sn.dist) + ' UNITS' : 'NO CONTACT', x, y, 14, COL.dim);
   y += 32;
 
@@ -956,7 +950,7 @@ function drawPanels(time) {
 
   label('ACTIVE PORTION', rx, ry); ry += 22;
   value('ANCHOR', rx, ry, 14, anchored ? COL.teal : COL.faint); ry += 20;
-  value('EMIT', rx, ry, 14, dev && dev.emit ? COL.amber : COL.faint);
+  value('EMIT', rx, ry, 14, dev && dev.emit ? COL.cyan : COL.faint);
 }
 
 // phone layout
@@ -986,8 +980,8 @@ function drawBars(time) {
   label('POWER', pad + bwid + gap, by - 7, 12);
   label('SIGNAL', pad + (bwid + gap) * 2, by - 7, 12);
   bar(pad, by, bwid, 10, integrity / 100, integrity < 30 ? COL.red : COL.teal);
-  bar(pad + bwid + gap, by, bwid, 10, power / 100, power < 25 ? COL.amber : '#7a9c6a');
-  bar(pad + (bwid + gap) * 2, by, bwid, 10, sn ? sn.strength : 0, COL.amber);
+  bar(pad + bwid + gap, by, bwid, 10, power / 100, power < 25 ? COL.cyan : '#7a9c6a');
+  bar(pad + (bwid + gap) * 2, by, bwid, 10, sn ? sn.strength : 0, COL.cyan);
 
   drawMap(L.map.x, L.map.y, L.map.w, L.map.h);
 }
@@ -1001,18 +995,18 @@ function drawTouch(time) {
     const p = toScreen(dev.x, dev.y);
     if (sn) {
       const r = 54;
-      ctx.strokeStyle = 'rgba(255,182,72,0.30)';
+      ctx.strokeStyle = 'rgba(126,224,255,0.30)';
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.stroke();
       const ax = p.x + Math.cos(sn.angle) * r, ay = p.y + Math.sin(sn.angle) * r;
       ctx.save();
       ctx.translate(ax, ay); ctx.rotate(sn.angle);
-      ctx.fillStyle = COL.amber;
+      ctx.fillStyle = COL.cyan;
       ctx.beginPath();
       ctx.moveTo(11, 0); ctx.lineTo(-6, -7); ctx.lineTo(-6, 7);
       ctx.closePath(); ctx.fill();
       ctx.restore();
-      ctx.fillStyle = COL.amber;
+      ctx.fillStyle = COL.cyan;
       ctx.font = (13 * L.hud) + 'px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'center';
       ctx.fillText(Math.round(sn.dist) + '', p.x + Math.cos(sn.angle) * (r + 26),
@@ -1026,58 +1020,69 @@ function drawTouch(time) {
   const lit = anchored;
   const emit = dev && dev.emit;
   ctx.fillStyle = lit ? 'rgba(53,224,208,0.16)' : 'rgba(7,4,5,0.72)';
-  ctx.strokeStyle = emit ? COL.amber : (lit ? COL.teal : 'rgba(53,224,208,0.5)');
+  ctx.strokeStyle = emit ? COL.cyan : (lit ? COL.teal : 'rgba(53,224,208,0.5)');
   ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = emit ? COL.amber : (lit ? COL.teal : COL.dim);
+  ctx.fillStyle = emit ? COL.cyan : (lit ? COL.teal : COL.dim);
   ctx.font = '700 ' + (14 * L.hud) + 'px ui-monospace, Menlo, monospace';
   ctx.textAlign = 'center';
   ctx.fillText(emit ? 'BURN' : 'HOLD', b.x, b.y + 5);
   ctx.textAlign = 'left';
 }
 
-function card(title, titleColor, sub, rows, footer) {
+const OVERLAY = 'rgba(7,4,5,0.94)';
+
+function card(title, titleColor, sub, lines, button, accent) {
   const c = L.ch;
-  ctx.fillStyle = 'rgba(7,4,5,0.93)';
+  ctx.fillStyle = OVERLAY;
   ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
 
-  const k = Math.min(L.hud, H / 560, c.w / 430);
-  const rowH = 30 * k, subH = 20 * k;
-  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
-  let y = Math.max(46 * k, (H - blockH) / 2);
+  // absolute sizes, so the card cannot compound with the HUD scale
+  const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
+  const put = (t, y, size, color, weight) => {
+    ctx.fillStyle = color;
+    ctx.font = (weight ? weight + ' ' : '') + (size * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText(t, c.cx, y);
+  };
 
-  value(title, c.cx, y, Math.min(46, c.w * 0.095) * k, titleColor); y += 28 * k;
-  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
-  for (const r of rows) {
-    value(r[0], c.cx, y, 15 * k, COL.amber); y += rowH * 0.66;
-    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
-  }
-  y += 16 * k;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value(footer, c.cx, y, 17 * k, COL.teal);
-  ctx.globalAlpha = 1;
+  const bw = Math.min(c.w * 0.62, 280 * k), bh = 56 * k;
+  const block = 46 * k + 26 * k + bh + 44 * k + lines.length * 27 * k;
+  let y = Math.max(44 * k, (H - block) / 2) + 34 * k;
+
+  put(title, y, Math.min(44, c.w * 0.1), titleColor, '600'); y += 24 * k;
+  put(sub, y, 13, COL.dim); y += 30 * k;
+
+  const bx = c.cx - bw / 2;
+  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
+  ctx.fillStyle = 'rgba(126,224,255,' + (0.08 + pulse * 0.07) + ')';
+  ctx.fillRect(bx, y, bw, bh);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
+  put(button, y + bh / 2 + 7 * k, 19, accent, '700');
+  y += bh + 40 * k;
+
+  for (const t of lines) { put(t, y, 14, COL.dim); y += 27 * k; }
   ctx.textAlign = 'left';
 }
 
 function drawTitle() {
   const touch = L.narrow;
   card('LUMEN', COL.teal, 'A SELF PROPELLING DEVICE IN A VESSEL BED', [
-    [touch ? 'DRAG TO DRIVE' : 'MOVE THE CURSOR',
-     'the device heads for it, and the distance is the throttle'],
-    [touch ? 'HOLD THE BIG BUTTON' : 'HOLD THE BUTTON',
-     'the wheels grip the wall and you hold station against the flow'],
-    ['FIND THE PLAQUE', 'the sensor gives a bearing, and it fibs while you are far off'],
-    ['HOLD ON TARGET', 'get close, the ring lights up, then hold and it burns away'],
-    ['MIND THE WALL', 'scraping the lumen costs hull, and clots cost more'],
-  ], touch ? 'TAP TO DEPLOY' : 'CLICK TO DEPLOY');
+    touch ? 'Drag to drive. How far you drag is the throttle.'
+          : 'The device follows the cursor. Distance is the throttle.',
+    'Follow the sensor bearing to the gold plaque. It fibs at range.',
+    touch ? 'Hold the big button to anchor and burn.'
+          : 'Hold the mouse button to anchor and burn.',
+  ], 'PLAY NOW', COL.teal);
 }
 
 function drawOver() {
   card('DEVICE LOST', COL.red, dev && dev.deadReason ? dev.deadReason : '', [
-    ['SCORE', String(score).padStart(6, '0')],
-    ['VESSEL BEDS CLEARED', String(level - 1)],
-  ], L.narrow ? 'TAP TO DEPLOY AGAIN' : 'CLICK TO DEPLOY AGAIN');
+    'Score ' + String(score).padStart(6, '0'),
+    (level - 1) + ' vessel beds cleared',
+  ], 'DEPLOY AGAIN', COL.teal);
 }
 
 // ---------------------------------------------------------------- loop

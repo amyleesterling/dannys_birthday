@@ -46,11 +46,11 @@
   }
   .gamebar-pat {
     font-size: 15px; letter-spacing: .06em;
-    color: rgb(var(--holo-warm, 232 169 58));
-    border-bottom: 1px solid rgb(var(--holo-warm, 232 169 58) / .35);
+    color: rgb(var(--holo-cyan, 126 224 255) / .85);
+    border-bottom: 1px solid rgb(var(--holo-cyan, 126 224 255) / .35);
     white-space: nowrap;
   }
-  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-warm, 232 169 58)); }
+  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-cyan, 126 224 255) / .85); }
   .gamebar-title {
     flex: 1 1 auto; min-width: 0;
     font-size: 13.5px; color: rgb(var(--holo-dim, 154 162 177) / .85);
@@ -79,7 +79,7 @@
 </style>
 </head>
 <body>
-<header class="gamebar holopanel" style="--bar-accent: 255 182 72;">
+<header class="gamebar holopanel" style="--bar-accent: 138 96 230;">
   <a class="gamebar-back" href="../../">ALL GAMES</a>
   <span class="gamebar-name">SEPARATOR</span>
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9480991B2/en" target="_blank" rel="noopener">US 9,480,991 B2</a>
@@ -113,18 +113,18 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 
 const COL = {
-  bg:     '#07090a',
-  panel:  '#0d1112',
-  rule:   '#1e2826',
-  text:   '#e2e6e4',
-  dim:    '#7f918b',
-  faint:  '#4e5a55',
-  amber:  '#ffb648',
-  hot:    '#ff7a3c',
+  bg:     '#05070c',
+  panel:  '#0f1218',
+  rule:   '#1e2a38',
+  text:   '#eff4fb',   // --holo-ink
+  dim:    '#9aa2b1',   // --holo-dim
+  faint:  '#66738a',
+  cyan:   '#7ee0ff',   // --holo-cyan, the working accent
+  viol:   '#a07cff',   // --holo-viol, the boosted field
   teal:   '#35e0d0',
   red:    '#ff4d5e',
-  fluid:  '#101c1d',
-  fluid2: '#0a1314',
+  fluid:  '#0c1a24',
+  fluid2: '#07121a',
 };
 
 // ---------------------------------------------------------------------------
@@ -141,12 +141,12 @@ const TUNE_K = 46;                                   // MHz mm squared
 const optimalMHz = d => TUNE_K / (d * d);
 
 const MINERAL = {
-  gold:     { name: 'GOLD',      d: 1.60, color: '#ffc74a', loss: 1.00, value: 260, target: true },
+  gold:     { name: 'GOLD',      d: 1.60, color: '#f0d38a', loss: 1.00, value: 260, target: true },
   silver:   { name: 'SILVER',    d: 1.10, color: '#dfe7ee', loss: 0.94, value: 180, target: true },
-  copper:   { name: 'COPPER',    d: 0.80, color: '#e2793f', loss: 0.88, value: 140, target: true },
+  copper:   { name: 'COPPER',    d: 0.80, color: '#cf8f86', loss: 0.88, value: 140, target: true },
   platinum: { name: 'PLATINUM',  d: 0.55, color: '#b9c6d6', loss: 0.80, value: 330, target: true },
-  quartz:   { name: 'QUARTZ',    d: 0,    color: '#79867f', loss: 0.34, value: 0,   target: false },
-  shale:    { name: 'SHALE',     d: 0,    color: '#4d5a56', loss: 0.30, value: 0,   target: false },
+  quartz:   { name: 'QUARTZ',    d: 0,    color: '#7c8695', loss: 0.34, value: 0,   target: false },
+  shale:    { name: 'SHALE',     d: 0,    color: '#4b5262', loss: 0.30, value: 0,   target: false },
 };
 const TARGETS = ['gold', 'silver', 'copper', 'platinum'];
 
@@ -264,7 +264,7 @@ function layout() {
     ? { x: L.ch.x + L.ch.w - btnW / 2 - 14, y: L.dial.y + L.dialH / 2, r: 40 }
     : null;
 
-  L.surfaceY = narrow ? L.topH + 34 : H * 0.18;
+  L.surfaceY = narrow ? L.topH + 66 : H * 0.18;
   L.bedY = L.dial.y - 26;
   L.zone = { x: L.ch.x + L.ch.w * 0.32, w: L.ch.w * 0.30 };
   L.skim = L.ch.x + L.ch.w * 0.80;
@@ -530,7 +530,6 @@ function collect(p) {
   } else {
     stat.waste++;
     score = Math.max(0, score - 60);
-    shake = Math.max(shake, 4);
     audio.bad();
     fx.push({ k: 'coin', x: p.x, y: p.y, t: 0, dur: 0.7, c: COL.red, label: 'GANGUE' });
   }
@@ -543,17 +542,14 @@ function draw(time) {
   ctx.fillStyle = COL.bg;
   ctx.fillRect(0, 0, W, H);
 
-  const sx = shake > 0.05 ? rand(-shake, shake) : 0;
-  const sy = shake > 0.05 ? rand(-shake, shake) : 0;
-
   ctx.save();
   ctx.beginPath(); ctx.rect(L.ch.x, 0, L.ch.w, L.ch.h); ctx.clip();
-  ctx.translate(sx, sy);
   drawChute(time);
   drawParticles(time);
   drawFx();
   ctx.restore();
 
+  drawGoal(time);
   drawDial(time);
   drawPanels(time);
   if (state === 'title')  drawTitle();
@@ -604,14 +600,14 @@ function drawChute(time) {
   const on = state === 'play';
   const amp = on ? (boost ? 0.20 : 0.10) : 0.04;
   const zg = ctx.createLinearGradient(z.x, 0, z.x + z.w, 0);
-  zg.addColorStop(0, 'rgba(255,182,72,0)');
-  zg.addColorStop(0.5, 'rgba(255,182,72,' + amp + ')');
-  zg.addColorStop(1, 'rgba(255,182,72,0)');
+  zg.addColorStop(0, 'rgba(126,224,255,0)');
+  zg.addColorStop(0.5, 'rgba(126,224,255,' + amp + ')');
+  zg.addColorStop(1, 'rgba(126,224,255,0)');
   ctx.fillStyle = zg;
   ctx.fillRect(z.x, L.surfaceY, z.w, L.bedY - L.surfaceY);
 
   // field lines, spaced by the tuned frequency
-  ctx.strokeStyle = 'rgba(255,182,72,' + (on ? 0.20 : 0.07) + ')';
+  ctx.strokeStyle = 'rgba(126,224,255,' + (on ? 0.20 : 0.07) + ')';
   ctx.lineWidth = 1;
   const spacing = clamp(1400 / freq, 6, 46);
   for (let x = z.x; x < z.x + z.w; x += spacing) {
@@ -619,7 +615,7 @@ function drawChute(time) {
     if (xx > z.x + z.w) continue;
     ctx.beginPath(); ctx.moveTo(xx, L.surfaceY); ctx.lineTo(xx, L.bedY); ctx.stroke();
   }
-  ctx.strokeStyle = 'rgba(255,182,72,0.45)';
+  ctx.strokeStyle = 'rgba(126,224,255,0.45)';
   ctx.beginPath();
   ctx.moveTo(z.x, L.surfaceY); ctx.lineTo(z.x, L.bedY);
   ctx.moveTo(z.x + z.w, L.surfaceY); ctx.lineTo(z.x + z.w, L.bedY);
@@ -631,7 +627,7 @@ function drawChute(time) {
   ctx.fillText('SUBJECTED PORTION', z.x + z.w / 2, L.bedY + 15);
 
   // generator coil under the zone
-  ctx.strokeStyle = on ? COL.amber : COL.faint;
+  ctx.strokeStyle = on ? COL.cyan : COL.faint;
   ctx.lineWidth = 2;
   ctx.beginPath();
   for (let i = 0; i <= 40; i++) {
@@ -684,7 +680,7 @@ function drawParticles(time) {
     if (heat > 0.05) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(255,122,60,' + heat * 0.30 + ')';
+      ctx.fillStyle = 'rgba(160,124,255,' + heat * 0.30 + ')';
       ctx.beginPath(); ctx.arc(0, 0, p.r * (2 + heat), 0, TAU); ctx.fill();
       ctx.restore();
     }
@@ -697,7 +693,7 @@ function drawParticles(time) {
       i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
     }
     ctx.closePath();
-    ctx.fillStyle = mixHex(p.m.color, COL.hot, heat * 0.7);
+    ctx.fillStyle = mixHex(p.m.color, COL.viol, heat * 0.7);
     ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.45)';
     ctx.lineWidth = 1;
@@ -712,7 +708,7 @@ function drawParticles(time) {
 
     // heat ring
     if (heat > 0.02 && heat < 1) {
-      ctx.strokeStyle = 'rgba(255,182,72,0.7)';
+      ctx.strokeStyle = 'rgba(126,224,255,0.7)';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r + 5, -Math.PI / 2, -Math.PI / 2 + heat * TAU);
@@ -793,15 +789,15 @@ function drawDial(time) {
   ctx.textAlign = 'left';
 
   const half = freq * BAND_FRAC * (boost ? BOOST_BAND : 1);
-  ctx.fillStyle = boost ? 'rgba(255,122,60,0.22)' : 'rgba(255,182,72,0.14)';
+  ctx.fillStyle = boost ? 'rgba(160,124,255,0.22)' : 'rgba(126,224,255,0.14)';
   ctx.fillRect(fToX(freq - half), bandY - 3,
                Math.max(2, fToX(freq + half) - fToX(freq - half)), bandH + 6);
 
   const nx = fToX(freq);
-  ctx.strokeStyle = boost ? COL.hot : COL.amber;
+  ctx.strokeStyle = boost ? COL.viol : COL.cyan;
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(nx, d.y + 5); ctx.lineTo(nx, d.y + d.h - 5); ctx.stroke();
-  ctx.fillStyle = boost ? COL.hot : COL.amber;
+  ctx.fillStyle = boost ? COL.viol : COL.cyan;
   ctx.beginPath();
   ctx.moveTo(nx, d.y + 8); ctx.lineTo(nx - 6, d.y + 1); ctx.lineTo(nx + 6, d.y + 1);
   ctx.closePath(); ctx.fill();
@@ -813,7 +809,7 @@ function drawDial(time) {
   ctx.fillText(freq.toFixed(1) + ' MHz', d.x + 8, d.y + d.h - 8);
   if (!L.narrow) {
     ctx.font = (11 * L.hud) + 'px ui-monospace, Menlo, monospace';
-    ctx.fillStyle = boost ? COL.hot : COL.dim;
+    ctx.fillStyle = boost ? COL.viol : COL.dim;
     ctx.textAlign = 'right';
     ctx.fillText(boost ? 'FIELD BOOSTED, SELECTIVITY DOWN' : 'HOLD SPACE TO BOOST THE FIELD',
                  d.x + d.w - 8, d.y + d.h - 8);
@@ -822,11 +818,11 @@ function drawDial(time) {
 
   if (L.btn) {
     const b = L.btn;
-    ctx.fillStyle = boost ? 'rgba(255,122,60,0.20)' : 'rgba(10,14,15,0.85)';
-    ctx.strokeStyle = boost ? COL.hot : 'rgba(255,182,72,0.55)';
+    ctx.fillStyle = boost ? 'rgba(160,124,255,0.20)' : 'rgba(10,14,15,0.85)';
+    ctx.strokeStyle = boost ? COL.viol : 'rgba(126,224,255,0.55)';
     ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = boost ? COL.hot : COL.amber;
+    ctx.fillStyle = boost ? COL.viol : COL.cyan;
     ctx.font = '700 ' + (14 * L.hud) + 'px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'center';
     ctx.fillText('BOOST', b.x, b.y + 5);
@@ -835,7 +831,7 @@ function drawDial(time) {
 }
 
 function drawCursor() {
-  ctx.strokeStyle = 'rgba(255,182,72,0.6)';
+  ctx.strokeStyle = 'rgba(126,224,255,0.6)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 7, 0, TAU); ctx.stroke();
   ctx.beginPath();
@@ -865,6 +861,20 @@ function bar(x, y, w, h, frac, color) {
   ctx.lineWidth = 1;
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
 }
+function wrapText(text, x, y, maxW, size, color, lh) {
+  ctx.font = (size * L.hud) + 'px ui-monospace, Menlo, monospace';
+  const words = text.split(' ');
+  let line = '';
+  for (const w of words) {
+    const t = line ? line + ' ' + w : w;
+    if (ctx.measureText(t).width > maxW && line) {
+      value(line, x, y, size, color); y += lh; line = w;
+    } else { line = t; }
+  }
+  if (line) { value(line, x, y, size, color); y += lh; }
+  return y;
+}
+
 function grades() {
   if (!stat) return { grade: 0, recovery: 0 };
   const collected = stat.recovered + stat.waste;
@@ -872,6 +882,53 @@ function grades() {
     grade: collected ? stat.recovered / collected : 0,
     recovery: stat.targets ? stat.recovered / stat.targets : 0,
   };
+}
+
+// The ore that has not reached the field yet. That is what you should be
+// tuning for, so it is what the prompt names.
+function incoming() {
+  const counts = {};
+  for (const p of parts) {
+    if (!p.m.target || p.lifted) continue;
+    if (p.x > L.zone.x + L.zone.w) continue;
+    counts[p.kind] = (counts[p.kind] || 0) + 1;
+  }
+  let best = null, bn = 0;
+  for (const k in counts) if (counts[k] > bn) { bn = counts[k]; best = k; }
+  return best;
+}
+
+// The objective, on screen the whole time, because a title card you clicked
+// past two minutes ago is not an answer to "what am I doing".
+function drawGoal(time) {
+  if (state !== 'play') return;
+  const c = L.ch;
+  const y = (L.narrow ? L.topH : 0) + 28;
+  ctx.textAlign = 'center';
+
+  const kind = incoming();
+  if (kind) {
+    const m = MINERAL[kind];
+    const fc = optimalMHz(m.d);
+    const on = Math.abs(freq - fc) < fc * BAND_FRAC * (boost ? BOOST_BAND : 1);
+    if (on) {
+      value('ON BAND FOR ' + m.name + ', HOLD IT', c.cx, y, 16, COL.cyan);
+    } else {
+      value('TUNE ' + (fc > freq ? 'UP' : 'DOWN') + ' TO ' + m.name + ', ' +
+            fc.toFixed(0) + ' MHz', c.cx, y, 16, COL.text);
+    }
+  } else {
+    value('WAITING ON THE FEED', c.cx, y, 16, COL.dim);
+  }
+
+  const gr = grades();
+  const need = [];
+  if (gr.grade < 0.70) need.push('grade ' + Math.round(gr.grade * 100) + ' of 70');
+  if (gr.recovery < 0.55) need.push('recovery ' + Math.round(gr.recovery * 100) + ' of 55');
+  value(need.length ? 'TO CLEAR THIS BATCH: ' + need.join(', ')
+                    : 'BATCH IS CLEARING, KEEP GOING',
+        c.cx, y + 21, 12.5, need.length ? COL.faint : COL.teal);
+  ctx.textAlign = 'left';
 }
 
 function drawPanels(time) {
@@ -890,8 +947,6 @@ function drawPanels(time) {
   const x = 20, bw = L.left.w - 40;
   let y = 40;
   ctx.textAlign = 'left';
-  label('RADIOFREQUENCY PARTICLE SEP.', x, y, 11); y += 30;
-
   label('VALUE RECOVERED', x, y); y += 32;
   value(String(score).padStart(6, '0'), x, y, 30, COL.text); y += 34;
 
@@ -899,7 +954,7 @@ function drawPanels(time) {
   value(String(batch).padStart(2, '0'), x, y, 22, COL.text); y += 32;
 
   label('GENERATOR POWER', x, y); y += 15;
-  bar(x, y, bw, 10, power / 100, power < 25 ? COL.red : COL.amber); y += 32;
+  bar(x, y, bw, 10, power / 100, power < 25 ? COL.red : COL.cyan); y += 32;
 
   const gr = grades();
   label('GRADE', x, y); y += 15;
@@ -907,7 +962,7 @@ function drawPanels(time) {
   value(Math.round(gr.grade * 100) + ' %, need 70', x, y, 13, COL.dim); y += 28;
 
   label('RECOVERY', x, y); y += 15;
-  bar(x, y, bw, 9, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.amber); y += 20;
+  bar(x, y, bw, 9, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.cyan); y += 20;
   value(Math.round(gr.recovery * 100) + ' %, need 55', x, y, 13, COL.dim); y += 34;
 
   if (stat) {
@@ -930,7 +985,7 @@ function drawPanels(time) {
   // ---- right panel, the assay
   const rx = L.right.x + 20;
   let ry = 40;
-  value('ASSAY', rx, ry, 16, COL.amber); ry += 19;
+  value('ASSAY', rx, ry, 16, COL.cyan); ry += 19;
   label('TUNING FROM DIAMETER', rx, ry, 11); ry += 26;
   ctx.strokeStyle = COL.rule;
   ctx.beginPath(); ctx.moveTo(rx, ry - 11); ctx.lineTo(W - 20, ry - 11); ctx.stroke();
@@ -938,7 +993,7 @@ function drawPanels(time) {
 
   label('MINERAL', rx, ry, 11);
   ctx.textAlign = 'right';
-  label('mm', W - 96, ry, 11); label('optimum', W - 20, ry, 11);
+  label('mm', W - 132, ry, 11); label('optimum', W - 20, ry, 11);
   ctx.textAlign = 'left';
   ry += 22;
 
@@ -950,8 +1005,8 @@ function drawPanels(time) {
     ctx.beginPath(); ctx.arc(rx + 5, ry - 5, 5, 0, TAU); ctx.fill();
     value(m.name, rx + 18, ry, 13.5, on ? COL.text : COL.dim);
     ctx.textAlign = 'right';
-    value(m.d.toFixed(2), W - 96, ry, 13.5, COL.dim);
-    value(fc.toFixed(0) + ' MHz', W - 20, ry, 13.5, on ? COL.amber : COL.dim);
+    value(m.d.toFixed(2), W - 132, ry, 13.5, COL.dim);
+    value(fc.toFixed(0) + ' MHz', W - 20, ry, 13.5, on ? COL.cyan : COL.dim);
     ctx.textAlign = 'left';
     ry += 25;
   }
@@ -971,21 +1026,14 @@ function drawPanels(time) {
   }
 
   ry += 22;
-  const note = [
-    'Skin depth falls with the square',
-    'root of frequency, so a bigger',
-    'grain tunes lower. Every figure',
-    'above comes off one diameter by',
-    'one formula.',
-    '',
-    'Gangue has no band. It heats when',
-    'its size happens to match your',
-    'dial, and boosting widens that.',
-  ];
-  for (const ln of note) {
-    if (ry > H - 20) break;
-    value(ln, rx, ry, 12, COL.faint); ry += 17;
-  }
+  const noteW = W - 20 - rx;
+  ry = wrapText('Skin depth falls with the square root of frequency, so a bigger ' +
+                'grain tunes lower. Every figure above comes off one diameter by ' +
+                'one formula.', rx, ry, noteW, 12, COL.faint, 17);
+  ry += 12;
+  wrapText('Gangue has no band of its own. It heats whenever its size happens to ' +
+           'match your dial, and boosting widens that window.',
+           rx, ry, noteW, 12, COL.faint, 17);
 }
 
 function drawBars(time) {
@@ -1016,64 +1064,72 @@ function drawBars(time) {
   label('RECOVERY', pad + bwid + gap, by - 7, 12);
   label('POWER', pad + (bwid + gap) * 2, by - 7, 12);
   bar(pad, by, bwid, 10, gr.grade, gr.grade >= 0.70 ? COL.teal : COL.red);
-  bar(pad + bwid + gap, by, bwid, 10, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.amber);
-  bar(pad + (bwid + gap) * 2, by, bwid, 10, power / 100, power < 25 ? COL.red : COL.amber);
+  bar(pad + bwid + gap, by, bwid, 10, gr.recovery, gr.recovery >= 0.55 ? COL.teal : COL.cyan);
+  bar(pad + (bwid + gap) * 2, by, bwid, 10, power / 100, power < 25 ? COL.red : COL.cyan);
 }
 
-function card(title, titleColor, sub, rows, footer) {
+const OVERLAY = 'rgba(5,7,12,0.94)';
+
+function card(title, titleColor, sub, lines, button, accent) {
   const c = L.ch;
-  ctx.fillStyle = 'rgba(7,9,10,0.93)';
+  ctx.fillStyle = OVERLAY;
   ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
 
-  const k = Math.min(L.hud, H / 560, c.w / 430);
-  const rowH = 30 * k, subH = 20 * k;
-  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
-  let y = Math.max(46 * k, (H - blockH) / 2);
+  // absolute sizes, so the card cannot compound with the HUD scale
+  const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
+  const put = (t, y, size, color, weight) => {
+    ctx.fillStyle = color;
+    ctx.font = (weight ? weight + ' ' : '') + (size * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText(t, c.cx, y);
+  };
 
-  value(title, c.cx, y, Math.min(44, c.w * 0.09) * k, titleColor); y += 28 * k;
-  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
-  for (const r of rows) {
-    value(r[0], c.cx, y, 15 * k, COL.teal); y += rowH * 0.66;
-    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
-  }
-  y += 16 * k;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value(footer, c.cx, y, 17 * k, COL.amber);
-  ctx.globalAlpha = 1;
+  const bw = Math.min(c.w * 0.62, 280 * k), bh = 56 * k;
+  const block = 46 * k + 26 * k + bh + 44 * k + lines.length * 27 * k;
+  let y = Math.max(44 * k, (H - block) / 2) + 34 * k;
+
+  put(title, y, Math.min(44, c.w * 0.1), titleColor, '600'); y += 24 * k;
+  put(sub, y, 13, COL.dim); y += 30 * k;
+
+  const bx = c.cx - bw / 2;
+  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
+  ctx.fillStyle = 'rgba(126,224,255,' + (0.08 + pulse * 0.07) + ')';
+  ctx.fillRect(bx, y, bw, bh);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
+  put(button, y + bh / 2 + 7 * k, 19, accent, '700');
+  y += bh + 40 * k;
+
+  for (const t of lines) { put(t, y, 14, COL.dim); y += 27 * k; }
   ctx.textAlign = 'left';
 }
 
 function drawTitle() {
   const touch = L.narrow;
-  card('SEPARATOR', COL.amber, 'TUNE THE FIELD TO THE GRAIN', [
-    [touch ? 'DRAG THE DIAL' : 'SCROLL TO TUNE',
-     touch ? 'the coloured bands are the minerals worth having'
-           : 'two fingers on the trackpad, the arrow keys, or drag the dial'],
-    ['SIZE IS THE CLUE', 'a big grain wants a low frequency, a fine one wants a high one'],
-    [touch ? 'HOLD BOOST' : 'HOLD SPACE TO BOOST',
-     'heats faster, widens the window, and lifts rock you did not want'],
-    ['WATCH THE GRADE', 'rock in the concentrate costs more than ore in the tailings'],
-    ['CLEAR THE BATCH', 'seventy percent grade and fifty five percent recovery'],
-  ], touch ? 'TAP TO START THE FEED' : 'CLICK TO START THE FEED');
+  card('SEPARATOR', COL.cyan, 'TUNE THE FIELD TO THE GRAIN', [
+    touch ? 'Drag the dial. A big grain tunes low, a fine one tunes high.'
+          : 'Scroll to tune. A big grain tunes low, a fine one tunes high.',
+    'The line at the top tells you what is coming and where to put the dial.',
+    'Rock lifts too when it happens to match. Watch the grade.',
+  ], 'PLAY NOW', COL.cyan);
 }
 
 function drawReport() {
   const r = stat.report;
   card(r.pass ? 'BATCH CLEARED' : 'BATCH REJECTED', r.pass ? COL.teal : COL.red,
        r.pass ? 'THAT ONE GOES TO THE SMELTER' : 'THE ASSAY OFFICE SENT IT BACK', [
-    ['GRADE', Math.round(r.grade * 100) + ' %'],
-    ['RECOVERY', Math.round(r.recovery * 100) + ' %'],
-    ['ORE', stat.recovered + ' of ' + stat.targets],
-    ['GANGUE', String(stat.waste)],
-  ], L.narrow ? 'TAP FOR THE NEXT BATCH' : 'CLICK FOR THE NEXT BATCH');
+    'Grade ' + Math.round(r.grade * 100) + ' per cent, needed 70',
+    'Recovery ' + Math.round(r.recovery * 100) + ' per cent, needed 55',
+    stat.recovered + ' ore of ' + stat.targets + ', and ' + stat.waste + ' gangue',
+  ], 'NEXT BATCH', COL.cyan);
 }
 
 function drawOver() {
   card('PLANT SHUT DOWN', COL.red, 'THREE BATCHES REJECTED', [
-    ['VALUE RECOVERED', String(score).padStart(6, '0')],
-    ['BATCHES RUN', String(batch)],
-  ], L.narrow ? 'TAP TO RUN IT AGAIN' : 'CLICK TO RUN IT AGAIN');
+    'Value recovered ' + String(score).padStart(6, '0'),
+    batch + ' batches run',
+  ], 'RUN IT AGAIN', COL.cyan);
 }
 
 // ---------------------------------------------------------------- loop

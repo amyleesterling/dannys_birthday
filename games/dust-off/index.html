@@ -46,11 +46,11 @@
   }
   .gamebar-pat {
     font-size: 15px; letter-spacing: .06em;
-    color: rgb(var(--holo-warm, 232 169 58));
-    border-bottom: 1px solid rgb(var(--holo-warm, 232 169 58) / .35);
+    color: rgb(var(--holo-cyan, 126 224 255) / .85);
+    border-bottom: 1px solid rgb(var(--holo-cyan, 126 224 255) / .35);
     white-space: nowrap;
   }
-  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-warm, 232 169 58)); }
+  .gamebar-pat:hover { border-bottom-color: rgb(var(--holo-cyan, 126 224 255) / .85); }
   .gamebar-title {
     flex: 1 1 auto; min-width: 0;
     font-size: 13.5px; color: rgb(var(--holo-dim, 154 162 177) / .85);
@@ -124,7 +124,7 @@ const COL = {
   tealDim:  '#1a6f6c',
   text:     '#cfe6e6',
   dim:      '#4d6f74',
-  amber:    '#ffb648',
+  cyan:     '#7ee0ff',   // --holo-cyan, the working accent
   red:      '#ff4d5e',
 };
 
@@ -284,12 +284,18 @@ function layout() {
   L.ch.cx = L.ch.x + L.ch.w / 2;
   L.figScale = L.figH / 185;
   L.intake = { w: Math.min(480, L.ch.w * (narrow ? 0.76 : 0.56)), h: 24, y: L.floorY + 8 };
-  L.rail = {
-    top: H * (narrow ? 0.20 : 0.09),
-    bot: L.floorY - 30,
-    lx: L.ch.x + (narrow ? 15 : 26),
-    rx: L.ch.x + L.ch.w - (narrow ? 15 : 26),
-  };
+  // Two outlets per side wall, fixed, near the top. Four beams that cross at
+  // the point you aim at, which is where the intensity finally gets high
+  // enough to lift anything. Two photon, or four, since it is a birthday.
+  const inset = L.ch.x + (narrow ? 17 : 30);
+  const hiY = (narrow ? L.topH + 30 : 0) + H * (narrow ? 0.10 : 0.10);
+  const loY = hiY + H * 0.11;
+  L.emitters = [
+    { x: inset, y: hiY, s: 1 },
+    { x: inset, y: loY, s: 1 },
+    { x: L.ch.x + L.ch.w - (inset - L.ch.x), y: hiY, s: -1 },
+    { x: L.ch.x + L.ch.w - (inset - L.ch.x), y: loY, s: -1 },
+  ];
 }
 
 // ---------------------------------------------------------------- subject
@@ -376,7 +382,7 @@ function capture(p) {
   captured++;
   addFeed(p.type);
   fx.push({ k: 'cap', x: p.x, y: p.y, t: 0, dur: 0.35, c: p.type.color });
-  if (p.type.flagged) { audio.flagged(); shake = Math.max(shake, 5); }
+  if (p.type.flagged) audio.flagged();
   else audio.capture();
 }
 
@@ -397,7 +403,6 @@ function fire() {
   laser.heat += PULSE_HEAT;
   laser.beamT = 1;
   audio.pulse();
-  shake = Math.max(shake, 3.5);
   fx.push({ k: 'ring', x, y, t: 0, dur: 0.3, r: PULSE_RADIUS });
 
   const n = subject ? dislodge(x, y, PULSE_RADIUS) : 0;
@@ -596,11 +601,7 @@ function draw(time) {
   ctx.fillStyle = COL.bg;
   ctx.fillRect(0, 0, W, H);
 
-  const sx = shake > 0.05 ? rand(-shake, shake) : 0;
-  const sy = shake > 0.05 ? rand(-shake, shake) : 0;
-
   ctx.save();
-  ctx.translate(sx, sy);
   drawChamber(time);
   if (subject && state !== 'title') drawSubject(subject, time);
   drawLoose(time);
@@ -608,6 +609,7 @@ function draw(time) {
   if (state === 'play') drawLaser(time);
   ctx.restore();
 
+  drawGoal(time);
   drawPanels(time);
   if (state === 'title') drawTitle();
   if (state === 'over') drawOver();
@@ -642,13 +644,19 @@ function drawChamber(time) {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(c.x, L.floorY + .5); ctx.lineTo(c.x + c.w, L.floorY + .5); ctx.stroke();
 
-  // outlet rails, one on each side wall
-  ctx.strokeStyle = COL.rule;
-  ctx.lineWidth = 2;
-  for (const rx of [L.rail.lx, L.rail.rx]) {
-    ctx.beginPath(); ctx.moveTo(rx, L.rail.top); ctx.lineTo(rx, L.rail.bot); ctx.stroke();
-    ctx.fillStyle = 'rgba(53,224,208,0.16)';
-    for (let ry = L.rail.top; ry < L.rail.bot; ry += 22) ctx.fillRect(rx - 3, ry, 6, 2);
+  // the four outlet housings, fixed to the side walls
+  for (const e of L.emitters) {
+    ctx.fillStyle = '#0b171b';
+    ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(e.x - 9 * e.s, e.y - 13);
+    ctx.lineTo(e.x - 9 * e.s, e.y + 13);
+    ctx.lineTo(e.x + 11 * e.s, e.y + 7);
+    ctx.lineTo(e.x + 11 * e.s, e.y - 7);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = laser.lock > 0 ? COL.red : COL.teal;
+    ctx.fillRect(e.x + 9 * e.s, e.y - 2, 3 * e.s, 4);
   }
 
   // intake vent
@@ -769,10 +777,10 @@ function drawFx() {
   for (const f of fx) {
     const k = f.t / f.dur;
     if (f.k === 'ring') {
-      ctx.strokeStyle = `rgba(255,182,72,${(1 - k) * 0.8})`;
+      ctx.strokeStyle = `rgba(126,224,255,${(1 - k) * 0.8})`;
       ctx.lineWidth = 2.5 * (1 - k) + 0.5;
       ctx.beginPath(); ctx.arc(f.x, f.y, f.r * easeOut(k), 0, TAU); ctx.stroke();
-      ctx.fillStyle = `rgba(255,240,200,${(1 - k) * 0.5})`;
+      ctx.fillStyle = `rgba(220,250,255,${(1 - k) * 0.5})`;
       ctx.beginPath(); ctx.arc(f.x, f.y, 9 * (1 - k), 0, TAU); ctx.fill();
     } else if (f.k === 'cap') {
       ctx.strokeStyle = f.c;
@@ -787,59 +795,47 @@ function drawFx() {
 
 function drawLaser(time) {
   const c = L.ch;
-  const ey = clamp(pointer.y, L.rail.top, L.rail.bot);
-  const heads = [{ x: L.rail.lx, s: 1 }, { x: L.rail.rx, s: -1 }];
-
-  // the outlets themselves, one on each side wall
-  for (const h of heads) {
-    ctx.fillStyle = '#0b171b';
-    ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(h.x - 8 * h.s, ey - 14);
-    ctx.lineTo(h.x - 8 * h.s, ey + 14);
-    ctx.lineTo(h.x + 10 * h.s, ey + 8);
-    ctx.lineTo(h.x + 10 * h.s, ey - 8);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-  }
-
   if (!pointer.inside || pointer.x < c.x || pointer.x > c.x + c.w) return;
 
   const beamOn = pointer.down && laser.lock <= 0;
   const flash = laser.beamT;
+  if (!beamOn && flash <= 0) return;
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const h of heads) {
-    const dx = pointer.x - h.x, dy = pointer.y - ey;
+  for (const e of L.emitters) {
+    const dx = pointer.x - e.x, dy = pointer.y - e.y;
+    const len = Math.hypot(dx, dy) || 1;
+    // each beam runs past the focus, so you can see all four cross
+    const ox = e.x + dx / len * (len + 110), oy = e.y + dy / len * (len + 110);
     if (beamOn) {
-      const ang = Math.atan2(dy, dx);
-      const spread = Math.atan2(BEAM_RADIUS * 0.45, Math.max(40, Math.hypot(dx, dy)));
-      ctx.fillStyle = 'rgba(53,224,208,0.055)';
-      ctx.beginPath();
-      ctx.moveTo(h.x, ey);
-      ctx.lineTo(h.x + Math.cos(ang - spread) * 2200, ey + Math.sin(ang - spread) * 2200);
-      ctx.lineTo(h.x + Math.cos(ang + spread) * 2200, ey + Math.sin(ang + spread) * 2200);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(53,224,208,0.5)';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(126,224,255,0.20)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ox, oy); ctx.stroke();
     }
     if (flash > 0) {
-      ctx.strokeStyle = `rgba(255,214,140,${flash})`;
-      ctx.lineWidth = 1 + flash * 4;
-      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
-      ctx.strokeStyle = `rgba(255,255,235,${flash * 0.9})`;
-      ctx.lineWidth = 1 + flash * 1.2;
-      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(190,240,255,' + flash * 0.8 + ')';
+      ctx.lineWidth = 1 + flash * 3;
+      ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(ox, oy); ctx.stroke();
     }
   }
+
+  // the focus, the only place the four beams add up to anything
+  const focus = beamOn ? 0.75 : flash;
+  const fr = beamOn ? BEAM_RADIUS * 0.8 : PULSE_RADIUS * (0.7 + flash * 0.6);
+  const gr = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, fr);
+  gr.addColorStop(0, 'rgba(226,250,255,' + 0.55 * focus + ')');
+  gr.addColorStop(0.35, 'rgba(126,224,255,' + 0.17 * focus + ')');
+  gr.addColorStop(1, 'rgba(126,224,255,0)');
+  ctx.fillStyle = gr;
+  ctx.beginPath(); ctx.arc(pointer.x, pointer.y, fr, 0, TAU); ctx.fill();
+  ctx.restore();
+
   if (beamOn) {
-    ctx.strokeStyle = 'rgba(53,224,208,0.32)';
+    ctx.strokeStyle = 'rgba(126,224,255,0.30)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(pointer.x, pointer.y, BEAM_RADIUS, 0, TAU); ctx.stroke();
   }
-  ctx.restore();
 }
 
 // A nod to the Clock of the Long Now. The outer dial is the scan window; the
@@ -859,7 +855,7 @@ function drawLongNow(cx, cy, r, frac, time) {
     ctx.fill();
   }
 
-  ctx.strokeStyle = frac < 0.25 ? COL.amber : COL.teal;
+  ctx.strokeStyle = frac < 0.25 ? COL.cyan : COL.teal;
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.arc(cx, cy, r * 0.78, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
@@ -870,7 +866,7 @@ function drawLongNow(cx, cy, r, frac, time) {
   ctx.beginPath(); ctx.arc(cx, cy, r * 0.60, 0, TAU); ctx.stroke();
   for (let i = 0; i < 12; i++) {
     const a = i / 12 * TAU + year * 0.09;
-    ctx.strokeStyle = i === 0 ? COL.amber : COL.rule;
+    ctx.strokeStyle = i === 0 ? COL.cyan : COL.rule;
     ctx.beginPath();
     ctx.moveTo(cx + Math.cos(a) * r * 0.52, cy + Math.sin(a) * r * 0.52);
     ctx.lineTo(cx + Math.cos(a) * r * 0.67, cy + Math.sin(a) * r * 0.67);
@@ -896,7 +892,7 @@ function drawCursor() {
   const c = L.ch;
   if (pointer.x < c.x || pointer.x > c.x + c.w) return;
   const locked = laser.lock > 0;
-  ctx.strokeStyle = locked ? COL.red : (laser.onBody ? COL.amber : COL.tealDim);
+  ctx.strokeStyle = locked ? COL.red : (laser.onBody ? COL.cyan : COL.tealDim);
   ctx.lineWidth = 1;
   const r = PULSE_RADIUS;
   ctx.globalAlpha = locked ? 0.5 : 0.75;
@@ -942,12 +938,32 @@ function strikeDots(x, y, r) {
   }
 }
 function heatColor() {
-  return laser.lock > 0 ? COL.red : (laser.heat > 75 ? COL.amber : COL.teal);
+  return laser.lock > 0 ? COL.red : (laser.heat > 75 ? COL.cyan : COL.teal);
 }
 function scanFrac() {
   const tLeft = subject && subject.phase === 'scan' ? subject.scanLeft
               : (subject ? subject.scanTime : 0);
   return { tLeft, frac: subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0 };
+}
+
+// "Am I supposed to click all the dots, or just the red ones?" is a fair
+// question that the title card was answering two minutes too early.
+function drawGoal(time) {
+  if (state !== 'play' || !subject) return;
+  const c = L.ch;
+  const y = (L.narrow ? L.topH : 0) + 30;
+  ctx.textAlign = 'center';
+  const left = subject.parts.filter(p => p.type.flagged).length +
+               loose.filter(p => p.type.flagged).length;
+  if (left > 0) {
+    value(left + ' RED LEFT ON THIS SUBJECT, THOSE ARE THE ONES THAT COUNT',
+          c.cx, y, 15, COL.red);
+  } else {
+    value('ALL RED RECOVERED, SWEEP THE REST FOR POINTS', c.cx, y, 15, COL.teal);
+  }
+  value('TAP THE BODY TO KNOCK PARTICLES OFF, THEN HOLD AND DRAG THEM TO THE INTAKE',
+        c.cx, y + 21, 12, COL.dim);
+  ctx.textAlign = 'left';
 }
 
 function drawPanels(time) {
@@ -989,7 +1005,7 @@ function drawPanels(time) {
   y += dialR * 2 + 28;
   value(sc.tLeft.toFixed(1) + ' s', x, y, 17, COL.text);
   ctx.textAlign = 'right';
-  value('0' + year, x + bw, y, 17, COL.amber);
+  value('0' + year, x + bw, y, 17, COL.cyan);
   ctx.textAlign = 'left';
   y += 17;
   label('LEFT', x, y, 11);
@@ -1043,7 +1059,7 @@ function drawPanels(time) {
   const rows = [
     ['DISLODGED', String(released), COL.text],
     ['CAPTURED', String(captured), COL.text],
-    ['RECOVERY', rate + ' %', rate >= 60 ? COL.teal : COL.amber],
+    ['RECOVERY', rate + ' %', rate >= 60 ? COL.teal : COL.cyan],
   ];
   rows.forEach((r, i) => {
     label(r[0], rx, fy + i * 26);
@@ -1069,7 +1085,7 @@ function drawBars(time) {
   const dx = clamp(W * 0.60, 170, W - 108);
   drawLongNow(dx, 48, dialR, sc.frac, time);
   value(sc.tLeft.toFixed(0) + ' s', dx + dialR + 10, 46, 20, COL.text);
-  value('0' + year, dx + dialR + 10, 68, 15, COL.amber);
+  value('0' + year, dx + dialR + 10, 68, 15, COL.cyan);
 
   ctx.textAlign = 'right';
   label('SHIFT ' + String(shift).padStart(2, '0'), W - pad, 26, 12);
@@ -1103,53 +1119,62 @@ function drawBars(time) {
   const rate = released > 0 ? Math.round(captured / released * 100) : 0;
   ctx.textAlign = 'right';
   label('RECOVERY', W - pad, by + 24, 12);
-  value(rate + ' %', W - pad, by + 50, 20, rate >= 60 ? COL.teal : COL.amber);
+  value(rate + ' %', W - pad, by + 50, 20, rate >= 60 ? COL.teal : COL.cyan);
   ctx.textAlign = 'left';
 }
 
-function card(title, titleColor, sub, rows, footer) {
+const OVERLAY = 'rgba(4,7,10,0.93)';
+
+function card(title, titleColor, sub, lines, button, accent) {
   const c = L.ch;
-  ctx.fillStyle = 'rgba(4,7,10,0.92)';
+  ctx.fillStyle = OVERLAY;
   ctx.fillRect(c.x, 0, c.w, H);
   ctx.textAlign = 'center';
 
-  const k = Math.min(L.hud, H / 560, c.w / 430);
-  const rowH = 30 * k, subH = 20 * k;
-  const blockH = 74 * k + rows.length * (rowH + subH) + 70 * k;
-  let y = Math.max(46 * k, (H - blockH) / 2);
+  // absolute sizes, so the card cannot compound with the HUD scale
+  const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
+  const put = (t, y, size, color, weight) => {
+    ctx.fillStyle = color;
+    ctx.font = (weight ? weight + ' ' : '') + (size * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText(t, c.cx, y);
+  };
 
-  value(title, c.cx, y, Math.min(46, c.w * 0.095) * k, titleColor); y += 28 * k;
-  value(sub, c.cx, y, 13 * k, COL.dim); y += 46 * k;
+  const bw = Math.min(c.w * 0.62, 280 * k), bh = 56 * k;
+  const block = 46 * k + 26 * k + bh + 44 * k + lines.length * 27 * k;
+  let y = Math.max(44 * k, (H - block) / 2) + 34 * k;
 
-  for (const r of rows) {
-    value(r[0], c.cx, y, 15 * k, COL.amber); y += rowH * 0.66;
-    value(r[1], c.cx, y, 13 * k, COL.dim); y += rowH + subH - rowH * 0.66;
-  }
-  y += 16 * k;
-  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
-  value(footer, c.cx, y, 17 * k, COL.teal);
-  ctx.globalAlpha = 1;
+  put(title, y, Math.min(44, c.w * 0.1), titleColor, '600'); y += 24 * k;
+  put(sub, y, 13, COL.dim); y += 30 * k;
+
+  const bx = c.cx - bw / 2;
+  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
+  ctx.fillStyle = 'rgba(126,224,255,' + (0.08 + pulse * 0.07) + ')';
+  ctx.fillRect(bx, y, bw, bh);
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
+  put(button, y + bh / 2 + 7 * k, 19, accent, '700');
+  y += bh + 40 * k;
+
+  for (const t of lines) { put(t, y, 14, COL.dim); y += 27 * k; }
   ctx.textAlign = 'left';
 }
 
 function drawTitle() {
   card('DUST OFF', COL.teal, 'LASER PARTICLE RECOVERY', [
-    ['TAP THE SUBJECT', 'both wall outlets fire and the pulse knocks particles loose'],
-    ['HOLD AND DRAG', 'the beams push them, sweep them down into the intake'],
-    ['WATCH THE HEAT', 'the outlets lock out at 100 and take 1.6 seconds to cool'],
-    ['RED IS FLAGGED', 'let one leave the chamber and the subject walks uncleared'],
-    ['THE DIAL IS A CLOCK', 'it keeps long now time, so the year has a leading zero'],
-  ], 'TAP TO BEGIN THE SHIFT');
+    'Tap the body. Four beams cross there and knock particles loose.',
+    'Then hold and drag, and sweep them down into the intake.',
+    'The red ones are the job. Everything else is points.',
+  ], 'PLAY NOW', COL.teal);
 }
 
 function drawOver() {
   const rate = released > 0 ? Math.round(captured / released * 100) : 0;
   card('SHIFT ENDED', COL.red, 'THREE SUBJECTS LEFT UNCLEARED', [
-    ['SCORE', String(score).padStart(6, '0')],
-    ['SUBJECTS PROCESSED', String(shift)],
-    ['RECOVERY RATE', rate + ' %'],
-    ['LONG NOW YEAR', '0' + year],
-  ], 'TAP TO RUN IT AGAIN');
+    'Score ' + String(score).padStart(6, '0'),
+    shift + ' subjects processed, ' + rate + ' per cent recovered',
+    'Long now year 0' + year,
+  ], 'RUN IT AGAIN', COL.teal);
 }
 
 // ---------------------------------------------------------------- loop

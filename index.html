@@ -11,8 +11,9 @@
     --ink: rgb(var(--holo-ink));
     --dim: rgb(var(--holo-dim));
     --line: rgb(var(--holo-line) / .22);
-    --warm: rgb(var(--holo-warm));
     --cyan: rgb(var(--holo-cyan));
+    --viol: rgb(var(--holo-viol));
+    --rose: 255 107 120;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -29,8 +30,8 @@
 
   .ribbon {
     display: inline-block;
-    border: 1px solid rgb(var(--holo-warm) / .55);
-    color: var(--warm);
+    border: 1px solid rgb(var(--holo-cyan) / .5);
+    color: var(--cyan);
     font-size: 13px; letter-spacing: .12em;
     padding: 7px 15px;
     margin-bottom: 24px;
@@ -47,18 +48,38 @@
   @media (min-width: 720px) { .cards { grid-template-columns: 1fr 1fr; } }
   @media (min-width: 1040px) { .cards { grid-template-columns: repeat(3, 1fr); } }
 
-  .card { padding: 24px; display: flex; flex-direction: column; text-decoration: none; }
+  .card { padding: 22px 24px 24px; display: flex; flex-direction: column; text-decoration: none; }
   .card .pat { font-size: 13px; letter-spacing: .1em; color: rgb(var(--holo-dim) / .8); }
-  .card .name { font-size: 27px; margin: 12px 0 6px; font-weight: 600; color: var(--cyan); }
-  .card .tag { font-size: 14px; color: var(--dim); margin: 0 0 18px; }
-  .card .body { font-size: 15px; color: var(--dim); margin: 0 0 24px; flex: 1; }
+
+  /* the figure, redrawn in the patent idiom rather than copied from the office
+     drawing: thin single weight strokes, no fill, numbered leaders */
+  .fig {
+    display: block; width: 100%; height: auto; margin: 16px 0 4px;
+    fill: none;
+    stroke: rgb(var(--accent) / .85);
+    stroke-width: 1.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .fig text {
+    fill: rgb(var(--holo-dim) / .75); stroke: none;
+    font-family: ui-monospace, Menlo, monospace; font-size: 9px;
+  }
+  .fig .lead { stroke: rgb(var(--holo-dim) / .5); stroke-width: .8; }
+  .fig .dash { stroke-dasharray: 3 3; stroke: rgb(var(--accent) / .5); }
+  .fig .dot { fill: rgb(var(--accent) / .85); stroke: none; }
+  .card:hover .fig { stroke: rgb(var(--accent)); }
+
+  .card .name { font-size: 26px; margin: 10px 0 6px; font-weight: 600; color: rgb(var(--accent)); }
+  .card .tag { font-size: 14px; color: var(--dim); margin: 0 0 16px; }
+  .card .body { font-size: 15px; color: var(--dim); margin: 0 0 22px; flex: 1; }
   .card .body strong { color: var(--ink); font-weight: 600; }
   .card .go {
     font-size: 14px; letter-spacing: .14em; align-self: flex-start;
-    color: var(--ink); border: 1px solid rgb(var(--holo-cyan) / .3);
+    color: var(--ink); border: 1px solid rgb(var(--accent) / .35);
     padding: 12px 22px;
   }
-  .card:hover .go { border-color: rgb(var(--holo-cyan) / .7); }
+  .card:hover .go { border-color: rgb(var(--accent) / .8); }
 
   .cite { margin-top: 50px; border-top: 1px solid var(--line); padding-top: 26px; }
   .cite h2 { font-size: 14px; letter-spacing: .14em; color: rgb(var(--holo-dim) / .85); margin: 0 0 16px; font-weight: 600; }
@@ -67,7 +88,7 @@
   .note { font-size: 15px; color: var(--dim); margin-top: 26px; max-width: 70ch; }
   .signoff {
     margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line);
-    font-size: 19px; color: var(--warm);
+    font-size: 19px; color: var(--cyan);
   }
   .built { margin-top: 14px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
 </style>
@@ -90,48 +111,104 @@
 
   <div class="cards">
 
-    <a class="card holocard" href="games/dust-off/">
+    <a class="card holocard" href="games/dust-off/" style="--accent: var(--holo-cyan);">
       <span class="holocard-trace"></span>
       <div class="pat">US 9,134,205 B2 &middot; 2015</div>
+
+      <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a subject in a chamber, four outlets, and a capture intake below">
+        <rect x="10" y="10" width="300" height="116"/>
+        <circle cx="160" cy="40" r="9"/>
+        <path d="M160 49 v32 M160 57 l-15 13 M160 57 l15 13 M160 81 l-11 24 M160 81 l11 24"/>
+        <rect x="22" y="28" width="15" height="12"/>
+        <rect x="22" y="54" width="15" height="12"/>
+        <rect x="283" y="28" width="15" height="12"/>
+        <rect x="283" y="54" width="15" height="12"/>
+        <path class="dash" d="M37 34 L160 66 M37 60 L160 66 M283 34 L160 66 M283 60 L160 66"/>
+        <circle class="dot" cx="139" cy="80" r="1.8"/>
+        <circle class="dot" cx="182" cy="86" r="1.8"/>
+        <circle class="dot" cx="147" cy="96" r="1.8"/>
+        <circle class="dot" cx="173" cy="99" r="1.8"/>
+        <rect x="120" y="108" width="80" height="9"/>
+        <path class="lead" d="M160 22 L196 22"/><text x="200" y="25">10</text>
+        <path class="lead" d="M37 28 L52 18"/><text x="56" y="21">20</text>
+        <path class="lead" d="M200 112 L232 112"/><text x="236" y="115">30</text>
+      </svg>
+
       <div class="name">Dust Off</div>
       <p class="tag">System and method for removing surface particles from an object</p>
       <p class="body">
         The airport puffer booth. A sensor picks a spot on a person, a jet knocks particles
-        loose, and capture jets herd them into a collector for analysis.
+        loose, and capture jets herd them into a collector.
         <strong>We replaced the air jets with lasers</strong>, because it is a birthday.
-        Tap the subject, sweep the loose particles down into the intake, and try not to let
-        the red ones drift off. The clock in the corner is the ten thousand year one.
+        Four of them, crossing where you aim. The clock in the corner is the ten thousand
+        year one.
       </p>
       <span class="go">PLAY</span>
     </a>
 
-    <a class="card holocard" href="games/lumen/">
+    <a class="card holocard" href="games/lumen/" style="--accent: var(--rose);">
       <span class="holocard-trace"></span>
       <div class="pat">US 7,857,767 B2 &middot; 2010</div>
+
+      <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a wheeled device inside a body lumen, with plaque on the wall">
+        <path d="M10 40 H310 M10 106 H310"/>
+        <path d="M143 62 h36 l12 11 -12 11 h-36 z"/>
+        <circle cx="152" cy="54" r="8"/><circle cx="172" cy="54" r="8"/>
+        <circle cx="152" cy="92" r="8"/><circle cx="172" cy="92" r="8"/>
+        <path d="M152 50 v8 M148 54 h8 M172 50 v8 M168 54 h8"/>
+        <path d="M186 73 h26"/>
+        <path d="M40 73 h44 m-9 -6 l9 6 -9 6"/>
+        <path d="M236 106 q9 -17 19 -8 q10 9 20 8"/>
+        <path class="lead" d="M60 40 L60 26"/><text x="64" y="29">100</text>
+        <path class="lead" d="M162 62 L200 40"/><text x="204" y="38">110</text>
+        <path class="lead" d="M152 100 L140 122"/><text x="112" y="126">120</text>
+        <path class="lead" d="M255 100 L276 122"/><text x="280" y="126">130</text>
+      </svg>
+
       <div class="name">Lumen</div>
       <p class="tag">Lumen traveling device</p>
       <p class="body">
         A self propelling microrobot with wall gripping wheels, a sensor for a condition of
         interest, and an active portion that does something about it.
-        <strong>You are the motion control circuitry.</strong> Drive through a branching
-        vessel bed lit only by your own lamp, chase a sensor bearing that fibs when you are
-        far away, dig the wheels in against the current, and burn the plaque out.
+        <strong>You are the motion control circuitry.</strong> Drive by lamplight, chase a
+        sensor bearing that fibs at range, dig the wheels in against the current, and burn
+        the plaque out.
       </p>
       <span class="go">PLAY</span>
     </a>
 
-    <a class="card holocard" href="games/separator/">
+    <a class="card holocard" href="games/separator/" style="--accent: var(--holo-viol);">
       <span class="holocard-trace"></span>
       <div class="pat">US 9,480,991 B2 &middot; 2016</div>
+
+      <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a chute of carrier fluid, a radiofrequency generator, grains rising on bubbles to a skimmer">
+        <path d="M10 40 H310 M10 112 H310"/>
+        <rect class="dash" x="118" y="40" width="74" height="72"/>
+        <path d="M124 122 q9 -12 18 0 q9 12 18 0 q9 -12 18 0"/>
+        <circle cx="150" cy="96" r="6"/>
+        <circle cx="153" cy="82" r="3.4"/><circle cx="147" cy="71" r="2.6"/><circle cx="151" cy="61" r="2"/>
+        <circle cx="176" cy="70" r="5"/>
+        <circle cx="179" cy="57" r="2.6"/>
+        <circle cx="222" cy="48" r="6"/>
+        <path d="M234 48 h34 m-9 -6 l9 6 -9 6"/>
+        <circle cx="286" cy="40" r="11"/>
+        <path d="M286 29 v22 M275 40 h22"/>
+        <path d="M28 70 h40 m-9 -6 l9 6 -9 6"/>
+        <circle class="dot" cx="76" cy="88" r="2.4"/>
+        <circle class="dot" cx="92" cy="100" r="2"/>
+        <path class="lead" d="M60 40 L60 26"/><text x="64" y="29">200</text>
+        <path class="lead" d="M150 122 L118 132"/><text x="86" y="134">210</text>
+        <path class="lead" d="M286 29 L286 18"/><text x="266" y="15">220</text>
+      </svg>
+
       <div class="name">Separator</div>
       <p class="tag">Radiofrequency particle separator</p>
       <p class="body">
         A radiofrequency field heats mineral grains until the water around them boils, and
-        the bubble carries the grain up to a skimmer. Frequency sets the skin depth, and it
+        the bubble carries the grain up to a skimmer. Frequency sets the skin depth, which
         wants to land at about a tenth of the grain, so
         <strong>a big grain tunes low and a fine one tunes high.</strong>
-        Ride the dial across the feed. The rock has no band of its own, and lifts whenever
-        its size happens to match yours, which it will, at the worst moment.
+        The rock has no band of its own, and lifts whenever its size happens to match yours.
       </p>
       <span class="go">PLAY</span>
     </a>
@@ -166,6 +243,10 @@
       with the square root of frequency so a bigger grain tunes lower, is the real one off
       the page. Nothing here simulates the physics. If you are planning to build a mining
       plant from this website, that is between you and your investors.
+    </p>
+    <p class="note">
+      The three figures above are drawn here, in the style of a patent sheet. They are not
+      the office drawings, and the numerals are ours. Follow the links for the real ones.
     </p>
     <p class="note">
       They run on a phone, and they are happier still on a laptop with a trackpad.
