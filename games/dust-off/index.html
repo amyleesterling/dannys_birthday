@@ -48,12 +48,12 @@ const COL = {
 };
 
 const TYPES = [
-  { id: 'skin',   name: 'SKIN CELL',      color: '#d9c8a4', pts: 10, weight: 30, size: 1.9 },
-  { id: 'dust',   name: 'DUST',           color: '#8d99a6', pts: 10, weight: 26, size: 1.7 },
-  { id: 'lint',   name: 'LINT',           color: '#9fd4ff', pts: 15, weight: 18, size: 2.4 },
-  { id: 'pollen', name: 'POLLEN',         color: '#ffd166', pts: 20, weight: 14, size: 2.2 },
-  { id: 'bact',   name: 'BACTERIA',       color: '#93dd86', pts: 25, weight: 8,  size: 1.5 },
-  { id: 'trace',  name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 150, weight: 0, size: 3.2, flagged: true },
+  { id: 'skin',   name: 'SKIN CELL',      color: '#d9c8a4', pts: 30, weight: 30, size: 2.2 },
+  { id: 'dust',   name: 'DUST',           color: '#8d99a6', pts: 30, weight: 26, size: 2.0 },
+  { id: 'lint',   name: 'LINT',           color: '#9fd4ff', pts: 45, weight: 18, size: 2.7 },
+  { id: 'pollen', name: 'POLLEN',         color: '#ffd166', pts: 60, weight: 14, size: 2.5 },
+  { id: 'bact',   name: 'BACTERIA',       color: '#93dd86', pts: 75, weight: 8,  size: 1.8 },
+  { id: 'trace',  name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 400, weight: 0, size: 3.6, flagged: true },
 ];
 const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const WEIGHT_TOTAL = TYPES.reduce((s, t) => s + t.weight, 0);
@@ -69,9 +69,9 @@ const PULSE_HEAT   = 16;
 const BEAM_HEAT    = 24;   // per second
 const COOL_RATE    = 30;   // per second
 const OVERHEAT_LOCK = 1.6; // seconds
-const PULSE_RADIUS = 46;   // screen px
-const BEAM_RADIUS  = 108;
-const BEAM_FORCE   = 1500;
+const PULSE_RADIUS = 62;   // screen px
+const BEAM_RADIUS  = 155;
+const BEAM_FORCE   = 2800;
 
 const MAX_MISSES = 3;
 
@@ -156,7 +156,7 @@ const ctx = canvas.getContext('2d', { alpha: false });
 let W = 0, H = 0, dpr = 1;
 let L = {};        // layout
 let state = 'title';
-let shift = 0, score = 0, misses = 0;
+let shift = 0, score = 0, misses = 0, year = 2026;
 let captured = 0, released = 0;   // running totals for the report line
 
 let subject = null;
@@ -187,11 +187,12 @@ function layout() {
     ch:    { x: padL, y: 0, w: W - padL - padR, h: H - 26 },
   };
   L.ch.cx = L.ch.x + L.ch.w / 2;
-  L.floorY = L.ch.h * 0.86;
-  L.gantryY = L.ch.h * 0.085;
-  L.figH = clamp(L.ch.h * 0.60, 220, 380);
+  L.floorY = L.ch.h * 0.87;
+  L.figH = clamp(L.ch.h * 0.76, 280, 620);
   L.figScale = L.figH / 185;
-  L.intake = { w: Math.min(300, L.ch.w * 0.42), h: 22, y: L.floorY + 8 };
+  L.intake = { w: Math.min(460, L.ch.w * 0.56), h: 24, y: L.floorY + 8 };
+  // the outlets ride vertical rails on the two side walls, as in the drawings
+  L.rail = { top: L.ch.h * 0.10, bot: L.floorY - 30, lx: L.ch.x + 26, rx: L.ch.x + L.ch.w - 26 };
   L.hud = H < 660 ? 0.9 : 1;
 }
 
@@ -209,6 +210,7 @@ function newSubject() {
   while (pts.length < count && guard < count * 300) {
     guard++;
     const x = rand(-34, 34), y = rand(-99, 86);
+    if (Math.abs(x) < 14 && y > -6 && y < 22) continue;   // not there
     if (!hitCtx.isPointInPath(path, x, y)) continue;
     pts.push({ x, y });
   }
@@ -228,8 +230,8 @@ function newSubject() {
     id: 'SB' + String(1740 + shift * 7 + ((Math.random() * 60) | 0)).padStart(4, '0'),
     phase: 'enter', t: 0,
     enterDur: 0.85, exitDur: 1.0,
-    scanTime: Math.max(12, 20 - shift * 0.7),
-    scanLeft: Math.max(12, 20 - shift * 0.7),
+    scanTime: Math.max(16, 26 - shift * 0.7),
+    scanLeft: Math.max(16, 26 - shift * 0.7),
     x: L.ch.x - 70,
     turb: 0.45 + shift * 0.09,
     flagTotal: flagCount,
@@ -345,7 +347,7 @@ window.addEventListener('resize', () => { layout(); });
 
 function startRun() {
   layout();
-  shift = 1; score = 0; misses = 0; captured = 0; released = 0;
+  shift = 1; score = 0; misses = 0; captured = 0; released = 0; year = 2026;
   loose = []; fx = []; feed = [];
   laser.heat = 0; laser.lock = 0; laser.beamT = 0;
   subject = newSubject();
@@ -354,6 +356,7 @@ function startRun() {
 }
 
 function endSubject() {
+  year++;
   let missed = subject.parts.filter(p => p.type.flagged).length;
   missed += loose.filter(p => p.type.flagged).length;
   if (missed > 0) {
@@ -364,7 +367,7 @@ function endSubject() {
   } else {
     feed.unshift({ ok: true, text: 'SUBJECT CLEARED', age: 0 });
     if (feed.length > 9) feed.length = 9;
-    score += 200;
+    score += 500;
   }
   loose = loose.filter(p => !p.type.flagged);
   if (misses >= MAX_MISSES) { state = 'over'; return; }
@@ -447,7 +450,7 @@ function updateLoose(dt, turb, beamOn) {
 
     // buoyant drift plus a little turbulence: light debris rises out of frame
     let ax = Math.sin(now * 1.7 + p.ph * 3.1 + p.y * 0.012) * 26 * turb;
-    let ay = -26 - (p.type.flagged ? -14 : 0);
+    let ay = -13 - (p.type.flagged ? -7 : 0);
 
     if (beamOn) {
       const dx = pointer.x - p.x, dy = pointer.y - p.y;
@@ -460,9 +463,9 @@ function updateLoose(dt, turb, beamOn) {
     }
 
     // intake suction near the vent mouth
-    const overVent = p.x > ix - 40 && p.x < ix + iw + 40 && p.y > iy - 130;
+    const overVent = p.x > ix - 70 && p.x < ix + iw + 70 && p.y > iy - 300;
     if (overVent) {
-      ay += 340 * (1 - clamp((iy - p.y) / 130, 0, 1));
+      ay += 520 * (1 - clamp((iy - p.y) / 300, 0, 1));
       ax += ((ix + iw / 2) - p.x) * 1.2;
     }
 
@@ -543,13 +546,13 @@ function drawChamber(time) {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(c.x, L.floorY + .5); ctx.lineTo(c.x + c.w, L.floorY + .5); ctx.stroke();
 
-  // gantry rail
+  // outlet rails, one on each side wall
   ctx.strokeStyle = COL.rule;
   ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(c.x + 14, L.gantryY); ctx.lineTo(c.x + c.w - 14, L.gantryY); ctx.stroke();
-  for (let x = c.x + 14; x < c.x + c.w - 10; x += 22) {
+  for (const rx of [L.rail.lx, L.rail.rx]) {
+    ctx.beginPath(); ctx.moveTo(rx, L.rail.top); ctx.lineTo(rx, L.rail.bot); ctx.stroke();
     ctx.fillStyle = 'rgba(53,224,208,0.16)';
-    ctx.fillRect(x, L.gantryY - 3, 2, 6);
+    for (let ry = L.rail.top; ry < L.rail.bot; ry += 22) ctx.fillRect(rx - 3, ry, 6, 2);
   }
 
   // intake vent
@@ -688,17 +691,21 @@ function drawFx() {
 
 function drawLaser(time) {
   const c = L.ch;
-  const ex = clamp(pointer.x, c.x + 20, c.x + c.w - 20);
-  const ey = L.gantryY;
+  const ey = clamp(pointer.y, L.rail.top, L.rail.bot);
+  const heads = [{ x: L.rail.lx, s: 1 }, { x: L.rail.rx, s: -1 }];
 
-  // emitter head, the steering mechanism riding the gantry
-  ctx.fillStyle = '#0b171b';
-  ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(ex - 13, ey - 7); ctx.lineTo(ex + 13, ey - 7);
-  ctx.lineTo(ex + 7, ey + 9); ctx.lineTo(ex - 7, ey + 9);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // the outlets themselves, one on each side wall
+  for (const h of heads) {
+    ctx.fillStyle = '#0b171b';
+    ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(h.x - 8 * h.s, ey - 14);
+    ctx.lineTo(h.x - 8 * h.s, ey + 14);
+    ctx.lineTo(h.x + 10 * h.s, ey + 8);
+    ctx.lineTo(h.x + 10 * h.s, ey - 8);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
 
   if (!pointer.inside || pointer.x < c.x || pointer.x > c.x + c.w) return;
 
@@ -707,35 +714,85 @@ function drawLaser(time) {
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-
+  for (const h of heads) {
+    const dx = pointer.x - h.x, dy = pointer.y - ey;
+    if (beamOn) {
+      const ang = Math.atan2(dy, dx);
+      const spread = Math.atan2(BEAM_RADIUS * 0.45, Math.max(40, Math.hypot(dx, dy)));
+      ctx.fillStyle = 'rgba(53,224,208,0.055)';
+      ctx.beginPath();
+      ctx.moveTo(h.x, ey);
+      ctx.lineTo(h.x + Math.cos(ang - spread) * 2200, ey + Math.sin(ang - spread) * 2200);
+      ctx.lineTo(h.x + Math.cos(ang + spread) * 2200, ey + Math.sin(ang + spread) * 2200);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(53,224,208,0.5)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+    }
+    if (flash > 0) {
+      ctx.strokeStyle = `rgba(255,214,140,${flash})`;
+      ctx.lineWidth = 1 + flash * 4;
+      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+      ctx.strokeStyle = `rgba(255,255,235,${flash * 0.9})`;
+      ctx.lineWidth = 1 + flash * 1.2;
+      ctx.beginPath(); ctx.moveTo(h.x, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+    }
+  }
   if (beamOn) {
-    // continuous tractor beam: a cone of radiation pressure
-    const ang = Math.atan2(pointer.y - ey, pointer.x - ex);
-    const spread = Math.atan2(BEAM_RADIUS * 0.55, Math.max(40, Math.hypot(pointer.x - ex, pointer.y - ey)));
-    ctx.fillStyle = 'rgba(53,224,208,0.07)';
-    ctx.beginPath();
-    ctx.moveTo(ex, ey);
-    ctx.lineTo(ex + Math.cos(ang - spread) * 1400, ey + Math.sin(ang - spread) * 1400);
-    ctx.lineTo(ex + Math.cos(ang + spread) * 1400, ey + Math.sin(ang + spread) * 1400);
-    ctx.closePath(); ctx.fill();
-
-    ctx.strokeStyle = 'rgba(53,224,208,0.55)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(53,224,208,0.35)';
+    ctx.strokeStyle = 'rgba(53,224,208,0.32)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(pointer.x, pointer.y, BEAM_RADIUS, 0, TAU); ctx.stroke();
   }
+  ctx.restore();
+}
 
-  if (flash > 0) {
-    ctx.strokeStyle = `rgba(255,214,140,${flash})`;
-    ctx.lineWidth = 1 + flash * 4;
-    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,235,${flash * 0.9})`;
-    ctx.lineWidth = 1 + flash * 1.2;
-    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+// A nod to the Clock of the Long Now. The outer dial is the scan window; the
+// inner rings just keep turning, which is more or less the point of that clock.
+function drawLongNow(cx, cy, r, frac, time) {
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke();
+
+  for (let i = 0; i < 24; i++) {
+    const a = i / 24 * TAU + time * 0.02;
+    const big = i % 6 === 0;
+    ctx.fillStyle = big ? COL.tealDim : COL.rule;
+    ctx.beginPath();
+    ctx.arc(cx + Math.cos(a) * r * 0.93, cy + Math.sin(a) * r * 0.93, big ? 1.8 : 1.1, 0, TAU);
+    ctx.fill();
   }
+
+  ctx.strokeStyle = frac < 0.25 ? COL.amber : COL.teal;
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.78, -Math.PI / 2, -Math.PI / 2 + frac * TAU);
+  ctx.stroke();
+
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.60, 0, TAU); ctx.stroke();
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * TAU + year * 0.09;
+    ctx.strokeStyle = i === 0 ? COL.amber : COL.rule;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * r * 0.52, cy + Math.sin(a) * r * 0.52);
+    ctx.lineTo(cx + Math.cos(a) * r * 0.67, cy + Math.sin(a) * r * 0.67);
+    ctx.stroke();
+  }
+
+  const ph = (time * 0.05) % 1;
+  ctx.fillStyle = '#0d1418';
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.34, 0, TAU); ctx.fill();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.34, 0, TAU); ctx.clip();
+  ctx.fillStyle = COL.tealDim;
+  ctx.beginPath();
+  ctx.arc(cx + (ph - 0.5) * r * 0.9, cy, r * 0.34, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.34, 0, TAU); ctx.stroke();
   ctx.restore();
 }
 
@@ -812,19 +869,21 @@ function drawPanels(time) {
   if (laser.lock > 0) { value('OVERHEAT. COOLING.', x, y, 10, COL.red); }
   y += 24;
 
-  // scan window
-  label('SCAN WINDOW', x, y); y += 12;
+  // scan window, kept on a long now dial
+  label('SCAN WINDOW', x, y); y += 10;
   const tLeft = subject && subject.phase === 'scan' ? subject.scanLeft : (subject ? subject.scanTime : 0);
   const tFrac = subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0;
-  ctx.fillStyle = '#0d1418';
-  ctx.fillRect(x, y, bw, bh);
-  ctx.fillStyle = tFrac < 0.25 ? COL.amber : COL.tealDim;
-  ctx.fillRect(x, y, bw * tFrac, bh);
-  ctx.strokeStyle = COL.rule;
-  ctx.strokeRect(x + .5, y + .5, bw - 1, bh - 1);
-  y += bh + 12;
-  value(tLeft.toFixed(1) + ' S', x, y, 13, COL.dim);
-  y += 34;
+  const dialR = Math.min(44, bw / 2 - 6);
+  drawLongNow(x + bw / 2, y + dialR + 2, dialR, tFrac, time);
+  y += dialR * 2 + 20;
+  value(tLeft.toFixed(1) + ' s', x, y, 14, COL.dim);
+  ctx.textAlign = 'right';
+  value('0' + year, x + bw, y, 14, COL.amber);
+  ctx.textAlign = 'left';
+  y += 13;
+  label('LEFT', x, y);
+  ctx.textAlign = 'right'; label('LONG NOW YEAR', x + bw, y); ctx.textAlign = 'left';
+  y += 30;
 
   // strikes
   label('FLAGGED LOST', x, y); y += 18;
@@ -914,10 +973,11 @@ function drawTitle() {
   value('LASER PARTICLE RECOVERY', c.cx, y, 13, COL.dim); y += 56;
 
   const lines = [
-    ['CLICK THE SUBJECT', 'a pulse ablates the surface and throws particles loose'],
-    ['HOLD AND DRAG', 'the beam pushes loose particles, steer them into the intake'],
-    ['WATCH THE HEAT', 'the emitter locks out at 100 and takes 1.6 seconds to cool'],
+    ['TAP THE SUBJECT', 'both wall outlets fire and the pulse throws particles loose'],
+    ['HOLD AND DRAG', 'the beams push loose particles, sweep them down into the intake'],
+    ['WATCH THE HEAT', 'the outlets lock out at 100 and take 1.6 seconds to cool'],
     ['RED IS FLAGGED', 'let one leave the chamber and the subject walks uncleared'],
+    ['THE DIAL IS A CLOCK', 'it keeps long now time, so the year carries a leading zero'],
   ];
   for (const [k, v] of lines) {
     value(k, c.cx, y, 12, COL.amber); y += 15;

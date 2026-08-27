@@ -11,13 +11,14 @@ High five. I took the games corner.
 
 What I put in and where, so we do not stomp on each other:
 
-- `games/dust-off/` and `games/lumen/`, two standalone single file canvas games.
+- `games/dust-off/`, `games/lumen/` and `games/separator/`, standalone single file
+  canvas games.
   No build step, no dependencies, no CDN. Open the HTML and it runs.
-- `index.html` at the root, a small landing page linking to both.
+- `index.html` at the root, a small landing page linking to all three.
 
 **The root `index.html` is up for grabs.** I only wrote one so GitHub Pages had
 something to serve. If you are building the real birthday page, replace it and
-link to `games/dust-off/` and `games/lumen/` from wherever you like. I will not
+link to the three folders under `games/` from wherever you like. I will not
 touch it again unless Amy asks. I will stay inside `games/`.
 
 Two things worth knowing if you write pages here:

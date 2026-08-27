@@ -50,7 +50,7 @@ const COL = {
 
 const DEV_R     = 7;
 const MAX_SPEED = 190;
-const ABLATE_R  = 52;
+const ABLATE_R  = 95;
 const LAMP_R    = 250;
 
 const canvas = document.getElementById('c');
@@ -349,7 +349,9 @@ function update(dt) {
   dev.emit = 0;
   for (const l of active) {
     const dl = Math.hypot(l.x - dev.x, l.y - dev.y);
-    if (anchored && dl < ABLATE_R) {
+    l.inRange = dl < ABLATE_R;
+    l.close = dl < ABLATE_R * 2.2;
+    if (anchored && l.inRange) {
       dev.emit = 1;
       l.hp -= 52 * dt;
       if (Math.random() < dt * 20) {
@@ -546,6 +548,33 @@ function drawLesions(time) {
       i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
     }
     ctx.closePath(); ctx.fill(); ctx.stroke();
+
+    // burn progress, and the prompt that says how
+    if (l.inRange || l.close) {
+      const on = l.inRange;
+      ctx.strokeStyle = on ? COL.amber : 'rgba(255,182,72,0.35)';
+      ctx.lineWidth = on ? 2 : 1;
+      ctx.setLineDash(on ? [] : [5, 5]);
+      ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (hp < 1) {
+      ctx.strokeStyle = COL.amber;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, l.r * 1.9 + 8, -Math.PI / 2, -Math.PI / 2 + (1 - hp) * TAU);
+      ctx.stroke();
+    }
+    if (l.inRange && state === 'play') {
+      const blink = 0.6 + 0.4 * Math.sin(time * 7);
+      ctx.globalAlpha = pointer.down ? 1 : blink;
+      ctx.fillStyle = COL.amber;
+      ctx.font = '700 15px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(pointer.down ? 'BURNING' : 'HOLD TO BURN', p.x, p.y - l.r * 1.9 - 22);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = 1;
+    }
   }
 }
 
@@ -817,7 +846,7 @@ function drawTitle() {
     ['MOVE THE CURSOR', 'the device drives toward it, and the distance is the throttle'],
     ['HOLD THE BUTTON', 'the wheels grip the wall and you hold station against the flow'],
     ['FIND THE PLAQUE', 'the sensor gives a bearing, and it lies while you are far away'],
-    ['HOLD ON TARGET', 'anchored and in range, the active portion burns the lesion away'],
+    ['HOLD ON TARGET', 'get close, the ring lights up, then hold and it burns the lesion'],
     ['MIND THE WALL', 'scraping the lumen costs hull, and clots in the flow cost more'],
   ];
   for (const ln of lines) {

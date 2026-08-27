@@ -14,6 +14,7 @@
     --faint: #4a6067;
     --teal: #35e0d0;
     --red: #ff6b78;
+    --amber: #ffb648;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -30,7 +31,8 @@
   .sub { color: var(--dim); font-size: 13px; margin: 0; max-width: 62ch; }
 
   .cards { display: grid; gap: 22px; grid-template-columns: 1fr; }
-  @media (min-width: 760px) { .cards { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 700px) { .cards { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 1040px) { .cards { grid-template-columns: repeat(3, 1fr); } }
 
   .card {
     background: var(--panel);
@@ -44,11 +46,13 @@
   .card:hover { border-color: #2e4650; transform: translateY(-2px); }
   .card.dust { border-top-color: var(--teal); }
   .card.lumen { border-top-color: var(--red); }
+  .card.sep { border-top-color: var(--amber); }
 
   .pat { font-size: 10.5px; letter-spacing: .12em; color: var(--faint); text-transform: uppercase; }
   .name { font-size: 22px; margin: 12px 0 4px; color: var(--text); font-weight: 600; }
   .card.dust .name { color: var(--teal); }
   .card.lumen .name { color: var(--red); }
+  .card.sep .name { color: var(--amber); }
   .tag { font-size: 11.5px; color: var(--dim); margin: 0 0 16px; }
   .body { font-size: 12.5px; color: var(--dim); margin: 0 0 20px; flex: 1; }
   .body strong { color: var(--text); font-weight: 600; }
@@ -73,8 +77,8 @@
   <header>
     <h1>Patents you can play</h1>
     <p class="sub">
-      Two of Danny Hillis's patents, read closely and then built as things you can actually
-      operate. The mechanics come from the claims, not from the vibe of the drawings.
+      Three of Danny Hillis's patents, read closely and then built as things you can
+      actually operate. The mechanics come from the claims, not from the vibe of the drawings.
     </p>
   </header>
 
@@ -108,6 +112,21 @@
       <span class="play">Play</span>
     </a>
 
+    <a class="card sep" href="games/separator/">
+      <div class="pat">US 9,480,991 B2 &middot; 2016</div>
+      <div class="name">Separator</div>
+      <p class="tag">Radiofrequency particle separator</p>
+      <p class="body">
+        A radiofrequency field heats mineral grains until the water around them boils, and
+        the vapour pocket floats the grain up to a skimmer. Frequency sets the skin depth,
+        and separation works when the skin depth lands at about a tenth of the grain,
+        so <strong>a big grain tunes low and a fine one tunes high.</strong> Ride the dial
+        across the feed. Waste rock has no band of its own; it lifts whenever its size
+        happens to match yours.
+      </p>
+      <span class="play">Play</span>
+    </a>
+
   </div>
 
   <div class="cite">
@@ -123,12 +142,19 @@
       Ferren, Hillis, Hyde, Ishikawa, Jung, Leuthardt, Myhrvold, Sweeney, Tegreene, Wood, Wood.
       Gearbox LLC, granted 28 December 2010.
     </p>
+    <p>
+      <a href="https://patents.google.com/patent/US9480991B2/en">US 9,480,991 B2</a>,
+      radiofrequency particle separator.
+      Baym, Briggs, Gilbert, Hillis, Hyde, Ishikawa, Kare, Myhrvold, Myhrvold, Pan,
+      Tegreene, Whitmer, Wood, Wood. Elwha LLC, granted 1 November 2016.
+    </p>
     <p class="note">
-      These are games, not implementations. Both take the arrangement of parts described in
-      the claims and turn it into something you operate; neither one simulates the physics
-      the patents actually rely on. Dust Off swaps the fluid jets for lasers on purpose.
-      Both are best on a laptop with a mouse or trackpad, and both want a window about
-      1200 pixels wide or more.
+      These are games, not implementations. All three take the arrangement of parts described in
+      the claims and turn it into something you operate; none of them simulates the physics
+      the patents actually rely on. Dust Off swaps the fluid jets for lasers on purpose, and
+      Separator's frequencies are invented numbers that obey a real relation from the patent.
+      All three are best on a laptop with a mouse or trackpad, and all three want a window
+      about 1200 pixels wide or more.
     </p>
   </div>
 
