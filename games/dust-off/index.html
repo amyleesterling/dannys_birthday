@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dust Off</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #04070a; color: #cfe6e6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: none; touch-action: none; }
+  #hint {
+    position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: .09em; color: #3d5d63; pointer-events: none;
+    text-align: center; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">R restart &nbsp;&nbsp; M sound</div>
+<script>
+(() => {
+'use strict';
+
+// ---------------------------------------------------------------- constants
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeIn = t => t * t * t;
+
+const COL = {
+  bg:       '#04070a',
+  panel:    '#080d11',
+  rule:     '#12262c',
+  teal:     '#35e0d0',
+  tealDim:  '#1a6f6c',
+  text:     '#cfe6e6',
+  dim:      '#4d6f74',
+  amber:    '#ffb648',
+  red:      '#ff4d5e',
+};
+
+const TYPES = [
+  { id: 'skin',   name: 'SKIN CELL',      color: '#d9c8a4', pts: 10, weight: 30, size: 1.9 },
+  { id: 'dust',   name: 'DUST',           color: '#8d99a6', pts: 10, weight: 26, size: 1.7 },
+  { id: 'lint',   name: 'LINT',           color: '#9fd4ff', pts: 15, weight: 18, size: 2.4 },
+  { id: 'pollen', name: 'POLLEN',         color: '#ffd166', pts: 20, weight: 14, size: 2.2 },
+  { id: 'bact',   name: 'BACTERIA',       color: '#93dd86', pts: 25, weight: 8,  size: 1.5 },
+  { id: 'trace',  name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 150, weight: 0, size: 3.2, flagged: true },
+];
+const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
+const WEIGHT_TOTAL = TYPES.reduce((s, t) => s + t.weight, 0);
+
+function pickType() {
+  let r = Math.random() * WEIGHT_TOTAL;
+  for (const t of TYPES) { r -= t.weight; if (r <= 0) return t; }
+  return TYPES[0];
+}
+
+// laser + heat
+const PULSE_HEAT   = 16;
+const BEAM_HEAT    = 24;   // per second
+const COOL_RATE    = 30;   // per second
+const OVERHEAT_LOCK = 1.6; // seconds
+const PULSE_RADIUS = 46;   // screen px
+const BEAM_RADIUS  = 108;
+const BEAM_FORCE   = 1500;
+
+const MAX_MISSES = 3;
+
+// ---------------------------------------------------------------- body model
+
+// Local units: figure runs about y = -99 (crown) to y = +86 (soles).
+function capsule(p, x1, y1, x2, y2, r) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-6) { p.moveTo(x1 + r, y1); p.arc(x1, y1, r, 0, TAU, true); return; }
+  const a = Math.atan2(dy, dx);
+  const nx = -dy / len, ny = dx / len;
+  p.moveTo(x1 + nx * r, y1 + ny * r);
+  p.lineTo(x2 + nx * r, y2 + ny * r);
+  p.arc(x2, y2, r, a + Math.PI / 2, a - Math.PI / 2, true);
+  p.lineTo(x1 - nx * r, y1 - ny * r);
+  p.arc(x1, y1, r, a - Math.PI / 2, a + Math.PI / 2, true);
+  p.closePath();
+}
+
+// Every part is drawn with the same helper so the winding stays consistent and
+// the nonzero fill unions them instead of punching holes.
+function buildBody(pose) {
+  const p = new Path2D();
+  const armOut = pose.armOut;     // how far the arms are held from the torso
+  const stance = pose.stance;     // foot separation
+  capsule(p, 0, -85, 0, -77, 14);                                  // head
+  capsule(p, 0, -70, 0, -62, 5.2);                                 // neck
+  capsule(p, -15, -56, 15, -56, 13.5);                             // shoulders
+  capsule(p, 0, -52, 0, -14, 15);                                  // torso
+  capsule(p, -8, -8, 8, -8, 13);                                   // pelvis
+  for (const s of [-1, 1]) {
+    capsule(p, s * 18, -55, s * (23 + armOut), -20, 6.4);          // upper arm
+    capsule(p, s * (23 + armOut), -20, s * (25 + armOut * 1.5), 10, 5.4); // forearm
+    capsule(p, s * (25 + armOut * 1.5), 10, s * (25 + armOut * 1.5), 17, 4.8); // hand
+    capsule(p, s * 8, -6, s * (9 + stance), 34, 9);                // thigh
+    capsule(p, s * (9 + stance), 34, s * (10 + stance), 74, 6.8);  // shin
+    capsule(p, s * (10 + stance), 79, s * (14 + stance), 79, 5.2); // foot
+  }
+  return p;
+}
+
+// dedicated context for hit tests so the main transform is never disturbed
+const hitCtx = document.createElement('canvas').getContext('2d');
+
+// ---------------------------------------------------------------- audio
+
+const audio = {
+  ctx: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) this.ctx = new AC();
+  },
+  tone(freq, freq2, dur, type, gain) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, freq2), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+  pulse()   { this.tone(880, 180, 0.11, 'sawtooth', 0.06); },
+  capture() { this.tone(520, 900, 0.07, 'sine', 0.045); },
+  flagged() { this.tone(300, 1300, 0.16, 'square', 0.05); },
+  overheat(){ this.tone(160, 70, 0.3, 'square', 0.07); },
+  miss()    { this.tone(220, 90, 0.35, 'triangle', 0.06); },
+  arrive()  { this.tone(300, 460, 0.09, 'sine', 0.035); },
+};
+
+// ---------------------------------------------------------------- game state
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W = 0, H = 0, dpr = 1;
+let L = {};        // layout
+let state = 'title';
+let shift = 0, score = 0, misses = 0;
+let captured = 0, released = 0;   // running totals for the report line
+
+let subject = null;
+let loose = [];
+let fx = [];
+let feed = [];
+let shake = 0;
+
+const laser = { heat: 0, lock: 0, firing: false, x: 0, y: 0, onBody: false, beamT: 0 };
+const pointer = { x: 0, y: 0, down: false, inside: false };
+
+function layout() {
+  const rect = canvas.getBoundingClientRect();
+  W = Math.max(720, rect.width);
+  H = Math.max(480, rect.height);
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  W = rect.width; H = rect.height;
+
+  const wide = W >= 1120;
+  const padL = wide ? 208 : 168;
+  const padR = wide ? 244 : 186;
+  L = {
+    wide,
+    left:  { x: 0, y: 0, w: padL, h: H },
+    right: { x: W - padR, y: 0, w: padR, h: H },
+    ch:    { x: padL, y: 0, w: W - padL - padR, h: H - 26 },
+  };
+  L.ch.cx = L.ch.x + L.ch.w / 2;
+  L.floorY = L.ch.h * 0.86;
+  L.gantryY = L.ch.h * 0.085;
+  L.figH = clamp(L.ch.h * 0.60, 220, 380);
+  L.figScale = L.figH / 185;
+  L.intake = { w: Math.min(300, L.ch.w * 0.42), h: 22, y: L.floorY + 8 };
+  L.hud = H < 660 ? 0.9 : 1;
+}
+
+// ---------------------------------------------------------------- subject
+
+function newSubject() {
+  const pose = { armOut: rand(0, 5), stance: rand(0, 4) };
+  const path = buildBody(pose);
+  const count = Math.min(96, 34 + shift * 5);
+  const flagCount = Math.min(4, 1 + Math.floor(shift / 2));
+
+  // rejection sample points inside the silhouette, in body local units
+  const pts = [];
+  let guard = 0;
+  while (pts.length < count && guard < count * 300) {
+    guard++;
+    const x = rand(-34, 34), y = rand(-99, 86);
+    if (!hitCtx.isPointInPath(path, x, y)) continue;
+    pts.push({ x, y });
+  }
+  const parts = pts.map((pt, i) => ({
+    lx: pt.x, ly: pt.y,
+    type: i < flagCount ? TYPE_BY_ID.trace : pickType(),
+    ph: rand(0, TAU),
+  }));
+  // shuffle so the flagged ones are not all clustered at the sample head
+  for (let i = parts.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [parts[i], parts[j]] = [parts[j], parts[i]];
+  }
+
+  return {
+    path, pose, parts,
+    id: 'SB' + String(1740 + shift * 7 + ((Math.random() * 60) | 0)).padStart(4, '0'),
+    phase: 'enter', t: 0,
+    enterDur: 0.85, exitDur: 1.0,
+    scanTime: Math.max(12, 20 - shift * 0.7),
+    scanLeft: Math.max(12, 20 - shift * 0.7),
+    x: L.ch.x - 70,
+    turb: 0.45 + shift * 0.09,
+    flagTotal: flagCount,
+  };
+}
+
+function subjectTransform(s) {
+  return { x: s.x, y: L.floorY - L.figH * (86 / 185), s: L.figScale };
+}
+function toScreen(s, lx, ly) {
+  const t = subjectTransform(s);
+  return { x: t.x + lx * t.s, y: t.y + ly * t.s };
+}
+function toLocal(s, sx, sy) {
+  const t = subjectTransform(s);
+  return { x: (sx - t.x) / t.s, y: (sy - t.y) / t.s };
+}
+
+// ---------------------------------------------------------------- particles
+
+function dislodge(sx, sy, radius) {
+  if (!subject) return 0;
+  const t = subjectTransform(subject);
+  const rLocal = radius / t.s;
+  let n = 0;
+  for (let i = subject.parts.length - 1; i >= 0; i--) {
+    const p = subject.parts[i];
+    const d = Math.hypot(p.lx - (sx - t.x) / t.s, p.ly - (sy - t.y) / t.s);
+    if (d > rLocal) continue;
+    const scr = toScreen(subject, p.lx, p.ly);
+    const ang = Math.atan2(scr.y - sy, scr.x - sx) + rand(-0.5, 0.5);
+    const sp = rand(70, 190) * (1 - d / rLocal * 0.55);
+    loose.push({
+      x: scr.x, y: scr.y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - rand(20, 70),
+      type: p.type, ph: rand(0, TAU), age: 0,
+    });
+    subject.parts.splice(i, 1);
+    n++;
+  }
+  return n;
+}
+
+function capture(p) {
+  score += p.type.pts;
+  captured++;
+  addFeed(p.type);
+  fx.push({ k: 'cap', x: p.x, y: p.y, t: 0, dur: 0.35, c: p.type.color });
+  if (p.type.flagged) { audio.flagged(); shake = Math.max(shake, 5); }
+  else audio.capture();
+}
+
+function addFeed(type) {
+  const top = feed[0];
+  if (top && top.type === type && top.age < 2.5) { top.n++; top.age = 0; return; }
+  feed.unshift({ type, n: 1, age: 0 });
+  if (feed.length > 9) feed.length = 9;
+}
+
+// ---------------------------------------------------------------- input
+
+function fire() {
+  if (laser.lock > 0 || state !== 'play') return;
+  const { x, y } = pointer;
+  if (x < L.ch.x || x > L.ch.x + L.ch.w) return;
+
+  laser.heat += PULSE_HEAT;
+  laser.beamT = 1;
+  audio.pulse();
+  shake = Math.max(shake, 3.5);
+  fx.push({ k: 'ring', x, y, t: 0, dur: 0.3, r: PULSE_RADIUS });
+
+  const n = subject ? dislodge(x, y, PULSE_RADIUS) : 0;
+  released += n;
+
+  if (laser.heat >= 100) {
+    laser.heat = 100;
+    laser.lock = OVERHEAT_LOCK;
+    audio.overheat();
+  }
+}
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  updatePointer(e);
+  audio.init();
+  pointer.down = true;
+  if (state === 'title') { startRun(); return; }
+  if (state === 'over')  { startRun(); return; }
+  fire();
+});
+canvas.addEventListener('pointermove', updatePointer);
+canvas.addEventListener('pointerup', () => { pointer.down = false; });
+canvas.addEventListener('pointercancel', () => { pointer.down = false; });
+canvas.addEventListener('pointerenter', () => { pointer.inside = true; });
+canvas.addEventListener('pointerleave', () => { pointer.inside = false; pointer.down = false; });
+
+function updatePointer(e) {
+  const r = canvas.getBoundingClientRect();
+  pointer.x = e.clientX - r.left;
+  pointer.y = e.clientY - r.top;
+  pointer.inside = true;
+}
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'r') { audio.init(); startRun(); }
+  if (k === 'm') { audio.init(); audio.muted = !audio.muted; }
+});
+window.addEventListener('resize', () => { layout(); });
+
+// ---------------------------------------------------------------- run
+
+function startRun() {
+  layout();
+  shift = 1; score = 0; misses = 0; captured = 0; released = 0;
+  loose = []; fx = []; feed = [];
+  laser.heat = 0; laser.lock = 0; laser.beamT = 0;
+  subject = newSubject();
+  audio.arrive();
+  state = 'play';
+}
+
+function endSubject() {
+  let missed = subject.parts.filter(p => p.type.flagged).length;
+  missed += loose.filter(p => p.type.flagged).length;
+  if (missed > 0) {
+    misses += 1;
+    audio.miss();
+    feed.unshift({ warn: true, text: missed + ' FLAGGED LOST', age: 0 });
+    if (feed.length > 9) feed.length = 9;
+  } else {
+    feed.unshift({ ok: true, text: 'SUBJECT CLEARED', age: 0 });
+    if (feed.length > 9) feed.length = 9;
+    score += 200;
+  }
+  loose = loose.filter(p => !p.type.flagged);
+  if (misses >= MAX_MISSES) { state = 'over'; return; }
+  shift++;
+  subject = newSubject();
+  audio.arrive();
+}
+
+// ---------------------------------------------------------------- update
+
+function update(dt) {
+  shake *= Math.pow(0.02, dt);
+  for (let i = fx.length - 1; i >= 0; i--) {
+    fx[i].t += dt;
+    if (fx[i].t > fx[i].dur) fx.splice(i, 1);
+  }
+  for (const f of feed) f.age += dt;
+
+  laser.beamT = Math.max(0, laser.beamT - dt * 5);
+  laser.onBody = false;
+
+  if (state !== 'play') { updateLoose(dt, 0.4); return; }
+
+  // heat
+  if (laser.lock > 0) {
+    laser.lock -= dt;
+    laser.heat = Math.max(0, laser.heat - dt * (100 / OVERHEAT_LOCK));
+  } else if (pointer.down && pointer.inside) {
+    laser.heat += BEAM_HEAT * dt;
+    if (laser.heat >= 100) { laser.heat = 100; laser.lock = OVERHEAT_LOCK; audio.overheat(); }
+  } else {
+    laser.heat = Math.max(0, laser.heat - COOL_RATE * dt);
+  }
+
+  const beamOn = pointer.down && pointer.inside && laser.lock <= 0 &&
+                 pointer.x > L.ch.x && pointer.x < L.ch.x + L.ch.w;
+
+  // subject phase machine
+  const s = subject;
+  s.t += dt;
+  if (s.phase === 'enter') {
+    const k = easeOut(clamp(s.t / s.enterDur, 0, 1));
+    s.x = lerp(L.ch.x - 70, L.ch.cx, k);
+    if (s.t >= s.enterDur) { s.phase = 'scan'; s.t = 0; s.x = L.ch.cx; }
+  } else if (s.phase === 'scan') {
+    s.x = L.ch.cx + Math.sin(s.t * 1.4) * 1.6;
+    s.scanLeft -= dt;
+    const flaggedLeft = s.parts.some(p => p.type.flagged) ||
+                        loose.some(p => p.type.flagged);
+    if (s.scanLeft <= 0 || (s.parts.length === 0 && !flaggedLeft)) {
+      s.phase = 'exit'; s.t = 0;
+    }
+  } else {
+    const k = easeIn(clamp(s.t / s.exitDur, 0, 1));
+    s.x = lerp(L.ch.cx, L.ch.x + L.ch.w + 70, k);
+    if (s.t >= s.exitDur) { endSubject(); return; }
+  }
+
+  // pointer over the body?
+  if (s.phase !== 'exit') {
+    const lp = toLocal(s, pointer.x, pointer.y);
+    laser.onBody = hitCtx.isPointInPath(s.path, lp.x, lp.y);
+  }
+
+  // the beam keeps ablating while held
+  if (beamOn) {
+    if (Math.random() < dt * 14) released += dislodge(pointer.x, pointer.y, PULSE_RADIUS * 0.55);
+  }
+
+  updateLoose(dt, s.turb, beamOn);
+}
+
+function updateLoose(dt, turb, beamOn) {
+  const iw = L.intake.w, ix = L.ch.cx - iw / 2, iy = L.intake.y;
+  const now = performance.now() / 1000;
+
+  for (let i = loose.length - 1; i >= 0; i--) {
+    const p = loose[i];
+    p.age += dt;
+
+    // buoyant drift plus a little turbulence: light debris rises out of frame
+    let ax = Math.sin(now * 1.7 + p.ph * 3.1 + p.y * 0.012) * 26 * turb;
+    let ay = -26 - (p.type.flagged ? -14 : 0);
+
+    if (beamOn) {
+      const dx = pointer.x - p.x, dy = pointer.y - p.y;
+      const d = Math.hypot(dx, dy);
+      if (d < BEAM_RADIUS) {
+        const f = BEAM_FORCE * (1 - d / BEAM_RADIUS);
+        ax += dx / (d + 1) * f;
+        ay += dy / (d + 1) * f;
+      }
+    }
+
+    // intake suction near the vent mouth
+    const overVent = p.x > ix - 40 && p.x < ix + iw + 40 && p.y > iy - 130;
+    if (overVent) {
+      ay += 340 * (1 - clamp((iy - p.y) / 130, 0, 1));
+      ax += ((ix + iw / 2) - p.x) * 1.2;
+    }
+
+    p.vx += ax * dt; p.vy += ay * dt;
+    const drag = Math.pow(0.06, dt);
+    p.vx *= drag; p.vy *= drag;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+
+    // captured
+    if (p.y >= iy && p.x > ix && p.x < ix + iw) { capture(p); loose.splice(i, 1); continue; }
+
+    // floor bounce, so nothing gets stranded outside the vent
+    if (p.y > L.floorY + 4 && !(p.x > ix && p.x < ix + iw)) {
+      p.y = L.floorY + 4; p.vy = -Math.abs(p.vy) * 0.35;
+    }
+    // walls
+    if (p.x < L.ch.x + 4) { p.x = L.ch.x + 4; p.vx = Math.abs(p.vx) * 0.4; }
+    if (p.x > L.ch.x + L.ch.w - 4) { p.x = L.ch.x + L.ch.w - 4; p.vx = -Math.abs(p.vx) * 0.4; }
+
+    // lost out of the top
+    if (p.y < -14) {
+      if (p.type.flagged) { /* counted at the end of the subject */ }
+      loose.splice(i, 1);
+    }
+  }
+}
+
+// ---------------------------------------------------------------- draw
+
+function draw(time) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = COL.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const sx = shake > 0.05 ? rand(-shake, shake) : 0;
+  const sy = shake > 0.05 ? rand(-shake, shake) : 0;
+
+  ctx.save();
+  ctx.translate(sx, sy);
+  drawChamber(time);
+  if (subject && state !== 'title') drawSubject(subject, time);
+  drawLoose(time);
+  drawFx();
+  if (state === 'play') drawLaser(time);
+  ctx.restore();
+
+  drawPanels(time);
+  if (state === 'title') drawTitle();
+  if (state === 'over') drawOver();
+  if (state === 'play' && pointer.inside) drawCursor();
+}
+
+function drawChamber(time) {
+  const c = L.ch;
+  // back wall
+  ctx.fillStyle = '#060b0f';
+  ctx.fillRect(c.x, c.y, c.w, c.h);
+
+  // floor grid
+  ctx.save();
+  ctx.beginPath(); ctx.rect(c.x, L.floorY, c.w, c.h - L.floorY + 30); ctx.clip();
+  ctx.strokeStyle = 'rgba(53,224,208,0.10)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 12; i++) {
+    const t = i / 12;
+    const xTop = lerp(c.x + c.w * 0.30, c.x + c.w * 0.70, t);
+    const xBot = lerp(c.x - c.w * 0.2, c.x + c.w * 1.2, t);
+    ctx.beginPath(); ctx.moveTo(xTop, L.floorY); ctx.lineTo(xBot, c.h + 30); ctx.stroke();
+  }
+  for (let i = 1; i <= 7; i++) {
+    const y = L.floorY + Math.pow(i / 7, 1.9) * (c.h - L.floorY + 30);
+    ctx.beginPath(); ctx.moveTo(c.x, y); ctx.lineTo(c.x + c.w, y); ctx.stroke();
+  }
+  ctx.restore();
+
+  // horizon
+  ctx.strokeStyle = 'rgba(53,224,208,0.28)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(c.x, L.floorY + .5); ctx.lineTo(c.x + c.w, L.floorY + .5); ctx.stroke();
+
+  // gantry rail
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(c.x + 14, L.gantryY); ctx.lineTo(c.x + c.w - 14, L.gantryY); ctx.stroke();
+  for (let x = c.x + 14; x < c.x + c.w - 10; x += 22) {
+    ctx.fillStyle = 'rgba(53,224,208,0.16)';
+    ctx.fillRect(x, L.gantryY - 3, 2, 6);
+  }
+
+  // intake vent
+  const iw = L.intake.w, ix = c.cx - iw / 2, iy = L.intake.y;
+  const pulse = 0.5 + 0.5 * Math.sin(time * 2.2);
+  ctx.fillStyle = '#020506';
+  ctx.fillRect(ix, iy, iw, L.intake.h);
+  ctx.strokeStyle = `rgba(53,224,208,${0.35 + pulse * 0.25})`;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(ix + .5, iy + .5, iw - 1, L.intake.h - 1);
+  ctx.save();
+  ctx.beginPath(); ctx.rect(ix, iy, iw, L.intake.h); ctx.clip();
+  ctx.strokeStyle = 'rgba(53,224,208,0.30)';
+  ctx.lineWidth = 1;
+  for (let x = ix - 20; x < ix + iw + 20; x += 9) {
+    ctx.beginPath();
+    ctx.moveTo(x + ((time * 26) % 9), iy);
+    ctx.lineTo(x - 10 + ((time * 26) % 9), iy + L.intake.h);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // suction haze
+  const g = ctx.createLinearGradient(0, iy - 70, 0, iy);
+  g.addColorStop(0, 'rgba(53,224,208,0)');
+  g.addColorStop(1, `rgba(53,224,208,${0.05 + pulse * 0.04})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(ix, iy - 70, iw, 70);
+
+  ctx.fillStyle = COL.tealDim;
+  ctx.font = `${10 * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText('INTAKE', c.cx, iy + L.intake.h + 13);
+  ctx.textAlign = 'left';
+}
+
+function drawSubject(s, time) {
+  const t = subjectTransform(s);
+  const alpha = s.phase === 'exit' ? 1 - clamp(s.t / s.exitDur, 0, 1) * 0.7 : 1;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(t.x, t.y);
+  ctx.scale(t.s, t.s);
+  ctx.lineWidth = 1.6 / t.s;
+
+  // body fill
+  ctx.fillStyle = 'rgba(20,58,64,0.55)';
+  ctx.fill(s.path);
+
+  // sensor scan lines inside the silhouette
+  ctx.save();
+  ctx.clip(s.path);
+  ctx.strokeStyle = 'rgba(53,224,208,0.16)';
+  ctx.lineWidth = 0.8 / t.s;
+  const off = (time * 9) % 6;
+  for (let y = -104; y < 92; y += 6) {
+    ctx.beginPath(); ctx.moveTo(-40, y + off); ctx.lineTo(40, y + off); ctx.stroke();
+  }
+  // moving sensor bar
+  const bar = -104 + ((time * 52) % 200);
+  const bg = ctx.createLinearGradient(0, bar - 14, 0, bar + 14);
+  bg.addColorStop(0, 'rgba(53,224,208,0)');
+  bg.addColorStop(0.5, 'rgba(53,224,208,0.22)');
+  bg.addColorStop(1, 'rgba(53,224,208,0)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(-40, bar - 14, 80, 28);
+  ctx.restore();
+
+  // outline
+  ctx.strokeStyle = laser.onBody ? '#7ff2e6' : COL.teal;
+  ctx.stroke(s.path);
+  ctx.restore();
+
+  // attached particles
+  for (const p of s.parts) {
+    const scr = toScreen(s, p.lx, p.ly);
+    const r = p.type.size * (0.85 + 0.15 * Math.sin(time * 3 + p.ph));
+    ctx.globalAlpha = alpha;
+    if (p.type.flagged) {
+      const fl = 0.5 + 0.5 * Math.sin(time * 6 + p.ph);
+      ctx.fillStyle = `rgba(255,77,94,${0.35 + fl * 0.45})`;
+      ctx.beginPath(); ctx.arc(scr.x, scr.y, r + 4 + fl * 2.5, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = p.type.color;
+    ctx.beginPath(); ctx.arc(scr.x, scr.y, r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawLoose(time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const p of loose) {
+    const r = p.type.size;
+    if (p.type.flagged) {
+      const fl = 0.5 + 0.5 * Math.sin(time * 7 + p.ph);
+      ctx.fillStyle = `rgba(255,77,94,${0.30 + fl * 0.35})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r + 5 + fl * 3, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = p.type.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+    // motion streak
+    ctx.strokeStyle = p.type.color;
+    ctx.globalAlpha = 0.28;
+    ctx.lineWidth = r * 0.9;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+}
+
+function drawFx() {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const f of fx) {
+    const k = f.t / f.dur;
+    if (f.k === 'ring') {
+      ctx.strokeStyle = `rgba(255,182,72,${(1 - k) * 0.8})`;
+      ctx.lineWidth = 2.5 * (1 - k) + 0.5;
+      ctx.beginPath(); ctx.arc(f.x, f.y, f.r * easeOut(k), 0, TAU); ctx.stroke();
+      ctx.fillStyle = `rgba(255,240,200,${(1 - k) * 0.5})`;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 9 * (1 - k), 0, TAU); ctx.fill();
+    } else if (f.k === 'cap') {
+      ctx.strokeStyle = f.c;
+      ctx.globalAlpha = (1 - k) * 0.9;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(f.x, f.y, 4 + 18 * easeOut(k), 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+
+function drawLaser(time) {
+  const c = L.ch;
+  const ex = clamp(pointer.x, c.x + 20, c.x + c.w - 20);
+  const ey = L.gantryY;
+
+  // emitter head, the steering mechanism riding the gantry
+  ctx.fillStyle = '#0b171b';
+  ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(ex - 13, ey - 7); ctx.lineTo(ex + 13, ey - 7);
+  ctx.lineTo(ex + 7, ey + 9); ctx.lineTo(ex - 7, ey + 9);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  if (!pointer.inside || pointer.x < c.x || pointer.x > c.x + c.w) return;
+
+  const beamOn = pointer.down && laser.lock <= 0;
+  const flash = laser.beamT;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  if (beamOn) {
+    // continuous tractor beam: a cone of radiation pressure
+    const ang = Math.atan2(pointer.y - ey, pointer.x - ex);
+    const spread = Math.atan2(BEAM_RADIUS * 0.55, Math.max(40, Math.hypot(pointer.x - ex, pointer.y - ey)));
+    ctx.fillStyle = 'rgba(53,224,208,0.07)';
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex + Math.cos(ang - spread) * 1400, ey + Math.sin(ang - spread) * 1400);
+    ctx.lineTo(ex + Math.cos(ang + spread) * 1400, ey + Math.sin(ang + spread) * 1400);
+    ctx.closePath(); ctx.fill();
+
+    ctx.strokeStyle = 'rgba(53,224,208,0.55)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(53,224,208,0.35)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(pointer.x, pointer.y, BEAM_RADIUS, 0, TAU); ctx.stroke();
+  }
+
+  if (flash > 0) {
+    ctx.strokeStyle = `rgba(255,214,140,${flash})`;
+    ctx.lineWidth = 1 + flash * 4;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+    ctx.strokeStyle = `rgba(255,255,235,${flash * 0.9})`;
+    ctx.lineWidth = 1 + flash * 1.2;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(pointer.x, pointer.y); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCursor() {
+  const c = L.ch;
+  if (pointer.x < c.x || pointer.x > c.x + c.w) return;
+  const locked = laser.lock > 0;
+  ctx.strokeStyle = locked ? COL.red : (laser.onBody ? COL.amber : COL.tealDim);
+  ctx.lineWidth = 1;
+  const r = PULSE_RADIUS;
+  ctx.globalAlpha = locked ? 0.5 : 0.75;
+  ctx.beginPath(); ctx.arc(pointer.x, pointer.y, r, 0, TAU); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(pointer.x - 9, pointer.y); ctx.lineTo(pointer.x - 3, pointer.y);
+  ctx.moveTo(pointer.x + 3, pointer.y); ctx.lineTo(pointer.x + 9, pointer.y);
+  ctx.moveTo(pointer.x, pointer.y - 9); ctx.lineTo(pointer.x, pointer.y - 3);
+  ctx.moveTo(pointer.x, pointer.y + 3); ctx.lineTo(pointer.x, pointer.y + 9);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+// ---------------------------------------------------------------- panels
+
+function label(text, x, y) {
+  ctx.fillStyle = COL.dim;
+  ctx.font = `${9.5 * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.fillText(text, x, y);
+}
+function value(text, x, y, size, color) {
+  ctx.fillStyle = color || COL.text;
+  ctx.font = `${size * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.fillText(text, x, y);
+}
+
+function drawPanels(time) {
+  const lp = L.left, rp = L.right;
+  ctx.fillStyle = COL.panel;
+  ctx.fillRect(lp.x, lp.y, lp.w, lp.h);
+  ctx.fillRect(rp.x, rp.y, rp.w, rp.h);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(lp.w + .5, 0); ctx.lineTo(lp.w + .5, H);
+  ctx.moveTo(rp.x + .5, 0); ctx.lineTo(rp.x + .5, H);
+  ctx.stroke();
+
+  const x = 18;
+  let y = 34;
+
+  ctx.textAlign = 'left';
+  value('DUST OFF', x, y, 17, COL.teal); y += 15;
+  label('PARTICLE RECOVERY UNIT 04', x, y); y += 30;
+
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(lp.w - 18, y - 12); ctx.stroke();
+
+  label('SCORE', x, y); y += 24;
+  value(String(score).padStart(6, '0'), x, y, 26, COL.text); y += 30;
+
+  label('SHIFT', x, y); y += 22;
+  value(String(shift).padStart(2, '0'), x, y, 20, COL.text); y += 28;
+
+  // heat bar
+  label('EMITTER HEAT', x, y); y += 12;
+  const bw = lp.w - 36, bh = 8;
+  ctx.fillStyle = '#0d1418';
+  ctx.fillRect(x, y, bw, bh);
+  const hot = laser.heat / 100;
+  ctx.fillStyle = laser.lock > 0 ? COL.red : (hot > 0.75 ? COL.amber : COL.teal);
+  ctx.fillRect(x, y, bw * hot, bh);
+  ctx.strokeStyle = COL.rule;
+  ctx.strokeRect(x + .5, y + .5, bw - 1, bh - 1);
+  y += bh + 14;
+  if (laser.lock > 0) { value('OVERHEAT. COOLING.', x, y, 10, COL.red); }
+  y += 24;
+
+  // scan window
+  label('SCAN WINDOW', x, y); y += 12;
+  const tLeft = subject && subject.phase === 'scan' ? subject.scanLeft : (subject ? subject.scanTime : 0);
+  const tFrac = subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0;
+  ctx.fillStyle = '#0d1418';
+  ctx.fillRect(x, y, bw, bh);
+  ctx.fillStyle = tFrac < 0.25 ? COL.amber : COL.tealDim;
+  ctx.fillRect(x, y, bw * tFrac, bh);
+  ctx.strokeStyle = COL.rule;
+  ctx.strokeRect(x + .5, y + .5, bw - 1, bh - 1);
+  y += bh + 12;
+  value(tLeft.toFixed(1) + ' S', x, y, 13, COL.dim);
+  y += 34;
+
+  // strikes
+  label('FLAGGED LOST', x, y); y += 18;
+  for (let i = 0; i < MAX_MISSES; i++) {
+    ctx.strokeStyle = i < misses ? COL.red : COL.rule;
+    ctx.fillStyle = i < misses ? COL.red : 'transparent';
+    ctx.beginPath(); ctx.arc(x + 7 + i * 22, y, 6, 0, TAU);
+    if (i < misses) ctx.fill();
+    ctx.stroke();
+  }
+  y += 34;
+
+  label('SUBJECT', x, y); y += 18;
+  value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 14, COL.text);
+
+  // ---- right panel, the analysis feed
+  const rx = rp.x + 18;
+  let ry = 34;
+  value('ANALYSIS FEED', rx, ry, 12, COL.teal); ry += 14;
+  label('CAPTURE MECHANISM 1', rx, ry); ry += 22;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
+  ry += 10;
+
+  if (feed.length === 0) {
+    label('AWAITING SAMPLE', rx, ry);
+  }
+  for (const f of feed) {
+    const fade = clamp(1 - (f.age - 8) / 6, 0.25, 1);
+    ctx.globalAlpha = fade;
+    if (f.warn) {
+      ctx.fillStyle = COL.red;
+      ctx.fillRect(rx, ry - 8, 6, 6);
+      value(f.text, rx + 14, ry, 10.5, COL.red);
+    } else if (f.ok) {
+      ctx.fillStyle = COL.teal;
+      ctx.fillRect(rx, ry - 8, 6, 6);
+      value(f.text, rx + 14, ry, 10.5, COL.teal);
+    } else {
+      ctx.fillStyle = f.type.color;
+      ctx.beginPath(); ctx.arc(rx + 3, ry - 4, 3.2, 0, TAU); ctx.fill();
+      value(f.type.name, rx + 14, ry, 10.5, f.type.flagged ? COL.red : COL.text);
+      ctx.textAlign = 'right';
+      value(f.n > 1 ? '×' + f.n : '', W - 18, ry, 10.5, COL.dim);
+      ctx.textAlign = 'left';
+      if (f.type.flagged) { ry += 13; value('FLAGGED FOR ANALYSIS', rx + 14, ry, 9, COL.red); }
+    }
+    ry += 22;
+    ctx.globalAlpha = 1;
+  }
+
+  // running totals at the foot of the feed
+  const fy = H - 92;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(rx, fy - 18); ctx.lineTo(W - 18, fy - 18); ctx.stroke();
+  label('DISLODGED', rx, fy);
+  ctx.textAlign = 'right'; value(String(released), W - 18, fy, 11, COL.text); ctx.textAlign = 'left';
+  label('CAPTURED', rx, fy + 18);
+  ctx.textAlign = 'right'; value(String(captured), W - 18, fy + 18, 11, COL.text); ctx.textAlign = 'left';
+  label('RECOVERY', rx, fy + 36);
+  const rate = released > 0 ? Math.round(captured / released * 100) : 0;
+  ctx.textAlign = 'right';
+  value(rate + ' %', W - 18, fy + 36, 11, rate >= 60 ? COL.teal : COL.amber);
+  ctx.textAlign = 'left';
+
+  // credit strip
+  ctx.fillStyle = COL.panel;
+  ctx.fillRect(L.ch.x, H - 26, L.ch.w, 26);
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(L.ch.x, H - 26.5); ctx.lineTo(L.ch.x + L.ch.w, H - 26.5); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#375a60';
+  ctx.font = `${9.5 * L.hud}px ui-monospace, Menlo, monospace`;
+  ctx.fillText(
+    'After US 9,134,205 B2, system and method for removing surface particles from an object. Hillis, Hyde, Kare, Ishikawa, Wood. Elwha LLC, 2015. Air jets replaced with lasers.',
+    L.ch.cx, H - 9);
+  ctx.textAlign = 'left';
+}
+
+function drawTitle() {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(4,7,10,0.88)';
+  ctx.fillRect(c.x, 0, c.w, c.h);
+  ctx.textAlign = 'center';
+  let y = c.h * 0.30;
+  value('DUST OFF', c.cx, y, Math.min(58, c.w * 0.09), COL.teal); y += 30;
+  value('LASER PARTICLE RECOVERY', c.cx, y, 13, COL.dim); y += 56;
+
+  const lines = [
+    ['CLICK THE SUBJECT', 'a pulse ablates the surface and throws particles loose'],
+    ['HOLD AND DRAG', 'the beam pushes loose particles, steer them into the intake'],
+    ['WATCH THE HEAT', 'the emitter locks out at 100 and takes 1.6 seconds to cool'],
+    ['RED IS FLAGGED', 'let one leave the chamber and the subject walks uncleared'],
+  ];
+  for (const [k, v] of lines) {
+    value(k, c.cx, y, 12, COL.amber); y += 15;
+    value(v, c.cx, y, 11, COL.dim); y += 30;
+  }
+  y += 8;
+  const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  ctx.globalAlpha = blink;
+  value('CLICK TO BEGIN THE SHIFT', c.cx, y, 14, COL.teal);
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+function drawOver() {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(4,7,10,0.90)';
+  ctx.fillRect(c.x, 0, c.w, c.h);
+  ctx.textAlign = 'center';
+  let y = c.h * 0.36;
+  value('SHIFT ENDED', c.cx, y, 40, COL.red); y += 26;
+  value('THREE SUBJECTS LEFT UNCLEARED', c.cx, y, 12, COL.dim); y += 54;
+  value('SCORE  ' + String(score).padStart(6, '0'), c.cx, y, 20, COL.text); y += 26;
+  value('SUBJECTS PROCESSED  ' + shift, c.cx, y, 12, COL.dim); y += 18;
+  const rate = released > 0 ? Math.round(captured / released * 100) : 0;
+  value('RECOVERY RATE  ' + rate + ' %', c.cx, y, 12, COL.dim); y += 50;
+  const blink = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  ctx.globalAlpha = blink;
+  value('CLICK TO RUN IT AGAIN', c.cx, y, 14, COL.teal);
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+// ---------------------------------------------------------------- loop
+
+let last = performance.now();
+function step(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt);
+  draw(now / 1000);
+}
+function frame(now) { step(now); requestAnimationFrame(frame); }
+// Some embedded webviews throttle requestAnimationFrame to nothing. If frames
+// stop arriving, keep the loop alive on a timer.
+setInterval(() => { if (performance.now() - last > 250) step(performance.now()); }, 100);
+
+layout();
+subject = null;
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

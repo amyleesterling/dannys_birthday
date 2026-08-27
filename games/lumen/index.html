@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lumen</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #070405; color: #e6d5d5;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  canvas { display: block; width: 100%; height: 100%; cursor: none; touch-action: none; }
+  #hint {
+    position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%);
+    font-size: 10px; letter-spacing: .09em; color: #6b4148; pointer-events: none;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">R restart &nbsp;&nbsp; M sound</div>
+<script>
+(() => {
+'use strict';
+
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+const COL = {
+  bg:      '#070405',
+  panel:   '#0d0709',
+  rule:    '#2a151a',
+  text:    '#e6d5d5',
+  dim:     '#8a5c63',
+  faint:   '#5c383e',
+  teal:    '#35e0d0',
+  amber:   '#ffb648',
+  red:     '#ff4d5e',
+  wallDim: '#2c1016',
+  lumDim:  '#150609',
+  wallLit: '#7a2430',
+  lumLit:  '#3a1018',
+};
+
+const DEV_R     = 7;
+const MAX_SPEED = 190;
+const ABLATE_R  = 52;
+const LAMP_R    = 250;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W = 0, H = 0, dpr = 1, L = {};
+let state = 'title';
+let level = 1, score = 0;
+let integrity = 100, power = 100;
+
+let segs = [], leaves = [], bounds = null;
+let lesions = [], cells = [];
+let dev = null, cam = { x: 0, y: 0 };
+let fx = [], shake = 0, sinceBeep = 0;
+
+const pointer = { x: 0, y: 0, down: false, inside: false };
+
+// ---------------------------------------------------------------- audio
+
+const audio = {
+  ctx: null, muted: false,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) this.ctx = new AC();
+  },
+  tone(f1, f2, dur, type, gain) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f1, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(30, f2), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.ctx.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  },
+  ping()   { this.tone(1500, 1100, 0.07, 'sine', 0.03); },
+  scrape() { this.tone(140, 90, 0.10, 'sawtooth', 0.035); },
+  hit()    { this.tone(200, 60, 0.22, 'square', 0.06); },
+  clear()  { this.tone(400, 1400, 0.30, 'sine', 0.06); },
+  level()  { this.tone(300, 900, 0.45, 'triangle', 0.05); },
+  dead()   { this.tone(300, 50, 0.9, 'sawtooth', 0.07); },
+};
+
+// ---------------------------------------------------------------- layout
+
+function layout() {
+  const rect = canvas.getBoundingClientRect();
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+  W = rect.width; H = rect.height;
+
+  const wide = W >= 1120;
+  const padL = wide ? 208 : 168;
+  const padR = wide ? 244 : 186;
+  L = {
+    left:  { x: 0, w: padL },
+    right: { x: W - padR, w: padR },
+    ch:    { x: padL, y: 0, w: W - padL - padR, h: H - 26 },
+    hud:   H < 660 ? 0.9 : 1,
+  };
+  L.ch.cx = L.ch.x + L.ch.w / 2;
+  L.ch.cy = L.ch.h / 2;
+}
+
+// ---------------------------------------------------------------- vessel tree
+
+function genWorld(lv) {
+  segs = []; leaves = [];
+  const maxDepth = Math.min(7, 4 + Math.floor(lv / 2));
+  let budget = 120;
+
+  function grow(x, y, ang, depth, r, len) {
+    if (budget-- <= 0) return;
+    // three sub segments with a little wander, so vessels are not straight lines
+    let px = x, py = y, pr = r, a = ang;
+    const k = 3, sub = len / k;
+    for (let i = 0; i < k; i++) {
+      a += rand(-0.20, 0.20);
+      const nx = px + Math.cos(a) * sub;
+      const ny = py + Math.sin(a) * sub;
+      const nr = lerp(r, r * 0.86, (i + 1) / k);
+      segs.push({ ax: px, ay: py, bx: nx, by: ny, ra: pr, rb: nr, depth, seen: false });
+      px = nx; py = ny; pr = nr;
+    }
+    if (depth >= maxDepth || pr < 15) { leaves.push({ x: px, y: py, depth }); return; }
+    const split = Math.random() < 0.78 ? 2 : 1;
+    if (split === 1) {
+      grow(px, py, a + rand(-0.4, 0.4), depth + 1, pr * 0.95, len * 0.92);
+    } else {
+      const spread = rand(0.42, 0.80);
+      const bias = rand(-0.25, 0.25);
+      grow(px, py, a - spread + bias, depth + 1, pr * 0.80, len * 0.84);
+      grow(px, py, a + spread + bias, depth + 1, pr * 0.80, len * 0.84);
+    }
+  }
+
+  grow(0, 0, rand(-0.3, 0.3), 0, 46, 300);
+
+  let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+  for (const s of segs) {
+    minx = Math.min(minx, s.ax - s.ra, s.bx - s.rb);
+    maxx = Math.max(maxx, s.ax + s.ra, s.bx + s.rb);
+    miny = Math.min(miny, s.ay - s.ra, s.by - s.rb);
+    maxy = Math.max(maxy, s.ay + s.ra, s.by + s.rb);
+  }
+  bounds = { minx, miny, maxx, maxy, w: maxx - minx, h: maxy - miny };
+
+  // lesions sit on the far leaves, so every bed has to be searched
+  const target = Math.min(3, 1 + Math.floor((lv - 1) / 2));
+  const sorted = leaves.slice().sort((a, b) => Math.hypot(b.x, b.y) - Math.hypot(a.x, a.y));
+  const pool = sorted.slice(0, Math.max(target, Math.ceil(sorted.length * 0.6)));
+  lesions = [];
+  for (let i = 0; i < target && pool.length; i++) {
+    const lf = pool.splice((Math.random() * pool.length) | 0, 1)[0];
+    const n = bestSeg(lf.x, lf.y);
+    lesions.push({
+      x: lf.x, y: lf.y,
+      r: Math.max(11, n ? n.r * 0.7 : 14),
+      hp: 100, cleared: false, ph: rand(0, TAU),
+    });
+  }
+
+  // circulating cells, a few of them large enough to hurt
+  cells = [];
+  for (let i = 0; i < 90; i++) {
+    const s = pick(segs);
+    const t = Math.random();
+    const clot = Math.random() < 0.10 + lv * 0.015;
+    cells.push({
+      x: lerp(s.ax, s.bx, t) + rand(-6, 6),
+      y: lerp(s.ay, s.by, t) + rand(-6, 6),
+      clot,
+      r: clot ? rand(9, 14) : rand(2.6, 4.4),
+      ph: rand(0, TAU),
+    });
+  }
+
+  dev = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, wheel: 0, emit: 0 };
+  cam.x = 0; cam.y = 0;
+}
+
+// Prefer the segment that actually contains the point. At a junction that keeps
+// the device inside the vessel it is really in, not the nearest centreline.
+function bestSeg(x, y) {
+  let contain = null, cbest = -Infinity, near = null, nd = Infinity;
+  for (const s of segs) {
+    const dx = s.bx - s.ax, dy = s.by - s.ay;
+    const l2 = dx * dx + dy * dy || 1;
+    let t = ((x - s.ax) * dx + (y - s.ay) * dy) / l2;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    const px = s.ax + dx * t, py = s.ay + dy * t;
+    const d = Math.hypot(x - px, y - py);
+    const r = lerp(s.ra, s.rb, t);
+    if (d < r && r - d > cbest) { cbest = r - d; contain = { s, t, px, py, d, r }; }
+    if (d < nd) { nd = d; near = { s, t, px, py, d, r }; }
+  }
+  return contain || near;
+}
+
+function flowAt(n) {
+  const s = n.s;
+  const dx = s.bx - s.ax, dy = s.by - s.ay;
+  const l = Math.hypot(dx, dy) || 1;
+  return { x: dx / l, y: dy / l };
+}
+
+// ---------------------------------------------------------------- run control
+
+function startRun() {
+  layout();
+  level = 1; score = 0; integrity = 100; power = 100;
+  fx = []; shake = 0;
+  genWorld(level);
+  state = 'play';
+  audio.level();
+}
+
+function nextLevel() {
+  score += 400 + Math.round(power * 6);
+  level++;
+  power = Math.min(100, power + 34);
+  integrity = Math.min(100, integrity + 18);
+  genWorld(level);
+  audio.level();
+}
+
+function die(reason) {
+  state = 'over';
+  dev.deadReason = reason;
+  audio.dead();
+}
+
+// ---------------------------------------------------------------- input
+
+canvas.addEventListener('pointerdown', e => {
+  canvas.setPointerCapture(e.pointerId);
+  move(e);
+  audio.init();
+  pointer.down = true;
+  if (state !== 'play') startRun();
+});
+canvas.addEventListener('pointermove', move);
+canvas.addEventListener('pointerup', () => { pointer.down = false; });
+canvas.addEventListener('pointercancel', () => { pointer.down = false; });
+canvas.addEventListener('pointerleave', () => { pointer.inside = false; pointer.down = false; });
+function move(e) {
+  const r = canvas.getBoundingClientRect();
+  pointer.x = e.clientX - r.left;
+  pointer.y = e.clientY - r.top;
+  pointer.inside = true;
+}
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (k === 'r') { audio.init(); startRun(); }
+  if (k === 'm') { audio.init(); audio.muted = !audio.muted; }
+});
+window.addEventListener('resize', layout);
+
+const toScreen = (x, y) => ({ x: x - cam.x + L.ch.cx, y: y - cam.y + L.ch.cy });
+const toWorld  = (x, y) => ({ x: x + cam.x - L.ch.cx, y: y + cam.y - L.ch.cy });
+
+function lerpAngle(a, b, t) {
+  const d = ((b - a + Math.PI * 3) % TAU) - Math.PI;
+  return a + d * t;
+}
+
+// ---------------------------------------------------------------- update
+
+function update(dt) {
+  shake *= Math.pow(0.02, dt);
+  for (let i = fx.length - 1; i >= 0; i--) {
+    fx[i].t += dt;
+    if (fx[i].t > fx[i].dur) fx.splice(i, 1);
+  }
+  if (state !== 'play') return;
+
+  const flowSpeed = 46 + level * 9;
+  const anchored = pointer.down && pointer.inside;
+
+  // Steering. The device drives toward the cursor and the distance sets the
+  // throttle, so parking the cursor on the device holds it still.
+  const tgt = toWorld(pointer.x, pointer.y);
+  const dx = tgt.x - dev.x, dy = tgt.y - dev.y;
+  const d = Math.hypot(dx, dy);
+  const throttle = anchored ? 0 : clamp(d / 130, 0, 1);
+  const wx = d > 1 ? dx / d * MAX_SPEED * throttle : 0;
+  const wy = d > 1 ? dy / d * MAX_SPEED * throttle : 0;
+  const k = 1 - Math.pow(0.0008, dt);
+  dev.vx = lerp(dev.vx, wx, k);
+  dev.vy = lerp(dev.vy, wy, k);
+
+  let n = bestSeg(dev.x, dev.y);
+  const f = flowAt(n);
+  // the motion arresting portion cuts the drift to a trickle while engaged
+  const drift = anchored ? 0.18 : 1;
+  dev.x += (dev.vx + f.x * flowSpeed * drift) * dt;
+  dev.y += (dev.vy + f.y * flowSpeed * drift) * dt;
+
+  if (d > 4) dev.ang = lerpAngle(dev.ang, Math.atan2(dy, dx), 1 - Math.pow(0.001, dt));
+  dev.wheel += Math.hypot(dev.vx, dev.vy) * dt * 0.05;
+
+  // wall contact
+  n = bestSeg(dev.x, dev.y);
+  const lim = Math.max(2, n.r - DEV_R);
+  if (n.d > lim) {
+    const inv = 1 / (n.d || 1);
+    const nx = (dev.x - n.px) * inv, ny = (dev.y - n.py) * inv;
+    const over = n.d - lim;
+    dev.x = n.px + nx * lim;
+    dev.y = n.py + ny * lim;
+    const into = Math.max(0, dev.vx * nx + dev.vy * ny);
+    dev.vx -= nx * into * 1.4;
+    dev.vy -= ny * into * 1.4;
+    integrity -= (10 + into * 0.06) * dt + over * 0.05;
+    if (Math.random() < dt * 9) { audio.scrape(); shake = Math.max(shake, 2); }
+  }
+
+  power -= (1.5 + (anchored ? 6.5 : 0)) * dt;
+  if (power <= 0) { power = 0; die('POWER EXHAUSTED'); return; }
+  if (integrity <= 0) { integrity = 0; die('HULL BREACH'); return; }
+
+  // reveal what the lamp has swept
+  for (const s of segs) {
+    if (s.seen) continue;
+    const mx = (s.ax + s.bx) / 2, my = (s.ay + s.by) / 2;
+    if (Math.hypot(mx - dev.x, my - dev.y) < LAMP_R * 0.95) s.seen = true;
+  }
+
+  // lesions
+  const active = lesions.filter(l => !l.cleared);
+  dev.emit = 0;
+  for (const l of active) {
+    const dl = Math.hypot(l.x - dev.x, l.y - dev.y);
+    if (anchored && dl < ABLATE_R) {
+      dev.emit = 1;
+      l.hp -= 52 * dt;
+      if (Math.random() < dt * 20) {
+        fx.push({ k: 'spark', x: l.x + rand(-l.r, l.r), y: l.y + rand(-l.r, l.r), t: 0, dur: 0.4 });
+      }
+      if (l.hp <= 0) {
+        l.cleared = true;
+        score += 600;
+        shake = Math.max(shake, 6);
+        audio.clear();
+        fx.push({ k: 'burst', x: l.x, y: l.y, t: 0, dur: 0.6, r: l.r });
+      }
+    }
+  }
+  if (active.length === 0) { nextLevel(); return; }
+
+  // proximity beep off the sensor
+  const near = active.reduce((m, l) => Math.min(m, Math.hypot(l.x - dev.x, l.y - dev.y)), 1e9);
+  sinceBeep += dt;
+  if (sinceBeep > clamp(near / 900, 0.14, 1.6)) { sinceBeep = 0; audio.ping(); }
+
+  // circulating cells
+  const recycleR = Math.max(bounds.w, bounds.h) * 0.62;
+  for (const c of cells) {
+    const cn = bestSeg(c.x, c.y);
+    const cf = flowAt(cn);
+    c.x += cf.x * flowSpeed * dt;
+    c.y += cf.y * flowSpeed * dt;
+    const clim = Math.max(1, cn.r - c.r);
+    if (cn.d > clim) {
+      const inv = clim / (cn.d || 1);
+      c.x = cn.px + (c.x - cn.px) * inv;
+      c.y = cn.py + (c.y - cn.py) * inv;
+    }
+    if (Math.hypot(c.x, c.y) > recycleR) {
+      const s = segs[(Math.random() * Math.min(6, segs.length)) | 0];
+      const t = Math.random();
+      c.x = lerp(s.ax, s.bx, t); c.y = lerp(s.ay, s.by, t);
+    }
+    if (c.clot) {
+      const dd = Math.hypot(c.x - dev.x, c.y - dev.y);
+      if (dd < c.r + DEV_R) {
+        const inv = 1 / (dd || 1);
+        dev.vx += (dev.x - c.x) * inv * 190;
+        dev.vy += (dev.y - c.y) * inv * 190;
+        integrity -= 11;
+        shake = Math.max(shake, 5);
+        audio.hit();
+        const s = segs[(Math.random() * Math.min(6, segs.length)) | 0];
+        c.x = lerp(s.ax, s.bx, 0.5); c.y = lerp(s.ay, s.by, 0.5);
+      }
+    }
+  }
+
+  const camK = 1 - Math.pow(0.004, dt);
+  cam.x = lerp(cam.x, dev.x + dev.vx * 0.22, camK);
+  cam.y = lerp(cam.y, dev.y + dev.vy * 0.22, camK);
+}
+
+// ---------------------------------------------------------------- tissue backdrop
+
+let tissue = null;
+function makeTissue() {
+  const s = 160;
+  const off = document.createElement('canvas');
+  off.width = off.height = s;
+  const c = off.getContext('2d');
+  c.fillStyle = '#0b0508';
+  c.fillRect(0, 0, s, s);
+  for (let i = 0; i < 260; i++) {
+    c.fillStyle = 'rgba(120,50,60,' + (0.03 + Math.random() * 0.05) + ')';
+    c.beginPath();
+    c.arc(Math.random() * s, Math.random() * s, Math.random() * 2.2 + 0.4, 0, TAU);
+    c.fill();
+  }
+  tissue = ctx.createPattern(off, 'repeat');
+}
+
+// ---------------------------------------------------------------- draw
+
+function strokeVessels(lit) {
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = lit ? COL.wallLit : COL.wallDim;
+  for (const s of segs) {
+    if (!s.seen) continue;
+    const a = toScreen(s.ax, s.ay), b = toScreen(s.bx, s.by);
+    ctx.lineWidth = (s.ra + s.rb) + 7;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.strokeStyle = lit ? COL.lumLit : COL.lumDim;
+  for (const s of segs) {
+    if (!s.seen) continue;
+    const a = toScreen(s.ax, s.ay), b = toScreen(s.bx, s.by);
+    ctx.lineWidth = (s.ra + s.rb);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+}
+
+function draw(time) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = COL.bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const sx = shake > 0.05 ? rand(-shake, shake) : 0;
+  const sy = shake > 0.05 ? rand(-shake, shake) : 0;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(L.ch.x, L.ch.y, L.ch.w, L.ch.h);
+  ctx.clip();
+  ctx.translate(sx, sy);
+
+  if (tissue) {
+    ctx.save();
+    ctx.translate(-(cam.x % 160), -(cam.y % 160));
+    ctx.fillStyle = tissue;
+    ctx.fillRect(L.ch.x - 200, -200, L.ch.w + 400, H + 400);
+    ctx.restore();
+  }
+
+  if (dev) {
+    strokeVessels(false);
+
+    const dp = toScreen(dev.x, dev.y);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(dp.x, dp.y, LAMP_R, 0, TAU); ctx.clip();
+    strokeVessels(true);
+    drawCells();
+    drawLesions(time);
+    ctx.restore();
+
+    const g = ctx.createRadialGradient(dp.x, dp.y, LAMP_R * 0.35, dp.x, dp.y, LAMP_R);
+    g.addColorStop(0, 'rgba(7,4,5,0)');
+    g.addColorStop(1, 'rgba(7,4,5,0.92)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(dp.x, dp.y, LAMP_R, 0, TAU); ctx.fill();
+
+    drawFx();
+    drawDevice(time, dp);
+  }
+  ctx.restore();
+
+  drawPanels(time);
+  if (state === 'title') drawTitle();
+  if (state === 'over') drawOver();
+  if (state === 'play' && pointer.inside) drawCursor();
+}
+
+function drawCells() {
+  for (const c of cells) {
+    const p = toScreen(c.x, c.y);
+    if (p.x < L.ch.x - 30 || p.x > L.ch.x + L.ch.w + 30 || p.y < -30 || p.y > H + 30) continue;
+    if (c.clot) {
+      ctx.fillStyle = '#1d0509';
+      ctx.strokeStyle = '#5c1119';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * TAU;
+        const rr = c.r * (0.78 + 0.28 * Math.sin(a * 3 + c.ph));
+        const px = p.x + Math.cos(a) * rr, py = p.y + Math.sin(a) * rr;
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(196,54,66,0.55)';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, c.r * 1.25, c.r, c.ph, 0, TAU);
+      ctx.fill();
+    }
+  }
+}
+
+function drawLesions(time) {
+  for (const l of lesions) {
+    if (l.cleared) continue;
+    const p = toScreen(l.x, l.y);
+    const pulse = 0.5 + 0.5 * Math.sin(time * 3 + l.ph);
+    const hp = clamp(l.hp / 100, 0, 1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,182,72,' + (0.10 + pulse * 0.10) + ')';
+    ctx.beginPath(); ctx.arc(p.x, p.y, l.r * 2.4, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#c9a24a';
+    ctx.strokeStyle = '#f0d089';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let i = 0; i < 9; i++) {
+      const a = i / 9 * TAU;
+      const rr = l.r * hp * (0.8 + 0.3 * Math.sin(a * 2.5 + l.ph));
+      const px = p.x + Math.cos(a) * rr, py = p.y + Math.sin(a) * rr;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+}
+
+function drawFx() {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const f of fx) {
+    const p = toScreen(f.x, f.y);
+    const k = f.t / f.dur;
+    if (f.k === 'spark') {
+      ctx.fillStyle = 'rgba(255,232,170,' + (1 - k) + ')';
+      ctx.beginPath(); ctx.arc(p.x, p.y - k * 14, 2.2 * (1 - k) + 0.6, 0, TAU); ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(255,200,120,' + (1 - k) * 0.9 + ')';
+      ctx.lineWidth = 3 * (1 - k) + 0.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, f.r + 90 * k, 0, TAU); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawDevice(time, p) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(dev.ang);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const cone = ctx.createLinearGradient(0, 0, 150, 0);
+  cone.addColorStop(0, 'rgba(255,214,150,0.16)');
+  cone.addColorStop(1, 'rgba(255,214,150,0)');
+  ctx.fillStyle = cone;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(Math.cos(-0.42) * 170, Math.sin(-0.42) * 170);
+  ctx.lineTo(Math.cos(0.42) * 170, Math.sin(0.42) * 170);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  // lumen wall engaging wheels
+  ctx.strokeStyle = '#7ea0a6';
+  ctx.lineWidth = 1.4;
+  for (const s of [-1, 1]) {
+    ctx.save();
+    ctx.translate(0, s * 7.5);
+    ctx.rotate(dev.wheel * 6);
+    ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4.2, 0); ctx.lineTo(4.2, 0); ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.fillStyle = '#0f1c20';
+  ctx.strokeStyle = dev.emit ? COL.amber : COL.teal;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(9, 0);
+  ctx.lineTo(2, -5.4); ctx.lineTo(-8, -4.4);
+  ctx.lineTo(-8, 4.4); ctx.lineTo(2, 5.4);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  ctx.fillStyle = dev.emit ? COL.amber : COL.teal;
+  ctx.beginPath(); ctx.arc(4.5, 0, 1.9, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  if (pointer.down && pointer.inside && state === 'play') {
+    ctx.strokeStyle = 'rgba(53,224,208,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 15 + Math.sin(time * 9) * 1.5, 0, TAU); ctx.stroke();
+    ctx.setLineDash([]);
+    if (dev.emit) {
+      ctx.strokeStyle = 'rgba(255,182,72,0.55)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
+    }
+  }
+}
+
+function drawCursor() {
+  if (pointer.x < L.ch.x || pointer.x > L.ch.x + L.ch.w) return;
+  ctx.strokeStyle = 'rgba(53,224,208,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(pointer.x, pointer.y, 9, 0, TAU); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(pointer.x - 14, pointer.y); ctx.lineTo(pointer.x - 5, pointer.y);
+  ctx.moveTo(pointer.x + 5, pointer.y); ctx.lineTo(pointer.x + 14, pointer.y);
+  ctx.moveTo(pointer.x, pointer.y - 14); ctx.lineTo(pointer.x, pointer.y - 5);
+  ctx.moveTo(pointer.x, pointer.y + 5); ctx.lineTo(pointer.x, pointer.y + 14);
+  ctx.stroke();
+}
+
+// ---------------------------------------------------------------- panels
+
+function label(t, x, y) {
+  ctx.fillStyle = COL.faint;
+  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.fillText(t, x, y);
+}
+function value(t, x, y, size, color) {
+  ctx.fillStyle = color || COL.text;
+  ctx.font = (size * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.fillText(t, x, y);
+}
+function bar(x, y, w, h, frac, color) {
+  ctx.fillStyle = '#160a0d';
+  ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w * clamp(frac, 0, 1), h);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+}
+
+function drawPanels(time) {
+  ctx.fillStyle = COL.panel;
+  ctx.fillRect(0, 0, L.left.w, H);
+  ctx.fillRect(L.right.x, 0, L.right.w, H);
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(L.left.w + 0.5, 0); ctx.lineTo(L.left.w + 0.5, H);
+  ctx.moveTo(L.right.x + 0.5, 0); ctx.lineTo(L.right.x + 0.5, H);
+  ctx.stroke();
+
+  const x = 18, bw = L.left.w - 36;
+  let y = 34;
+  ctx.textAlign = 'left';
+  value('LUMEN', x, y, 17, COL.teal); y += 15;
+  label('LUMEN TRAVELING DEVICE', x, y); y += 28;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(L.left.w - 18, y - 12); ctx.stroke();
+
+  label('SCORE', x, y); y += 24;
+  value(String(score).padStart(6, '0'), x, y, 24, COL.text); y += 28;
+
+  label('VESSEL BED', x, y); y += 21;
+  value(String(level).padStart(2, '0'), x, y, 19, COL.text); y += 28;
+
+  label('HULL INTEGRITY', x, y); y += 12;
+  bar(x, y, bw, 8, integrity / 100, integrity < 30 ? COL.red : COL.teal);
+  y += 22;
+  label('POWER CELL', x, y); y += 12;
+  bar(x, y, bw, 8, power / 100, power < 25 ? COL.amber : '#7a9c6a');
+  y += 30;
+
+  label('CONDITION SENSOR', x, y); y += 14;
+  const cx = x + bw / 2, cy = y + 42, rr = 38;
+  ctx.strokeStyle = COL.rule;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, cy, rr, 0, TAU); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, rr * 0.6, 0, TAU); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx - rr, cy); ctx.lineTo(cx + rr, cy);
+  ctx.moveTo(cx, cy - rr); ctx.lineTo(cx, cy + rr);
+  ctx.stroke();
+
+  let strength = 0, dist = 0;
+  const active = lesions.filter(l => !l.cleared);
+  if (state === 'play' && active.length && dev) {
+    let best = null, bd = 1e9;
+    for (const l of active) {
+      const d = Math.hypot(l.x - dev.x, l.y - dev.y);
+      if (d < bd) { bd = d; best = l; }
+    }
+    dist = bd;
+    strength = clamp(1 - bd / 1800, 0, 1);
+    // the bearing wanders while the signal is weak
+    const noise = (1 - strength) * 0.55 * Math.sin(time * 1.7 + best.ph * 5);
+    const a = Math.atan2(best.y - dev.y, best.x - dev.x) + noise;
+    ctx.strokeStyle = COL.amber;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * rr * 0.86, cy + Math.sin(a) * rr * 0.86);
+    ctx.stroke();
+    ctx.fillStyle = COL.amber;
+    ctx.beginPath(); ctx.arc(cx, cy, 2.6, 0, TAU); ctx.fill();
+  }
+  y = cy + rr + 20;
+  label('SIGNAL', x, y); y += 11;
+  bar(x, y, bw, 6, strength, COL.amber); y += 20;
+  value(state === 'play' ? Math.round(dist) + ' UNITS' : 'NO CONTACT', x, y, 11, COL.dim);
+  y += 26;
+  label('LESIONS CLEARED', x, y); y += 18;
+  const total = lesions.length;
+  const done = lesions.filter(l => l.cleared).length;
+  value(done + ' / ' + total, x, y, 15, COL.text);
+
+  // right panel, the survey map
+  const rx = L.right.x + 18, rw = L.right.w - 36;
+  let ry = 34;
+  value('LUMEN SURVEY', rx, ry, 12, COL.teal); ry += 14;
+  label('MAPPED BY TRAVEL', rx, ry); ry += 20;
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(rx, ry - 8); ctx.lineTo(W - 18, ry - 8); ctx.stroke();
+
+  const mh = Math.min(rw, H * 0.40);
+  const mx = rx, my = ry + 8;
+  ctx.fillStyle = '#0a0406';
+  ctx.fillRect(mx, my, rw, mh);
+  ctx.strokeStyle = COL.rule;
+  ctx.strokeRect(mx + 0.5, my + 0.5, rw - 1, mh - 1);
+
+  if (bounds && dev) {
+    const sc = Math.min(rw / (bounds.w + 60), mh / (bounds.h + 60));
+    const ox = mx + rw / 2 - ((bounds.minx + bounds.maxx) / 2) * sc;
+    const oy = my + mh / 2 - ((bounds.miny + bounds.maxy) / 2) * sc;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(mx, my, rw, mh); ctx.clip();
+    ctx.strokeStyle = '#6b2530';
+    ctx.lineCap = 'round';
+    for (const s of segs) {
+      if (!s.seen) continue;
+      ctx.lineWidth = Math.max(0.8, (s.ra + s.rb) * 0.5 * sc);
+      ctx.beginPath();
+      ctx.moveTo(ox + s.ax * sc, oy + s.ay * sc);
+      ctx.lineTo(ox + s.bx * sc, oy + s.by * sc);
+      ctx.stroke();
+    }
+    for (const l of lesions) {
+      if (!l.cleared && Math.hypot(l.x - dev.x, l.y - dev.y) > LAMP_R) continue;
+      ctx.fillStyle = l.cleared ? COL.teal : COL.amber;
+      ctx.beginPath(); ctx.arc(ox + l.x * sc, oy + l.y * sc, 3.2, 0, TAU); ctx.fill();
+    }
+    ctx.fillStyle = COL.text;
+    ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 2.6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'rgba(230,213,213,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 6, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
+  ry = my + mh + 24;
+  const mapped = segs.length ? Math.round(segs.filter(s => s.seen).length / segs.length * 100) : 0;
+  label('MAPPED', rx, ry);
+  ctx.textAlign = 'right'; value(mapped + ' %', W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
+  ry += 18;
+  label('FLOW', rx, ry);
+  ctx.textAlign = 'right'; value((46 + level * 9) + ' U/S', W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
+  ry += 18;
+  label('SEGMENTS', rx, ry);
+  ctx.textAlign = 'right'; value(String(segs.length), W - 18, ry, 11, COL.text); ctx.textAlign = 'left';
+
+  ry += 32;
+  label('ACTIVE PORTION', rx, ry); ry += 15;
+  value('ANCHOR', rx, ry, 10.5, pointer.down ? COL.teal : COL.faint); ry += 14;
+  value('EMIT', rx, ry, 10.5, dev && dev.emit ? COL.amber : COL.faint);
+
+  // credit strip
+  ctx.fillStyle = COL.panel;
+  ctx.fillRect(L.ch.x, H - 26, L.ch.w, 26);
+  ctx.strokeStyle = COL.rule;
+  ctx.beginPath(); ctx.moveTo(L.ch.x, H - 26.5); ctx.lineTo(L.ch.x + L.ch.w, H - 26.5); ctx.stroke();
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6b4148';
+  ctx.font = (9.5 * L.hud) + 'px ui-monospace, Menlo, monospace';
+  ctx.fillText('After US 7,857,767 B2, lumen traveling device. Ferren, Hillis, Hyde, Ishikawa, Jung, Leuthardt, Myhrvold, Sweeney, Tegreene, Wood, Wood. Gearbox LLC, 2010.', L.ch.cx, H - 9);
+  ctx.textAlign = 'left';
+}
+
+function drawTitle() {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(7,4,5,0.90)';
+  ctx.fillRect(c.x, 0, c.w, c.h);
+  ctx.textAlign = 'center';
+  let y = c.h * 0.24;
+  value('LUMEN', c.cx, y, Math.min(58, c.w * 0.10), COL.teal); y += 28;
+  value('A SELF PROPELLING DEVICE IN A VESSEL BED', c.cx, y, 12, COL.dim); y += 50;
+  const lines = [
+    ['MOVE THE CURSOR', 'the device drives toward it, and the distance is the throttle'],
+    ['HOLD THE BUTTON', 'the wheels grip the wall and you hold station against the flow'],
+    ['FIND THE PLAQUE', 'the sensor gives a bearing, and it lies while you are far away'],
+    ['HOLD ON TARGET', 'anchored and in range, the active portion burns the lesion away'],
+    ['MIND THE WALL', 'scraping the lumen costs hull, and clots in the flow cost more'],
+  ];
+  for (const ln of lines) {
+    value(ln[0], c.cx, y, 12, COL.amber); y += 15;
+    value(ln[1], c.cx, y, 11, COL.dim); y += 27;
+  }
+  y += 8;
+  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  value('CLICK TO DEPLOY', c.cx, y, 14, COL.teal);
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+function drawOver() {
+  const c = L.ch;
+  ctx.fillStyle = 'rgba(7,4,5,0.92)';
+  ctx.fillRect(c.x, 0, c.w, c.h);
+  ctx.textAlign = 'center';
+  let y = c.h * 0.36;
+  value('DEVICE LOST', c.cx, y, 40, COL.red); y += 26;
+  value(dev && dev.deadReason ? dev.deadReason : '', c.cx, y, 12, COL.dim); y += 54;
+  value('SCORE  ' + String(score).padStart(6, '0'), c.cx, y, 20, COL.text); y += 26;
+  value('VESSEL BEDS CLEARED  ' + (level - 1), c.cx, y, 12, COL.dim); y += 50;
+  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+  value('CLICK TO DEPLOY AGAIN', c.cx, y, 14, COL.teal);
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+// ---------------------------------------------------------------- loop
+
+let last = performance.now();
+function step(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  update(dt);
+  draw(now / 1000);
+}
+function frame(now) { step(now); requestAnimationFrame(frame); }
+// Some embedded webviews throttle requestAnimationFrame to nothing. If frames
+// stop arriving, keep the loop alive on a timer.
+setInterval(() => { if (performance.now() - last > 250) step(performance.now()); }, 100);
+
+layout();
+makeTissue();
+genWorld(1);
+state = 'title';
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patents you can play</title>
+<style>
+  :root {
+    --bg: #080b0e;
+    --panel: #0e1319;
+    --rule: #1b2830;
+    --text: #d8e6e8;
+    --dim: #7b969c;
+    --faint: #4a6067;
+    --teal: #35e0d0;
+    --red: #ff6b78;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 64px 28px 80px; }
+
+  header { border-bottom: 1px solid var(--rule); padding-bottom: 26px; margin-bottom: 40px; }
+  h1 { font-size: 28px; margin: 0 0 10px; letter-spacing: .01em; color: var(--teal); font-weight: 600; }
+  .sub { color: var(--dim); font-size: 13px; margin: 0; max-width: 62ch; }
+
+  .cards { display: grid; gap: 22px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .cards { grid-template-columns: 1fr 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-top-width: 3px;
+    padding: 22px 22px 20px;
+    display: flex; flex-direction: column;
+    text-decoration: none; color: inherit;
+    transition: border-color .16s ease, transform .16s ease;
+  }
+  .card:hover { border-color: #2e4650; transform: translateY(-2px); }
+  .card.dust { border-top-color: var(--teal); }
+  .card.lumen { border-top-color: var(--red); }
+
+  .pat { font-size: 10.5px; letter-spacing: .12em; color: var(--faint); text-transform: uppercase; }
+  .name { font-size: 22px; margin: 12px 0 4px; color: var(--text); font-weight: 600; }
+  .card.dust .name { color: var(--teal); }
+  .card.lumen .name { color: var(--red); }
+  .tag { font-size: 11.5px; color: var(--dim); margin: 0 0 16px; }
+  .body { font-size: 12.5px; color: var(--dim); margin: 0 0 20px; flex: 1; }
+  .body strong { color: var(--text); font-weight: 600; }
+  .play {
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--text); border: 1px solid var(--rule); padding: 9px 16px;
+    align-self: flex-start;
+  }
+  .card:hover .play { border-color: #2e4650; }
+
+  .cite { margin-top: 46px; border-top: 1px solid var(--rule); padding-top: 22px; }
+  .cite h2 { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); margin: 0 0 14px; font-weight: 600; }
+  .cite p { font-size: 11.5px; color: var(--dim); margin: 0 0 12px; }
+  .cite a { color: var(--dim); }
+  .cite a:hover { color: var(--text); }
+  .note { font-size: 11.5px; color: var(--faint); margin-top: 22px; max-width: 66ch; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Patents you can play</h1>
+    <p class="sub">
+      Two of Danny Hillis's patents, read closely and then built as things you can actually
+      operate. The mechanics come from the claims, not from the vibe of the drawings.
+    </p>
+  </header>
+
+  <div class="cards">
+
+    <a class="card dust" href="games/dust-off/">
+      <div class="pat">US 9,134,205 B2 &middot; 2015</div>
+      <div class="name">Dust Off</div>
+      <p class="tag">System and method for removing surface particles from an object</p>
+      <p class="body">
+        The airport puffer booth. An image sensor picks a spot on a person, a jet knocks
+        particles loose, and capture jets herd them into a collector for analysis.
+        <strong>Here the air jets are lasers.</strong> Tap the subject to ablate a patch,
+        then hold the beam and steer the loose particles down into the intake before they
+        float out of the chamber. Miss a flagged one and the subject walks uncleared.
+      </p>
+      <span class="play">Play</span>
+    </a>
+
+    <a class="card lumen" href="games/lumen/">
+      <div class="pat">US 7,857,767 B2 &middot; 2010</div>
+      <div class="name">Lumen</div>
+      <p class="tag">Lumen traveling device</p>
+      <p class="body">
+        A self propelling microrobot with wall gripping wheels, a sensor for a condition of
+        interest, and an active portion that responds to it. <strong>You drive it.</strong>
+        Steer through a branching vessel bed you can only see by lamplight, follow a sensor
+        bearing that lies while you are far away, anchor against the flow, and burn out the
+        plaque before the power cell runs down.
+      </p>
+      <span class="play">Play</span>
+    </a>
+
+  </div>
+
+  <div class="cite">
+    <h2>Sources</h2>
+    <p>
+      <a href="https://patents.google.com/patent/US9134205B2/en">US 9,134,205 B2</a>,
+      system and method for removing surface particles from an object.
+      Hillis, Hyde, Kare, Ishikawa, Wood. Elwha LLC, granted 15 September 2015.
+    </p>
+    <p>
+      <a href="https://patents.google.com/patent/US7857767B2/en">US 7,857,767 B2</a>,
+      lumen traveling device.
+      Ferren, Hillis, Hyde, Ishikawa, Jung, Leuthardt, Myhrvold, Sweeney, Tegreene, Wood, Wood.
+      Gearbox LLC, granted 28 December 2010.
+    </p>
+    <p class="note">
+      These are games, not implementations. Both take the arrangement of parts described in
+      the claims and turn it into something you operate; neither one simulates the physics
+      the patents actually rely on. Dust Off swaps the fluid jets for lasers on purpose.
+      Both are best on a laptop with a mouse or trackpad, and both want a window about
+      1200 pixels wide or more.
+    </p>
+  </div>
+
+</div>
+</body>
+</html>
