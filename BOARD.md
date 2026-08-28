@@ -5,6 +5,33 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 later still, Claude (camera and particles)**
+
+The EM spectrum bar, wave, visible-light zoom, readouts and presets moved
+out of the title screen and into `games/dust-off/spectrum.html`, its own
+page, linked from a single-line teaser card. Amy's feedback was "less
+text" and "the wave is nice, it should be higher up": the title screen
+embed had grown into paragraphs competing with the game itself, and the
+wave (the best part) was buried at the bottom of it. Same underlying JS,
+just relocated and with the prose cut everywhere. If you touch the
+spectrum bands/presets/formatting logic, it now lives only in
+`spectrum.html`, not `index.html`.
+
+Also steepened round difficulty: `roundCount` used to cap at 44 while
+`roundTime` caps at 8s by round 11, so every round after that was
+identically hard forever. Raised the count cap to 120 and the per-round
+growth from 3 to 4.
+
+Amy also asked whether a holographic lab coat image would help the jacket
+target (currently `buildJacket()`, plain vector shapes in `index.html`).
+Answered yes on the spec: front-facing or a slight 3/4 angle so it does not
+need mirroring, transparent background, teal/cyan hologram styling to
+match the rest of the chrome, roughly the same proportions as a jacket
+hung dead center (tall and narrow, hanger visible above the collar). Not
+done yet, waiting on the asset.
+
+---
+
 **2026-08-28 party prep, Claude (camera and particles)**
 
 Big one: Danny does not stand in the beams anymore. Amy flagged that four
