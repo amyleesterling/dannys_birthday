@@ -134,7 +134,7 @@
   .qtable .u { color: #8b98a8; }
 
   /* ---- wavelength scale ladder ------------------------------------------ */
-  .scalecap { font-size: 12px; letter-spacing: .1em; color: #6c7c8c; text-transform: uppercase; margin: 0 0 8px; }
+  .scalecap { font-size: 12px; letter-spacing: .1em; color: #6c7c8c; text-transform: uppercase; margin: 14px 0 8px; }
   .scalerow { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 28px; }
   .scalecard {
     flex: 1 1 320px; display: flex; gap: 14px; align-items: center;
@@ -143,7 +143,7 @@
   .scalecard.a { border-left: 3px solid #7ee0ff; }
   .scalecard.b { border-left: 3px solid #e8a93a; }
   .scalecard img { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
-  .scalecard .who { font-size: 11.5px; letter-spacing: .08em; color: #6c7c8c; margin-bottom: 3px; }
+  .scalecard .who { font-size: 13.5px; font-weight: 700; letter-spacing: .07em; color: #eff4fb; margin-bottom: 4px; }
   .scalecard.a .who b { color: #7ee0ff; } .scalecard.b .who b { color: #e8a93a; }
   .scalecard .what { font-size: 14px; color: #eff4fb; line-height: 1.5; }
   .scalecard .what .num { color: #cfe6e6; }
@@ -232,6 +232,14 @@
     </div>
   </div>
 
+  <p class="scalecap">Wavelength, for scale</p>
+  <div class="scalerow">
+    <div class="scalecard a"><img id="scaleImgA" alt=""><div>
+      <div class="who" id="scaleWhoA"></div><div class="what" id="scaleWhatA"></div></div></div>
+    <div class="scalecard b"><img id="scaleImgB" alt=""><div>
+      <div class="who" id="scaleWhoB"></div><div class="what" id="scaleWhatB"></div></div></div>
+  </div>
+
   <p class="sentence" id="sentence" aria-live="polite"></p>
   <p class="insight" id="insight"></p>
 
@@ -261,14 +269,6 @@
     <thead><tr><th></th><th class="a" id="thA"></th><th class="b" id="thB"></th><th>Relationship (B vs A)</th></tr></thead>
     <tbody id="qBody"></tbody>
   </table>
-  </div>
-
-  <p class="scalecap">Wavelength, for scale</p>
-  <div class="scalerow">
-    <div class="scalecard a"><img id="scaleImgA" alt=""><div>
-      <div class="who" id="scaleWhoA"></div><div class="what" id="scaleWhatA"></div></div></div>
-    <div class="scalecard b"><img id="scaleImgB" alt=""><div>
-      <div class="who" id="scaleWhoB"></div><div class="what" id="scaleWhatB"></div></div></div>
   </div>
 
   <div class="power">
