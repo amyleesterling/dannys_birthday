@@ -71,10 +71,11 @@
   .fig .dot { fill: rgb(var(--accent) / .85); stroke: none; }
   .card:hover .fig { stroke: rgb(var(--accent)); }
 
-  /* Dust Off gets a real shot of Danny instead of the line figure: he is
-     the whole hook for that game now, between-round dances and all. */
+  /* Dust Off gets its own theme banner instead of the line figure the other
+     two still use. Native 3:1, so the aspect ratio matches it exactly and
+     nothing gets cropped, unlike the old 4:3 box built for Danny's photo. */
   .thumb {
-    display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+    display: block; width: 100%; aspect-ratio: 3 / 1; object-fit: cover;
     margin: 16px 0 4px; border: 1px solid rgb(var(--accent) / .25);
   }
   .card:hover .thumb { border-color: rgb(var(--accent) / .6); }
@@ -117,7 +118,7 @@
       <span class="holocard-trace"></span>
       <div class="pat">US 9,134,205 B2 &middot; 2015</div>
 
-      <img class="thumb" src="games/dust-off/thumb.png" alt="Danny mid dance, between rounds of Dust Off">
+      <img class="thumb" src="games/dust-off/theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose.">
 
       <div class="name">Dust Off</div>
       <p class="tag">System and method for removing surface particles from an object</p>

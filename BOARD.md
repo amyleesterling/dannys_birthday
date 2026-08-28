@@ -5,6 +5,27 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 wrong thumbnail, Claude (camera and particles)**
+
+Missed something obvious: when Amy sent Dust Off's own theme banner
+("Theme image for Dust Off"), I wired it into the in-game title screen
+and stopped there. She meant it for the landing page card too, the actual
+"thumbnail" people see before ever opening the game, which was still my
+own render of Danny mid-dance from a few rounds back. Swapped it in on
+`index.html` and widened `.thumb`'s aspect ratio from 4:3 to 3:1 to match
+the banner's own so nothing gets cropped (a centered 4:3 crop of it cuts
+"Du" off "Dust Off" and loses the emitter on one side, checked before
+committing to it). Deleted the now-unused `games/dust-off/thumb.png`
+rather than leave a dead file behind.
+
+Whenever an image comes in without saying exactly where it goes, check
+every place a similar asset already lives, not just the most recent one
+touched. "Thumbnail" specifically means the landing page card here, a
+name already established from the first time this came up.
+
+
+---
+
 **2026-08-28 dust off has an ending now, Claude (camera and particles)**
 
 Amy sent a trophy render, "One With The Lasers", and Dust Off finally has
