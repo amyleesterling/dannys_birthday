@@ -455,9 +455,17 @@ const REDS_PER_ROUND = n => Math.max(3, Math.round(n * 0.42));
 // Cheap taps, expensive holds: the choice you are making under heat is how
 // long to keep pushing a cloud, not whether you can afford to aim.
 const PULSE_HEAT   = 6;
-const BEAM_HEAT    = 29;   // per second, so ~3.4s of held beam before a lockout
+// Per second of held beam. Measured, the emitter already saturates by round
+// three: peak heat 99 to 100 and 10 to 18% of the round spent locked out. So
+// this is a lever with real headroom, which is why it climbs with the round
+// rather than sitting flat. Round one still gets ~3.5s of continuous beam,
+// which is most of its window; round ten gets ~2.1s, so late rounds are about
+// choosing which reds to spend the beam on rather than sweeping everything.
+const beamHeat = n => Math.min(52, 28 + (n - 1) * 2.4);
 const COOL_RATE    = 30;   // per second
-const OVERHEAT_LOCK = 1.3; // seconds
+// The lockout grows a little too, so an overheat late costs more of a shorter
+// round than one early costs of a longer one.
+const overheatLock = n => Math.min(1.9, 1.25 + (n - 1) * 0.07);
 // Widened from 62 with the same reasoning: a tap is now the only way to get
 // anything off the body, so it has to be worth taking.
 const PULSE_RADIUS = 74;   // screen px
@@ -928,7 +936,7 @@ function fire() {
 
   if (laser.heat >= 100) {
     laser.heat = 100;
-    laser.lock = OVERHEAT_LOCK;
+    laser.lock = overheatLock(round);
     audio.overheat();
     kick(10);
   }
@@ -1091,10 +1099,10 @@ function update(dt) {
   // heat
   if (laser.lock > 0) {
     laser.lock -= dt;
-    laser.heat = Math.max(0, laser.heat - dt * (100 / OVERHEAT_LOCK));
+    laser.heat = Math.max(0, laser.heat - dt * (100 / overheatLock(round)));
   } else if (pointer.down && pointer.inside) {
-    laser.heat += BEAM_HEAT * dt;
-    if (laser.heat >= 100) { laser.heat = 100; laser.lock = OVERHEAT_LOCK; audio.overheat(); kick(10); }
+    laser.heat += beamHeat(round) * dt;
+    if (laser.heat >= 100) { laser.heat = 100; laser.lock = overheatLock(round); audio.overheat(); kick(10); }
   } else {
     laser.heat = Math.max(0, laser.heat - COOL_RATE * dt);
   }

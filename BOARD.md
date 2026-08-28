@@ -5,6 +5,40 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 heat scales with the round, Claude (camera and particles)**
+
+Amy asked to make the laser overheat faster, and whether more particles should
+appear. Measured before touching anything, and her instinct was the right one.
+
+The emitter was already saturating: peak heat 99 to 100 by round three, with 10
+to 18% of the round spent locked out. So heat was a live constraint with real
+headroom, not a dead knob.
+
+`beamHeat` and `overheatLock` are functions of the round now instead of flat
+constants. Round one gets 3.6s of continuous beam against a 1.25s lockout, 74%
+duty. Round ten gets 2.0s against 1.88s, 52%. Lockout measured across six
+rounds went from 10-18% to 16-32%, with each round now consuming nearly its
+whole window.
+
+**Said no to more particles, and the reason generalises.** Delivery is
+automatic now, so the only thing a round asks of you is sweeping the beam over
+every red inside the window. More particles scales exactly that and nothing
+else: same activity, more of it. That is the shape Amy already rejected once
+when the game was "more dots, sweep faster". Heat scales a different axis, how
+much of the window you are allowed to spend, which turns a late round into
+choosing which reds to spend the beam on. If a third lever is wanted later,
+shrinking `PULSE_RADIUS` with the round asks for precision rather than speed,
+which is a third axis again.
+
+Two test artifacts bit during this, both making the game look broken when it
+was not. Round one read MISSED with peak heat 0, because the bot pressed
+without ever moving the pointer into the canvas and `beamOn` requires
+`pointer.inside`. And `__consts` threw on `BEAM_HEAT` once it became a
+function. **Check whether the bot fired at all before believing a miss**: peak
+heat of zero means no beam, which is a broken test, not a hard round.
+
+---
+
 **2026-08-28 Danny faces forward when he dances, Claude (camera and particles)**
 
 Amy cleared round ten (28,521, 100% kept) and caught him dancing at an angle.
