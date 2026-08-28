@@ -322,6 +322,24 @@ function buildBody(pose) {
 // keeps the wireframe head it always had.
 const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded);
 
+// The wall mount the beams fire from. Drawn nose-first: the lens sits at
+// (EMITTER_FX, EMITTER_FY) of the sprite, as a fraction of its width and
+// height, and that point is what lands on the emitter's (x, y) in the
+// chamber. A left-wall emitter draws as loaded; a right-wall one mirrors
+// around the same lens point, so the beam still leaves from the right place.
+// emitter-hot.png is the same render with the lens glow rechannelled from
+// blue to red, swapped in while the emitter is locked out cooling down.
+function loadEmitterArt(src) {
+  const img = new Image();
+  img.ready = false;
+  img.onload = () => { img.ready = true; };
+  img.src = src;
+  return img;
+}
+const emitterImg = loadEmitterArt('emitter.png');
+const emitterHotImg = loadEmitterArt('emitter-hot.png');
+const EMITTER_FX = 0.744, EMITTER_FY = 0.276;
+
 // dedicated context for hit tests so the main transform is never disturbed
 const hitCtx = document.createElement('canvas').getContext('2d');
 
@@ -853,18 +871,40 @@ function drawChamber(time) {
   ctx.beginPath(); ctx.moveTo(c.x, L.floorY + .5); ctx.lineTo(c.x + c.w, L.floorY + .5); ctx.stroke();
 
   // the four outlet housings, fixed to the side walls
+  const hot = laser.lock > 0;
+  const art = hot ? emitterHotImg : emitterImg;
   for (const e of L.emitters) {
-    ctx.fillStyle = '#0b171b';
-    ctx.strokeStyle = laser.lock > 0 ? COL.red : COL.teal;
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.moveTo(e.x - 9 * e.s, e.y - 13);
-    ctx.lineTo(e.x - 9 * e.s, e.y + 13);
-    ctx.lineTo(e.x + 11 * e.s, e.y + 7);
-    ctx.lineTo(e.x + 11 * e.s, e.y - 7);
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = laser.lock > 0 ? COL.red : COL.teal;
-    ctx.fillRect(e.x + 9 * e.s, e.y - 2, 3 * e.s, 4);
+    if (art.ready) {
+      const ew = 108, eh = ew * (art.naturalHeight / art.naturalWidth);
+      ctx.save();
+      ctx.translate(e.x, e.y);
+      if (e.s < 0) ctx.scale(-1, 1);
+      ctx.drawImage(art, -EMITTER_FX * ew, -EMITTER_FY * eh, ew, eh);
+      ctx.restore();
+    } else {
+      // the emitter art loads fast, but a plain housing covers the one frame it doesn't
+      ctx.fillStyle = '#0b171b';
+      ctx.strokeStyle = hot ? COL.red : COL.teal;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(e.x - 9 * e.s, e.y - 13);
+      ctx.lineTo(e.x - 9 * e.s, e.y + 13);
+      ctx.lineTo(e.x + 11 * e.s, e.y + 7);
+      ctx.lineTo(e.x + 11 * e.s, e.y - 7);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    // a little extra bloom on the lens itself, breathing gently, flickering
+    // fast while it cools down
+    const glow = hot ? '255,77,94' : '126,224,255';
+    const pulse = 0.65 + 0.35 * Math.sin(time * (hot ? 10 : 2.4) + e.x * 0.1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const gr = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, 15);
+    gr.addColorStop(0, `rgba(${glow},${0.35 * pulse})`);
+    gr.addColorStop(1, `rgba(${glow},0)`);
+    ctx.fillStyle = gr;
+    ctx.beginPath(); ctx.arc(e.x, e.y, 15, 0, TAU); ctx.fill();
+    ctx.restore();
   }
 
   // intake vent
