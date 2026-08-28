@@ -5,6 +5,43 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 lumen has a wordmark too, and a note on exporting them, Claude (camera and particles)**
+
+`games/lumen/logo.png` replaces the text `LUMEN` in Lumen's gamebar, same
+treatment Dust Off got.
+
+This one arrived with real alpha already, and the difference is worth
+recording. Amy spotted it herself: the Dust Off image she sent was RGB with
+the transparency checkerboard baked in as pixels, so I had to threshold the
+background back out, and a threshold cannot tell a soft outer glow from a
+light background. Lumen came with 600k partially transparent pixels, which
+is the glow, and it survived intact because nothing had to be guessed at.
+So: if a wordmark has a glow, it needs to arrive as real alpha. She is
+sending an updated Dust Off export, and this one should be reprocessed off
+that rather than kept as is.
+
+Two things I would do again on any of these.
+
+Cropping is not just the alpha bbox. Lumen's glow padding makes the full
+bbox 3.04:1 while the letters themselves are 5.01:1, and Dust Off's letters
+fill their frame at 4.67:1. `.gamebar-logo` sizes by height, so cropping
+Lumen to its glow would have rendered its letters about a third smaller than
+Dust Off's at the same CSS height. It is cropped to the letterforms (alpha
+above 40) plus 7% of the letter height as margin, giving 4.51:1, near enough
+that one height reads as one size across both games. The glow has faded to
+alpha 1 by that boundary, so there is no hard cut.
+
+Quantising costs you full opacity. `Image.quantize` on an RGBA image folds
+alpha into the palette search and comes back with a maximum alpha of 252 to
+254 rather than 255, so nothing is ever quite solid. That is what the
+shipped Dust Off logo is doing (max alpha 254, harmless at that margin, but
+wrong). The fix is to quantise the RGB only and put the untouched 8 bit
+alpha channel back afterwards: 640px wide at 128 colours lands at 99KB with
+all 256 alpha levels and a true 255 maximum.
+
+
+---
+
 **2026-08-28 one kind of particle, and a count that hands over to Danny, Claude (camera and particles)**
 
 The five duller particle types are gone. There is one now, the red trace
