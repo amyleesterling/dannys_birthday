@@ -1895,23 +1895,18 @@ function drawGoal(time) {
   if (subject.phase === 'ready') {
     fitCentered('RECOVER ALL ' + subject.total + ' IN ' +
                 subject.scanTime.toFixed(1) + ' SECONDS', c.cx, y + 26, maxW, 15, COL.cyan);
-    fitCentered(subject && subject.parts.some(q => q.type.hazard)
-                  ? (L.narrow ? 'DRAG THE RED IN. LEAVE THE CROSSED ONES'
-                              : 'DRAG THE RED ONES TO THE INTAKE. LEAVE THE CROSSED ONES ALONE')
-                  : (L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
-                              : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE'),
-                c.cx, y + 50, maxW, 12, COL.dim);
+    fitCentered(coachLine(subject), c.cx, y + 50, maxW, 12, COL.dim);
+    if (subject.parts.some(q => q.type.hazard)) drawLegend(c.cx, y + 72, time);
   } else {
     const capY = left > 0
       ? bigCount(left, left === 1 ? 'PARTICLE LEFT' : 'PARTICLES LEFT',
                  left <= 3 ? COL.cyan : COL.text, c.cx, y, maxW)
       : bigCount(0, 'ALL RECOVERED', COL.teal, c.cx, y, maxW);
-    fitCentered(subject && subject.parts.some(q => q.type.hazard)
-                  ? (L.narrow ? 'DRAG THE RED IN. LEAVE THE CROSSED ONES'
-                              : 'DRAG THE RED ONES TO THE INTAKE. LEAVE THE CROSSED ONES ALONE')
-                  : (L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
-                              : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE'),
-                c.cx, capY + 26, maxW, 12, COL.dim);
+    fitCentered(coachLine(subject), c.cx, capY + 26, maxW, 12,
+                loose.length ? COL.cyan : COL.dim);
+    if (subject.parts.some(q => q.type.hazard) || loose.some(q => q.type.hazard)) {
+      drawLegend(c.cx, capY + 48, time);
+    }
   }
   ctx.textAlign = 'left';
 }
@@ -2072,6 +2067,47 @@ function drawBars(time) {
 
 // Measure before drawing. A centred string that does not fit gets shrunk, down
 // to a floor of 12px, below which it is not worth reading.
+// The hint line used to be one static sentence trying to carry three separate
+// rules at 12px. Amy played the shipped build and asked what the crossed circle
+// was and whether particles came off with a longer blaze, which is a complete
+// answer: none of it was discoverable. So the line reacts to what you are
+// actually doing now, and says the one next thing rather than everything.
+function coachLine(s) {
+  const looseNow = loose.length > 0;
+  const anyFoul = s.parts.some(q => q.type.hazard) || loose.some(q => q.type.hazard);
+  if (!looseNow) {
+    return L.narrow ? 'TAP THE OBJECT TO KNOCK PARTICLES LOOSE'
+                    : 'TAP THE OBJECT TO KNOCK PARTICLES LOOSE. HOLDING THE BEAM WILL NOT';
+  }
+  if (anyFoul) {
+    return L.narrow ? 'HOLD AND DRAG THE RED DOWN. NOT THE CROSSED'
+                    : 'HOLD AND DRAG THE RED ONES DOWN TO THE INTAKE. LEAVE THE CROSSED ONES';
+  }
+  return L.narrow ? 'HOLD AND DRAG THEM DOWN TO THE INTAKE'
+                  : 'NOW HOLD AND DRAG THEM DOWN INTO THE INTAKE';
+}
+
+// Words are not enough for the contaminant: Amy could read "leave the crossed
+// ones" and still not know which speck that meant. So the legend draws the two
+// real glyphs, the same functions the game draws them with, rather than
+// describing them.
+function drawLegend(cx, y, time) {
+  const r = 4.6, gap = 8, fs = 10;
+  ctx.font = '600 ' + fs + 'px ui-monospace, Menlo, monospace';
+  const wA = ctx.measureText('RECOVER').width, wB = ctx.measureText('REJECT').width;
+  const total = r * 2 + gap + wA + 22 + r * 2 + gap + wB;
+  let x = cx - total / 2 + r;
+  ctx.textAlign = 'left';
+  drawSpeck(x, y, r, PART_TYPE.color);
+  ctx.fillStyle = COL.dim;
+  ctx.fillText('RECOVER', x + r + gap, y + fs * 0.36);
+  x += r + gap + wA + 22 + r;
+  drawFoul(x, y, r, time, 0);
+  ctx.fillStyle = COL.dim;
+  ctx.fillText('REJECT', x + r + gap, y + fs * 0.36);
+  ctx.textAlign = 'center';
+}
+
 function fitCentered(text, cx, y, maxW, size, color) {
   const mono = 'px ui-monospace, Menlo, monospace';
   let f = size * L.hud;
