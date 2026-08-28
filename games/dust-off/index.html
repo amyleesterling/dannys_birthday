@@ -467,18 +467,18 @@ const PULSE_RADIUS = 74;   // screen px
 // It settles back onto the body rather than vanishing, because vanishing reads
 // as the game stealing a particle you had earned, while re-settling reads as
 // what it is, that you left it too long.
-const LOOSE_LIFE  = 4.6;   // seconds in the air
+// The furthest corner of the chamber takes about 4.4s to reach the mouth under
+// its own steam, so this is a fail-safe for a particle that somehow gets stuck,
+// not a clock you are meant to race. It was 4.6, which left a 0.2s margin and
+// would have had particles settling back for no reason a player could see.
+const LOOSE_LIFE  = 6.0;   // seconds in the air
 const LOOSE_WARN  = 1.2;   // it starts flickering this long before settling
 const BEAM_RADIUS  = 132;  // how far the held beam can reach for loose grit
 
-// The swipe. FLING_MIN is the finger speed above which a pass reads as a throw
-// rather than a nudge; below it you shepherd, above it you launch. FLING_GAIN
-// under 1 means particles come off slower than the finger, which keeps a fast
-// flick from firing them straight through the far wall.
-const FLING_RADIUS = 96;
-const FLING_MIN    = 340;   // px/s
-const FLING_GAIN   = 0.72;
-const FLING_GRIP   = 0.34;
+// How hard the vent draws loose particles across the chamber. Tuned so a
+// particle knocked off the far top corner still reaches the mouth inside a
+// round, without the trip being so quick that dislodging is the whole game.
+const VENT_PULL = 330;
 const BEAM_FORCE   = 2000;
 // The beams dislodge again. Tapping for every particle was the previous
 // build's answer to "one gesture does everything" and Amy's verdict on playing
@@ -673,11 +673,7 @@ let shake = 0;
 let frags = [];
 
 const laser = { heat: 0, lock: 0, firing: false, x: 0, y: 0, onBody: false, beamT: 0 };
-// px and py are the previous sample, vx and vy the smoothed velocity in px/s.
-// The velocity is what separates the two verbs: holding the beam over the
-// object is slow, flinging is fast, so the gesture itself says which one you
-// meant and no mode switch is needed.
-const pointer = { x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, tPrev: 0, down: false, inside: false };
+const pointer = { x: 0, y: 0, down: false, inside: false };
 
 // Where the four housings are pointing. They rest angled down at the sample
 // on the floor rather than staring straight across the chamber, and swing to
@@ -932,30 +928,15 @@ canvas.addEventListener('pointerdown', e => {
   fire();
 });
 canvas.addEventListener('pointermove', updatePointer);
-canvas.addEventListener('pointerup', () => { pointer.down = false; pointer.vx = 0; pointer.vy = 0; });
+canvas.addEventListener('pointerup', () => { pointer.down = false; });
 canvas.addEventListener('pointercancel', () => { pointer.down = false; });
 canvas.addEventListener('pointerenter', () => { pointer.inside = true; });
 canvas.addEventListener('pointerleave', () => { pointer.inside = false; pointer.down = false; });
 
 function updatePointer(e) {
   const r = canvas.getBoundingClientRect();
-  const nx = e.clientX - r.left, ny = e.clientY - r.top;
-  const now = performance.now() / 1000;
-  const dt = now - pointer.tPrev;
-  // Sub-millisecond gaps make the divide explode, and coalesced pointer events
-  // on a phone arrive in bursts, so anything faster than 4ms is ignored rather
-  // than trusted. A gap longer than 100ms means the finger was lifted or
-  // stalled, so the old velocity is stale and gets dropped instead of decayed.
-  if (dt > 0.004 && dt < 0.1) {
-    const k = 1 - Math.pow(0.02, dt);
-    pointer.vx += ((nx - pointer.x) / dt - pointer.vx) * k;
-    pointer.vy += ((ny - pointer.y) / dt - pointer.vy) * k;
-  } else if (dt >= 0.1) {
-    pointer.vx = 0; pointer.vy = 0;
-  }
-  if (dt > 0.004) pointer.tPrev = now;
-  pointer.px = pointer.x; pointer.py = pointer.y;
-  pointer.x = nx; pointer.y = ny;
+  pointer.x = e.clientX - r.left;
+  pointer.y = e.clientY - r.top;
   pointer.inside = true;
 }
 
@@ -1162,51 +1143,42 @@ function updateLoose(dt, turb, beamOn) {
     const p = loose[i];
     p.age += dt;
 
-    // buoyant drift plus a little turbulence: light debris rises out of frame
-    let ax = Math.sin(now * 1.7 + p.ph * 3.1 + p.y * 0.012) * 26 * turb;
-    let ay = -7 - (p.type.flagged ? -4 : 0);
+    // a little turbulence so the drift is not a straight line. The buoyant
+    // rise is gone: it existed to carry particles out of frame, which is the
+    // opposite of what they do now.
+    let ax = Math.sin(now * 1.7 + p.ph * 3.1 + p.y * 0.012) * 22 * turb;
+    let ay = Math.cos(now * 1.3 + p.ph * 2.7) * 14 * turb;
 
-    // The swipe. This replaced a constant pull toward the pointer, which meant
-    // delivery was a slow drag: you parked the beam on a particle and walked it
-    // to the mouth. Now the finger's own velocity is handed to whatever it
-    // passes through, so a flick throws a whole cloud across the chamber and a
-    // slow pass barely disturbs it. Same gesture, two outcomes, decided by how
-    // fast you move rather than by a mode.
-    if (pointer.down) {
-      const dx = p.x - pointer.x, dy = p.y - pointer.y;
-      const d = Math.hypot(dx, dy);
-      if (d < FLING_RADIUS) {
-        const grip = 1 - d / FLING_RADIUS;
-        const speed = Math.hypot(pointer.vx, pointer.vy);
-        if (speed > FLING_MIN) {
-          // an impulse, not an acceleration: the throw should not depend on
-          // how many frames the finger happened to be near the particle
-          const take = Math.min(1, grip * grip * FLING_GRIP * dt * 60);
-          p.vx += (pointer.vx * FLING_GAIN - p.vx) * take;
-          p.vy += (pointer.vy * FLING_GAIN - p.vy) * take;
-        } else {
-          // a slow pass nudges rather than throws, so you can shepherd a
-          // straggler back over the mouth without launching it off screen
-          ax += -dx / (d + 1) * 260 * grip;
-          ay += -dy / (d + 1) * 260 * grip;
-        }
-      }
-    }
-
-    // Intake suction, at the vent mouth and nowhere else.
+    // Loose particles make their own way to the intake.
     //
-    // This reached 300px above the intake across the full width of the screen,
-    // which on a phone is the bottom half of the display and contains most of
-    // the sample. Anything knocked off the lower body fell in by itself, so
-    // "drag them to the intake" was not really a verb: the round largely
-    // played itself, and that is the single biggest reason it was too easy.
-    // Now it is a mouth you have to deliver to.
-    const VENT_REACH = 96, VENT_MARGIN = 30;
-    const overVent = p.x > ix - VENT_MARGIN && p.x < ix + iw + VENT_MARGIN &&
-                     p.y > iy - VENT_REACH;
-    if (overVent) {
-      ay += 520 * (1 - clamp((iy - p.y) / VENT_REACH, 0, 1));
-      ax += ((ix + iw / 2) - p.x) * 1.2;
+    // The swipe that used to do this could never work on a phone, and that is
+    // squarely my mistake: pointerdown fires the beam, so there is no way to
+    // touch the screen without shooting. On a mouse the two overlap and it
+    // looks like it works; on a finger every swipe is also a burst of laser,
+    // which is exactly what Amy saw. A gesture that cannot be performed without
+    // triggering a different verb is not a mechanic.
+    //
+    // So the vent pulls, everywhere in the chamber, and the beam's only job is
+    // getting particles off the object. The pull is deliberately gentle and
+    // gets stronger closer in, so a particle visibly travels rather than
+    // snapping to the mouth: you still have to knock things loose early enough
+    // for them to arrive before the buzzer.
+    const mouthX = ix + iw / 2;
+    const dx = mouthX - p.x, dy = iy - p.y;
+    const d = Math.hypot(dx, dy) || 1;
+    // Flat at range, stronger close in. The first version scaled the pull *down*
+    // with distance, which put the weakest force exactly where the journey was
+    // longest: a particle from a top corner never arrived at all, it just
+    // settled back onto the object. Measured, not guessed.
+    const near = clamp(1 - d / (L.ch.h * 0.9), 0, 1);
+    const pull = VENT_PULL * (1 + near * near * 1.2);
+    ax += dx / d * pull;
+    ay += dy / d * pull;
+
+    // right at the mouth it takes over completely, so nothing hovers on the lip
+    if (p.y > iy - 70 && p.x > ix - 30 && p.x < ix + iw + 30) {
+      ay += 460;
+      ax += (mouthX - p.x) * 1.1;
     }
 
     p.vx += ax * dt; p.vy += ay * dt;
@@ -2101,8 +2073,11 @@ function coachLine() {
     return L.narrow ? 'HOLD THE BEAM ON THE OBJECT TO SHAKE PARTICLES LOOSE'
                     : 'HOLD THE BEAM ON THE OBJECT TO SHAKE PARTICLES LOOSE';
   }
-  return L.narrow ? 'NOW SWIPE THEM INTO THE INTAKE'
-                  : 'NOW SWIPE THROUGH THEM TO FLING THEM INTO THE INTAKE';
+  // The intake does the carrying, so the only thing left to say is to keep
+  // going: the mistake to warn against now is standing still watching them
+  // travel instead of freeing the next batch.
+  return L.narrow ? 'THE INTAKE DRAWS THEM IN. KEEP GOING'
+                  : 'THE INTAKE DRAWS THEM IN BY ITSELF. KEEP FREEING THE REST';
 }
 
 // Both are wanted, so the legend says what each is worth rather than what to
