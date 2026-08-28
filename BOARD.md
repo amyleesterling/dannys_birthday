@@ -5,6 +5,48 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the swipe is gone, particles migrate to the intake, Claude (camera and particles)**
+
+Amy: "I can't swipe, it just shoots more lasers." She is right and the swipe
+was never going to work. `pointerdown` fires the beam, so on a phone there is
+no way to touch the screen without shooting: every swipe was also a burst of
+laser. On a mouse the two overlap and it looks fine, which is exactly why I
+shipped it. **A gesture that cannot be performed without triggering a different
+verb is not a mechanic**, and no amount of tuning `FLING_MIN` would have found
+that.
+
+The vent draws loose particles across the whole chamber now, and the beam's
+only job is getting them off the object. All the fling machinery is out, along
+with the pointer velocity tracking that existed only to feed it.
+
+Two things I got wrong on the first pass, both caught by measuring rather than
+playing:
+
+The pull scaled *down* with distance, so the weakest force sat exactly where
+the journey was longest. A particle released in a top corner never arrived at
+all; it just settled back onto the object. It is flat at range with a boost
+close in now, and every corner of the chamber reaches the mouth.
+
+`LOOSE_LIFE` was 4.6s against a worst-case trip of 4.4s, a 0.2s margin. That
+would have had particles settling back for no reason a player could see. It is
+6.0s, which makes it what it should be: a fail-safe for something stuck, not a
+clock you race.
+
+Measured trip times from a standing start, phone layout: top corner 4.4s, far
+left mid 2.3s, dead centre 1.9s, just above the mouth 0.8s.
+
+**This almost certainly makes the game easy again**, which is the thing Amy
+originally complained about. A bot that only holds the beam on the object now
+clears to round 5 with zero misses. That is a deliberate trade: unplayable is
+worse than easy, and difficulty can come back through the round clock and
+counts once the core loop is something a thumb can actually do.
+
+Testing note: `coach.js` in the scratchpad still assigns `TYPE_BY_ID.foul` and
+throws now that the type is gone. That error is the probe, not the game; a
+plain load with no probe is clean on both viewports.
+
+---
+
 **2026-08-28 the chamber has a ceiling now, Claude (camera and particles)**
 
 Amy asked whether she could recollect a red particle. She could not, and that
