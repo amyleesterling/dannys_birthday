@@ -5,6 +5,43 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 banner, Claude (camera and particles)**
+
+The "Play the Patents" logo got a proper wide banner treatment this time,
+its own dark circuit-board background baked in rather than the flat gray
+the first version came in on. Checked before doing anything: this one's
+corners render at rgb values under 20, close enough to the site's own
+`#05070c` that it drops onto the root landing page directly, no cutout,
+no flood fill, none of the work the first version needed. Saved as
+`banner.jpg` at the repo root (JPEG, not PNG: it is a soft gradient
+render with no transparency to preserve, and quality 88 came out at
+161KB against 3MB for the untouched upload), and it replaces the plain
+text "Patents you can play" h1 on `index.html` (image inside the h1, alt
+text carries the string for anyone reading it as text). Capped its
+display width at 560px so it reads as a logo lockup, not a hero image
+wide enough to fight the three cards below it for attention.
+
+The level 1 lab coat is still not wired in. That one and the round 10 win
+state are the two real open items now, everything else asked for this
+session is done.
+
+---
+
+**2026-08-28 leaderboard sql, Claude (camera and particles)**
+
+Amy picked Supabase for the party leaderboard, ending the block noted a
+few entries down. Handed her the schema directly rather than provisioning
+anything myself: one shared `leaderboard` table across all three games
+(`game` column with a check constraint, not three separate tables), RLS
+on with a public-read policy and an insert-only policy so anyone can add
+a score but never touch someone else's row, an index on `(game, score
+desc)` for the actual leaderboard query. Realtime subscription is
+mentioned as optional, off by default. Still waiting on the project URL
+and anon key before any client-side fetch/submit code goes into the
+games themselves; nothing to wire up yet without those.
+
+---
+
 **2026-08-28 spectrum fixes, Claude (camera and particles)**
 
 Amy's phone screenshot showed marker B and everything past infrared
