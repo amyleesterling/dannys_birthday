@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EM Spectrum</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #04070a; color: #cfe6e6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .gamebar {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px; border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 26px 20px 60px; }
+  h1 { font-size: 20px; color: #7ee0ff; margin: 0 0 6px; font-weight: 600; }
+  .sub { font-size: 13.5px; color: #9aa2b1; margin: 0 0 22px; }
+  .sub b { color: #eff4fb; font-weight: 600; }
+
+  /* the wave: the main draw, so it comes first and runs bigger here than it
+     ever could shoehorned under everything else on the title screen */
+  .specwavebox {
+    position: relative; height: 150px; margin-bottom: 6px;
+    border: 1px solid rgba(196,228,255,.18); background: #05070c;
+  }
+  .specwavebox canvas { display: block; width: 100%; height: 100%; }
+  .specwavebox .lane-tag {
+    position: absolute; left: 8px; font-size: 11px; letter-spacing: .06em;
+    top: 8px; color: #7ee0ff;
+  }
+  .specwavebox .lane-tag.b { top: auto; bottom: 8px; color: #e8a93a; }
+  .specwavenote { font-size: 11.5px; color: #5c6b7a; margin: 6px 0 26px; }
+
+  .specscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .specscroll > .specbar, .specscroll > .specticks { min-width: 640px; }
+
+  .specbar {
+    position: relative; height: 40px; margin: 0 0 4px;
+    border: 1px solid rgba(196,228,255,.18); background: #05070c;
+    touch-action: none; cursor: pointer;
+  }
+  .specband { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+  .specband span {
+    position: absolute; left: 5px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; letter-spacing: .06em; color: rgba(239,244,251,.8); white-space: nowrap;
+  }
+  .specmark {
+    position: absolute; top: -8px; bottom: -8px; width: 2px; margin-left: -1px;
+    background: #eff4fb; cursor: grab; touch-action: none;
+  }
+  .specmark::before { content: ""; position: absolute; left: -15px; right: -15px; top: 0; bottom: 0; }
+  .specmark::after {
+    content: attr(data-tag); position: absolute; left: 50%; transform: translateX(-50%);
+    top: -20px; font-size: 12px; white-space: nowrap; color: inherit;
+  }
+  .specmark:focus-visible { outline: 2px solid #7ee0ff; outline-offset: 3px; }
+  .specmark.a { background: #7ee0ff; color: #7ee0ff; }
+  .specmark.b { background: #e8a93a; color: #e8a93a; }
+
+  .specticks { position: relative; height: 18px; margin-bottom: 22px; font-size: 11px; color: #6c7c8c; }
+  .specticks i { position: absolute; transform: translateX(-50%); font-style: normal; white-space: nowrap; }
+
+  .cap { font-size: 12.5px; color: #8b98a8; margin: 0 0 7px; }
+  .specvisbar {
+    position: relative; height: 26px; margin-bottom: 24px; touch-action: none; cursor: pointer;
+    border: 1px solid rgba(196,228,255,.18);
+    background: linear-gradient(90deg, #ff2d2d 0%, #ff7b00 12%, #ffd400 26%,
+                                       #7bff2d 44%, #00e5ff 63%, #2b5cff 80%, #7a2bff 100%);
+  }
+  .specvisbar.off { filter: grayscale(1) brightness(.42); }
+  .specvisbar .specmark { top: -5px; bottom: -5px; }
+
+  .specread { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-bottom: 20px; }
+  .specread .r { grid-column: 1 / -1; }
+  @media (min-width: 560px) { .specread { grid-template-columns: 1fr 1fr 1fr; }
+                              .specread .r { grid-column: auto; } }
+  .speccard { border: 1px solid rgba(196,228,255,.14); padding: 11px 13px; }
+  .speccard.a { border-left: 3px solid #7ee0ff; }
+  .speccard.b { border-left: 3px solid #e8a93a; }
+  .speccard.r { border-left: 3px solid #a07cff; }
+  .speclabel { font-size: 11.5px; letter-spacing: .1em; color: #6c7c8c; }
+  .specval { font-size: 21px; color: #eff4fb; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .specmeta { font-size: 12.5px; color: #9aa2b1; margin-top: 4px; }
+  .u { text-transform: none; }   /* a unit symbol must never sit inside text-transform: uppercase */
+
+  .specpresets { display: flex; flex-wrap: wrap; gap: 7px; }
+  .specpresets button {
+    font: inherit; font-size: 12.5px; cursor: pointer; background: none; color: #9aa2b1;
+    border: 1px solid rgba(196,228,255,.14); padding: 8px 10px;
+  }
+  .specpresets button:hover { color: #7ee0ff; border-color: rgba(126,224,255,.5); }
+</style>
+</head>
+<body>
+<header class="gamebar holopanel" style="--bar-accent: 126 224 255;">
+  <a class="gamebar-back" href="index.html">← DUST OFF</a>
+  <span class="gamebar-name">EM SPECTRUM</span>
+</header>
+<div class="wrap">
+  <h1>Radio to gamma</h1>
+  <p class="sub">A to B: <b id="specRatio">5.6 million</b>&times; apart. Drag a marker, or pick something.</p>
+
+  <div class="specwavebox">
+    <span class="lane-tag a">A</span>
+    <span class="lane-tag b">B</span>
+    <canvas id="specWave"></canvas>
+  </div>
+  <p class="specwavenote" id="waveNote"></p>
+
+  <div class="specscroll">
+    <div class="specbar" id="specBar">
+      <div class="specmark a" id="markA" tabindex="0" role="slider" aria-label="Marker A frequency"></div>
+      <div class="specmark b" id="markB" tabindex="0" role="slider" aria-label="Marker B frequency"></div>
+    </div>
+    <div class="specticks" id="specTicks"></div>
+  </div>
+
+  <p class="cap">Visible light, magnified:</p>
+  <div class="specvisbar" id="specVis">
+    <div class="specmark b" id="markV" tabindex="0" role="slider" aria-label="Marker B within visible light"></div>
+  </div>
+
+  <div class="specread">
+    <div class="speccard a"><div class="speclabel">MARKER A</div>
+      <div class="specval" id="valA"></div><div class="specmeta" id="metaA"></div></div>
+    <div class="speccard b"><div class="speclabel">MARKER B</div>
+      <div class="specval" id="valB"></div><div class="specmeta" id="metaB"></div></div>
+    <div class="speccard r"><div class="speclabel">HIGHER BY</div>
+      <div class="specval" id="valR"></div><div class="specmeta" id="metaR"></div></div>
+  </div>
+
+  <div class="specpresets" id="specPresets"></div>
+</div>
+<script>
+// Every figure here is derived from the two marker positions, so the readouts
+// and the ratio cannot drift apart from one another.
+(() => {
+  const C = 299792458;
+  const F0 = 4, F1 = 20;                            // decades, 10 kHz to 100 EHz
+  const VIS_LO = C / 750e-9, VIS_HI = C / 380e-9;
+
+  const BANDS = [
+    { lo: 1e4, hi: 3e8, name: 'radio', col: 'rgba(74,150,224,.22)' },
+    { lo: 3e8, hi: 3e11, name: 'microwave', col: 'rgba(74,200,224,.20)' },
+    { lo: 3e11, hi: VIS_LO, name: 'infrared', col: 'rgba(196,96,64,.20)' },
+    { lo: VIS_LO, hi: VIS_HI, name: 'visible', col: 'rgba(255,255,255,.6)' },
+    { lo: VIS_HI, hi: 3e16, name: 'UV', col: 'rgba(138,96,230,.24)' },
+    { lo: 3e16, hi: 3e19, name: 'x-ray', col: 'rgba(126,224,255,.16)' },
+    { lo: 3e19, hi: 1e20, name: 'gamma', col: 'rgba(226,120,180,.20)' },
+  ];
+  const PRESETS = [
+    ['Separator, gold band', 18e6], ['FM radio', 100e6], ['Wifi', 2.4e9],
+    ['Microwave oven', 2.45e9], ['Body heat', 3e13], ['Red laser', C / 633e-9],
+    ['Dust Off beam', C / 532e-9], ['Blue laser', C / 450e-9],
+    ['Sunburn, UVB', C / 300e-9], ['Dental x-ray', 3e18],
+  ];
+
+  const bar = document.getElementById('specBar');
+  const vis = document.getElementById('specVis');
+  const mA = document.getElementById('markA');
+  const mB = document.getElementById('markB');
+  const mV = document.getElementById('markV');
+  let fA = 100e6, fB = C / 532e-9;
+
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const toX = f => (Math.log10(f) - F0) / (F1 - F0);
+  const toF = x => Math.pow(10, F0 + clamp(x, 0, 1) * (F1 - F0));
+  const vX = f => (Math.log10(f) - Math.log10(VIS_LO)) / (Math.log10(VIS_HI) - Math.log10(VIS_LO));
+  const vF = x => Math.pow(10, Math.log10(VIS_LO) + clamp(x, 0, 1) * (Math.log10(VIS_HI) - Math.log10(VIS_LO)));
+
+  const FU = [[1e18,'EHz'],[1e15,'PHz'],[1e12,'THz'],[1e9,'GHz'],[1e6,'MHz'],[1e3,'kHz'],[1,'Hz']];
+  const WU = [[1e3,'km'],[1,'m'],[1e-2,'cm'],[1e-3,'mm'],[1e-6,'µm'],[1e-9,'nm'],[1e-12,'pm']];
+  // h/e, so E = f * this is straight to eV without a separate joule step
+  const EV_PER_HZ = 4.135667696e-15;
+  const EU = [[1e9,'GeV'],[1e6,'MeV'],[1e3,'keV'],[1,'eV'],[1e-3,'meV'],[1e-6,'µeV']];
+  const num = v => v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v));
+  function unit(x, table, fallback) {
+    for (const [d, u] of table) if (x >= d) return num(x / d) + ' <span class="u">' + u + '</span>';
+    return x.toExponential(2) + ' <span class="u">' + fallback + '</span>';
+  }
+  const freq = f => unit(f, FU, 'Hz');
+  const wave = f => unit(C / f, WU, 'm');
+  const energy = f => unit(f * EV_PER_HZ, EU, 'eV');
+  function bandOf(f) {
+    for (const b of BANDS) if (f >= b.lo && f < b.hi) return b.name;
+    return f < 1e4 ? 'below radio' : 'gamma';
+  }
+  const BIG = [[1e12,'trillion'],[1e9,'billion'],[1e6,'million'],[1e3,'thousand']];
+  function ratio(r) {
+    if (r < 1000) return r < 10 ? r.toFixed(2) : String(Math.round(r));
+    for (const [d, w] of BIG) if (r >= d) { const v = r / d; return (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + w; }
+    return String(Math.round(r));
+  }
+
+  for (const b of BANDS) {
+    const el = document.createElement('div');
+    el.className = 'specband';
+    el.style.left = (toX(b.lo) * 100) + '%';
+    el.style.width = ((toX(b.hi) - toX(b.lo)) * 100) + '%';
+    el.style.background = b.col;
+    if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + b.name + '</span>';
+    bar.insertBefore(el, bar.firstChild);
+  }
+  const ticks = document.getElementById('specTicks');
+  for (let d = F0; d <= F1; d += 2) {
+    const i = document.createElement('i');
+    i.style.left = ((d - F0) / (F1 - F0) * 100) + '%';
+    i.innerHTML = freq(Math.pow(10, d));
+    ticks.appendChild(i);
+  }
+
+  function render() {
+    mA.style.left = (toX(fA) * 100) + '%'; mA.dataset.tag = 'A';
+    mB.style.left = (toX(fB) * 100) + '%'; mB.dataset.tag = 'B';
+    valA.innerHTML = freq(fA); valB.innerHTML = freq(fB);
+    metaA.innerHTML = bandOf(fA) + ', ' + wave(fA) + ', ' + energy(fA) + ' per photon';
+    metaB.innerHTML = bandOf(fB) + ', ' + wave(fB) + ', ' + energy(fB) + ' per photon';
+    const r = ratio(Math.max(fA, fB) / Math.min(fA, fB));
+    valR.textContent = r; specRatio.textContent = r;
+    metaR.textContent = fB >= fA ? 'B over A, in frequency' : 'A over B, in frequency';
+    const inVis = fB >= VIS_LO && fB <= VIS_HI;
+    vis.classList.toggle('off', !inVis);
+    mV.style.display = inVis ? '' : 'none';
+    if (inVis) { mV.style.left = (vX(fB) * 100) + '%'; mV.dataset.tag = 'B'; }
+    for (const [m, f] of [[mA, fA], [mB, fB]]) {
+      m.setAttribute('aria-valuetext', freq(f).replace(/<[^>]+>/g, ''));
+    }
+    const vA = visualHz(fA), vB = visualHz(fB);
+    const visR = (Math.max(vA, vB) / Math.min(vA, vB)).toFixed(vA === vB ? 0 : 1);
+    waveNote.innerHTML = 'On screen: A ' + vA.toFixed(2) + '/s, B ' + vB.toFixed(2) +
+      '/s (' + visR + '&times; apart) &mdash; really ' + r + '&times; apart.';
+  }
+
+  // The wave lanes. A literal scale is unwatchable at either end of a 16
+  // decade bar: radio would sit still for whole seconds and gamma would be a
+  // blur no display can even show. Instead each lane's speed is keyed to the
+  // same log position its marker sits at on the bar below, WAVE_HZ_MIN at
+  // the left edge running up to WAVE_HZ_MAX at the right, so a higher real
+  // frequency always animates visibly faster, just not by the real ratio.
+  const TAU = Math.PI * 2;
+  const WAVE_HZ_MIN = 0.2, WAVE_HZ_MAX = 6;
+  const visualHz = f => WAVE_HZ_MIN + toX(f) * (WAVE_HZ_MAX - WAVE_HZ_MIN);
+
+  const waveCanvas = document.getElementById('specWave');
+  const waveCtx = waveCanvas.getContext('2d');
+  let waveW = 0, waveH = 0, waveDpr = 1;
+  function sizeWave() {
+    const r = waveCanvas.getBoundingClientRect();
+    waveDpr = Math.min(2, window.devicePixelRatio || 1);
+    waveCanvas.width = Math.round(r.width * waveDpr);
+    waveCanvas.height = Math.round(r.height * waveDpr);
+    waveW = r.width; waveH = r.height;
+  }
+
+  const CYCLES_ACROSS = 3.2;   // fixed spatial period, purely cosmetic
+  function drawLane(y0, laneH, color, hz, t) {
+    const amp = laneH * 0.34, mid = y0 + laneH / 2;
+    waveCtx.beginPath();
+    for (let px = 0; px <= waveW; px += 2) {
+      const yy = mid - Math.sin((px / waveW) * CYCLES_ACROSS * TAU - t * hz * TAU) * amp;
+      if (px === 0) waveCtx.moveTo(px, yy); else waveCtx.lineTo(px, yy);
+    }
+    waveCtx.strokeStyle = color;
+    waveCtx.lineWidth = 2;
+    waveCtx.stroke();
+  }
+
+  const waveStart = performance.now();
+  function waveFrame(now) {
+    if (waveW) {
+      const t = (now - waveStart) / 1000;
+      waveCtx.setTransform(waveDpr, 0, 0, waveDpr, 0, 0);
+      waveCtx.clearRect(0, 0, waveW, waveH);
+      drawLane(0, waveH / 2, '#7ee0ff', visualHz(fA), t);
+      drawLane(waveH / 2, waveH / 2, '#e8a93a', visualHz(fB), t);
+    }
+    requestAnimationFrame(waveFrame);
+  }
+  // sizeWave() runs while the canvas already has real layout on this page
+  // (there is no display:none gate to fight, unlike the title-screen teaser),
+  // but a ResizeObserver still covers ordinary window resizes for free.
+  new ResizeObserver(sizeWave).observe(waveCanvas);
+  sizeWave();
+  requestAnimationFrame(waveFrame);
+
+  function grab(el, host, set, get) {
+    const move = (e) => {
+      const r = host.getBoundingClientRect();
+      set((e.clientX - r.left) / r.width, null);
+      render();
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      el.setPointerCapture(e.pointerId);
+      el.addEventListener('pointermove', move);
+      const up = () => el.removeEventListener('pointermove', move);
+      el.addEventListener('pointerup', up, { once: true });
+      el.addEventListener('pointercancel', up, { once: true });
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault(); e.stopPropagation();
+      const step = (e.shiftKey ? 0.5 : 0.1) * (e.key === 'ArrowRight' ? 1 : -1);
+      set(null, Math.pow(10, Math.log10(get()) + step));
+      render();
+    });
+  }
+  grab(mA, bar, (x, f) => { fA = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fA);
+  grab(mB, bar, (x, f) => { fB = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fB);
+  grab(mV, vis, (x, f) => { fB = clamp(f != null ? f : vF(x), VIS_LO, VIS_HI); }, () => fB);
+
+  const nearer = (f) => Math.abs(Math.log10(f / fA)) < Math.abs(Math.log10(f / fB));
+  bar.addEventListener('pointerdown', (e) => {
+    const r = bar.getBoundingClientRect();
+    const f = toF((e.clientX - r.left) / r.width);
+    if (nearer(f)) fA = f; else fB = f;
+    render();
+  });
+  vis.addEventListener('pointerdown', (e) => {
+    const r = vis.getBoundingClientRect();
+    fB = vF((e.clientX - r.left) / r.width);
+    render();
+  });
+
+  for (const [n, f] of PRESETS) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.textContent = n;
+    b.addEventListener('click', () => { if (nearer(f)) fA = f; else fB = f; render(); });
+    specPresets.appendChild(b);
+  }
+
+  render();
+  addEventListener('resize', render);
+})();
+</script>
+</body>
+</html>
