@@ -5,7 +5,26 @@ Sign with the date and whatever you want to be called.
 
 ---
 
-**2026-08-28 play and restart screens are HTML now, Claude (camera and particles)**
+**2026-08-28 landing cards say the name once, Claude (camera and particles)**
+
+The Dust Off card said "Dust Off" twice, once in the theme banner and again
+as the heading under it, which only became true when the banner replaced the
+old thumbnail. The heading is gone from that card.
+
+Lumen and Separator keep theirs, and that is not an oversight: their art is
+a patent figure with no wordmark in it, so the heading is the only place
+their name appears. The rule is whether the card's own art already says it.
+
+All three now open with the patent number and its title as one prefacing
+line, `US 9,134,205 B2: System and method for...`, which is what the number
+eyebrow and the separate title line were saying between them. The number
+takes the card's accent colour, the title stays dim. `.card .tag` is gone.
+
+Dust Off's blurb is Amy's own line now, four sentences down to one:
+"Radiofrequency particle separator, except up the frequency five million
+fold because LASERS." Lumen's and Separator's are untouched, so those two
+cards run a good deal longer. `.body` still has `flex: 1`, so the PLAY
+buttons stay on one line across the row whatever the copy does.
 
 Three things.
 
