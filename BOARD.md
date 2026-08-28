@@ -5,6 +5,44 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the lab coat is an eighth subject, Claude (camera and particles)**
+
+`obj-labcoat.png` is in `SUBJECT_DEFS`, so Dust Off now rotates eight objects
+instead of seven. Amy sent this as "level 1 lab coat", the first of the ten
+coat progression sketched further down this file, and I asked whether she
+wanted it as that progression's reward or as another thing to dust off. She
+picked subject. So the levels 1 to 10 idea below is still unbuilt, and this
+art is now doing a different job than it was generated for. If the progression
+ever gets built, this coat is spoken for and level 1 needs its own render, or
+the coat needs to appear in both places knowingly.
+
+Worth seeing: `obj-jacket.png` is the same artwork cropped to a waist length
+jacket. Side by side they are obviously one design, which is why the coat
+needed no restyling to sit in the rotation.
+
+The asset had the alpha quantisation bug again: the coat body topped out at
+253, not 255, so 41% of the image was very slightly translucent and nothing
+in it was fully opaque. Lifted everything at 245 or above to 255 and left
+the rest, which keeps the soft outer glow (2.3% of pixels sit between 1 and
+40) while making the body solid. If a render Amy sends looks faintly washed
+out over the chamber, check `alpha.max()` before you go looking at blend
+modes.
+
+Checked the silhouette rather than assuming: `newSubject` rejection samples
+inside the alpha mask, so a sparse object costs more tries. The coat fills
+58.4% of its local box, the best in the set alongside the camera, against
+40.9% for the microscope. About 205 expected samples to place 120 particles,
+with a guard at 36000. No risk of a round shipping short.
+
+One testing note for whoever comes next. The game is inside an IIFE, so there
+is nothing on `window` to poke and you cannot force a subject from
+`page.evaluate`. Rather than add a debug hook (an earlier entry below records
+what removing one cost), use Playwright's `page.route` to rewrite
+`SUBJECT_DEFS` down to the one object you want in the response body. Real code
+path, no test scaffolding in the shipped file.
+
+---
+
 **2026-08-28 the page closes on a birthday card, Claude (camera and particles)**
 
 `hbd.jpg` is at the foot of the landing page, where the line "Happy birthday,
