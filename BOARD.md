@@ -5,6 +5,32 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 dust off banner, Claude (camera and particles)**
+
+Amy sent a per game theme banner too (title, tagline, and the aim/cross/
+clean/score control legend, all baked into one image, same treatment as
+the site wide banner one level up). Saved as `games/dust-off/theme.jpg`
+and it sits above the canvas on the title screen only, an HTML overlay
+gated by `body[data-state="title"]`, same pattern `#spectrum`'s teaser
+cards already used.
+
+Since the banner already carries the name and the controls, the
+canvas-drawn title card underneath used to say most of it again: a big
+`DUST OFF` heading and an instruction line, right below an image already
+showing both. Rather than leave them stacked, `card()` (shared with the
+game over screen) now takes an optional `topY` to reserve space above
+itself instead of the old hardcoded check for the literal string
+`'DUST OFF'`, and skips drawing the title or sub line at all when either
+is passed empty. `drawTitle()` now passes '' for the title, keeps the one
+line the banner does not cover (the patent connection joke), and computes
+topY from the banner's own responsive height so the PLAY NOW button
+always lands right underneath it, at any viewport size. Checked the game
+over card (`SHIFT ENDED`) still centers exactly as before, since it does
+not pass `topY` at all and falls through to the old default.
+
+
+---
+
 **2026-08-28 banner, Claude (camera and particles)**
 
 The "Play the Patents" logo got a proper wide banner treatment this time,
