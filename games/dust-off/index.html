@@ -133,6 +133,19 @@
   .specvisbar.off { filter: grayscale(1) brightness(.42); }
   .specvisbar .specmark { top: -5px; bottom: -5px; }
 
+  .specwave .cap { font-size: 12.5px; color: #8b98a8; margin: 0 0 7px; }
+  .specwavebox {
+    position: relative; height: 84px; margin-bottom: 8px;
+    border: 1px solid rgba(196,228,255,.18); background: #05070c;
+  }
+  .specwavebox canvas { display: block; width: 100%; height: 100%; }
+  .specwavebox .lane-tag {
+    position: absolute; left: 8px; font-size: 11px; letter-spacing: .06em;
+    top: 6px; color: #7ee0ff;
+  }
+  .specwavebox .lane-tag.b { top: auto; bottom: 6px; color: #e8a93a; }
+  .specwavenote { font-size: 11.5px; color: #5c6b7a; margin: 0 0 20px; }
+
   .specread { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; margin-bottom: 16px; }
   .specread .r { grid-column: 1 / -1; }
   @media (min-width: 640px) { .specread { grid-template-columns: 1fr 1fr 1fr; }
@@ -185,6 +198,19 @@
     <div class="specvisbar" id="specVis">
       <div class="specmark b" id="markV" tabindex="0" role="slider" aria-label="Marker B within visible light"></div>
     </div>
+  </div>
+
+  <div class="specwave">
+    <p class="cap">A and B, waving. Actual speed is unwatchable at either end of this bar, radio barely
+      completes a cycle before next Tuesday and gamma finishes one before light crosses an atom, so
+      each lane runs at a speed keyed to position on the bar above: move a marker right and its wave
+      visibly speeds up.</p>
+    <div class="specwavebox">
+      <span class="lane-tag a" id="waveTagA">A</span>
+      <span class="lane-tag b" id="waveTagB">B</span>
+      <canvas id="specWave"></canvas>
+    </div>
+    <p class="specwavenote" id="waveNote"></p>
   </div>
 
   <div class="specread">
@@ -1702,6 +1728,9 @@ requestAnimationFrame(frame);
 
   const FU = [[1e18,'EHz'],[1e15,'PHz'],[1e12,'THz'],[1e9,'GHz'],[1e6,'MHz'],[1e3,'kHz'],[1,'Hz']];
   const WU = [[1e3,'km'],[1,'m'],[1e-2,'cm'],[1e-3,'mm'],[1e-6,'\u00b5m'],[1e-9,'nm'],[1e-12,'pm']];
+  // h/e, so E = f * this is straight to eV without a separate joule step
+  const EV_PER_HZ = 4.135667696e-15;
+  const EU = [[1e9,'GeV'],[1e6,'MeV'],[1e3,'keV'],[1,'eV'],[1e-3,'meV'],[1e-6,'\u00b5eV']];
   const num = v => v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v));
   function unit(x, table, fallback) {
     for (const [d, u] of table) if (x >= d) return num(x / d) + ' <span class="u">' + u + '</span>';
@@ -1709,6 +1738,7 @@ requestAnimationFrame(frame);
   }
   const freq = f => unit(f, FU, 'Hz');
   const wave = f => unit(C / f, WU, 'm');
+  const energy = f => unit(f * EV_PER_HZ, EU, 'eV');
   function bandOf(f) {
     for (const b of BANDS) if (f >= b.lo && f < b.hi) return b.name;
     return f < 1e4 ? 'below radio' : 'gamma';
@@ -1741,8 +1771,8 @@ requestAnimationFrame(frame);
     mA.style.left = (toX(fA) * 100) + '%'; mA.dataset.tag = 'A';
     mB.style.left = (toX(fB) * 100) + '%'; mB.dataset.tag = 'B';
     valA.innerHTML = freq(fA); valB.innerHTML = freq(fB);
-    metaA.innerHTML = bandOf(fA) + ', ' + wave(fA);
-    metaB.innerHTML = bandOf(fB) + ', ' + wave(fB);
+    metaA.innerHTML = bandOf(fA) + ', ' + wave(fA) + ', ' + energy(fA) + ' per photon';
+    metaB.innerHTML = bandOf(fB) + ', ' + wave(fB) + ', ' + energy(fB) + ' per photon';
     const r = ratio(Math.max(fA, fB) / Math.min(fA, fB));
     valR.textContent = r; specRatio.textContent = r;
     metaR.textContent = fB >= fA ? 'B over A, in frequency' : 'A over B, in frequency';
@@ -1753,7 +1783,67 @@ requestAnimationFrame(frame);
     for (const [m, f] of [[mA, fA], [mB, fB]]) {
       m.setAttribute('aria-valuetext', freq(f).replace(/<[^>]+>/g, ''));
     }
+    const vA = visualHz(fA), vB = visualHz(fB);
+    const visR = (Math.max(vA, vB) / Math.min(vA, vB)).toFixed(vA === vB ? 0 : 1);
+    waveNote.innerHTML = 'On screen right now: A completes ' + vA.toFixed(2) +
+      ' cycles a second, B completes ' + vB.toFixed(2) + ', only ' + visR +
+      '&times; apart. The real gap between them is ' + r + '&times; (see HIGHER BY, below).';
   }
+
+  // The wave lanes. A literal scale is unwatchable at either end of a 16
+  // decade bar: radio would sit still for whole seconds and gamma would be a
+  // blur no display can even show. Instead each lane's speed is keyed to the
+  // same log position its marker sits at on the bar above, WAVE_HZ_MIN at
+  // the left edge running up to WAVE_HZ_MAX at the right, so a higher real
+  // frequency always animates visibly faster, just not by the real ratio.
+  const TAU = Math.PI * 2;
+  const WAVE_HZ_MIN = 0.2, WAVE_HZ_MAX = 6;
+  const visualHz = f => WAVE_HZ_MIN + toX(f) * (WAVE_HZ_MAX - WAVE_HZ_MIN);
+
+  const waveCanvas = document.getElementById('specWave');
+  const waveCtx = waveCanvas && waveCanvas.getContext('2d');
+  let waveW = 0, waveH = 0, waveDpr = 1;
+  function sizeWave() {
+    if (!waveCanvas) return;
+    const r = waveCanvas.getBoundingClientRect();
+    waveDpr = Math.min(2, window.devicePixelRatio || 1);
+    waveCanvas.width = Math.round(r.width * waveDpr);
+    waveCanvas.height = Math.round(r.height * waveDpr);
+    waveW = r.width; waveH = r.height;
+  }
+
+  const CYCLES_ACROSS = 3.2;   // fixed spatial period, purely cosmetic
+  function drawLane(y0, laneH, color, hz, t) {
+    const amp = laneH * 0.34, mid = y0 + laneH / 2;
+    waveCtx.beginPath();
+    for (let px = 0; px <= waveW; px += 2) {
+      const yy = mid - Math.sin((px / waveW) * CYCLES_ACROSS * TAU - t * hz * TAU) * amp;
+      if (px === 0) waveCtx.moveTo(px, yy); else waveCtx.lineTo(px, yy);
+    }
+    waveCtx.strokeStyle = color;
+    waveCtx.lineWidth = 2;
+    waveCtx.stroke();
+  }
+
+  const waveStart = performance.now();
+  function waveFrame(now) {
+    if (waveCtx && waveW) {
+      const t = (now - waveStart) / 1000;
+      waveCtx.setTransform(waveDpr, 0, 0, waveDpr, 0, 0);
+      waveCtx.clearRect(0, 0, waveW, waveH);
+      drawLane(0, waveH / 2, '#7ee0ff', visualHz(fA), t);
+      drawLane(waveH / 2, waveH / 2, '#e8a93a', visualHz(fB), t);
+    }
+    requestAnimationFrame(waveFrame);
+  }
+  // A plain sizeWave() here measures a hidden panel: #spectrum is display:none
+  // until the game's own first frame flips body[data-state] to "title", which
+  // happens on the next animation frame, after this script has already run.
+  // A ResizeObserver both re-measures on ordinary resizes and fires once on
+  // its own as soon as the canvas actually gets a size, which covers exactly
+  // that gap.
+  new ResizeObserver(sizeWave).observe(waveCanvas);
+  requestAnimationFrame(waveFrame);
 
   function grab(el, host, set, get) {
     const move = (e) => {
