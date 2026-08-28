@@ -767,8 +767,8 @@ beam power      P = photons per second × energy per photon</pre>
       const r = lam / best.size;
       const M = m.toUpperCase();
       let phrase;
-      if (r >= 0.5 && r <= 2) phrase = 'about the size of <b>' + best.name + '</b>';
-      else if (r > 2) phrase = 'about <b>' + ratioWord(r) + '×</b> the size of <b>' + best.name + '</b>';
+      if (r >= 0.6 && r <= 1.6) phrase = 'about the size of <b>' + best.name + '</b>';
+      else if (r > 1) phrase = 'about <b>' + ratioWord(r) + '×</b> the size of <b>' + best.name + '</b>';
       else phrase = 'about <b>1/' + ratioWord(1 / r) + '</b> the size of <b>' + best.name + '</b>';
       $('scaleWho' + M).innerHTML = '<b>' + M + '</b> · ' + nameOf(m).toUpperCase();
       $('scaleWhat' + M).innerHTML = 'One wavelength — <span class="num">' + wave(hzOf(m), true) + '</span> — is ' + phrase + '.';

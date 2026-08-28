@@ -124,12 +124,18 @@ window.SPECTRUM_DATA = (() => {
   // length in meters; each marker's wavelength is compared against the nearest
   // object in log space, with the honest ratio stated rather than hidden.
   const SCALE_OBJECTS = [
-    { id: 'city',   name: 'a city',           size: 5e3,   img: 'scale/city.png' },
-    { id: 'apple',  name: 'an apple',         size: 0.08,  img: 'apple.png' },
-    { id: 'finger', name: 'a finger’s width', size: 0.016, img: 'scale/finger.png' },
-    { id: 'sand',   name: 'a grain of sand',  size: 5e-4,  img: 'scale/sand.png' },
-    { id: 'cell',   name: 'a living cell',    size: 1.5e-5, img: 'scale/cell.png' },
-    { id: 'atom',   name: 'an atom',          size: 1e-10, img: 'scale/atom.png' },
+    { id: 'city',      name: 'a city',            size: 5e3,    img: 'scale/city.png' },
+    { id: 'person',    name: 'a person',          size: 1.7,    img: 'scale/person.png' },
+    { id: 'apple',     name: 'an apple',          size: 0.08,   img: 'apple.png' },
+    { id: 'finger',    name: 'a finger’s width',  size: 0.016,  img: 'scale/finger.png' },
+    { id: 'sand',      name: 'a grain of sand',   size: 5e-4,   img: 'scale/sand.png' },
+    { id: 'cell',      name: 'a living cell',     size: 1.5e-5, img: 'scale/cell.png' },
+    { id: 'bacterium', name: 'a bacterium',       size: 2e-6,   img: 'scale/bacterium.png' },
+    { id: 'atom',      name: 'an atom',           size: 1e-10,  img: 'scale/atom.png' },
+    // an atomic nucleus (~10 fm) sits below any wavelength in the displayed
+    // 10 kHz–100 EHz window — it is here so the ladder keeps its footing if
+    // the window ever grows, and as a reminder the spectrum does not end here
+    { id: 'nucleus',   name: 'an atomic nucleus', size: 1e-14,  img: 'scale/nucleus.png' },
   ];
 
   return { LANDMARKS, STORIES, SCALE_OBJECTS };
