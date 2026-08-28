@@ -90,9 +90,16 @@
   .sentence {
     font-size: 16.5px; line-height: 1.55; color: #eff4fb;
     border: 1px solid rgba(160,124,255,.25); border-left: 3px solid #a07cff;
-    background: rgba(160,124,255,.05); padding: 13px 16px; margin: 0 0 8px;
+    background: rgba(160,124,255,.05); padding: 14px 18px; margin: 0 0 8px;
   }
   .sentence b { color: #fff; }
+  .relratio { font-size: 30px; font-weight: 650; color: #fff; letter-spacing: .01em; }
+  .relratio .x { color: #a07cff; font-weight: 400; }
+  .reldir { margin: 5px 0 9px; font-size: 15px; color: #cfe6e6; }
+  .reldir b.a { color: #7ee0ff; } .reldir b.b { color: #e8a93a; }
+  .reldir .relarrow { color: #a07cff; padding: 0 6px; }
+  .relnote { font-size: 13.5px; color: #9aa2b1; line-height: 1.55; }
+  .relnote b { color: #cfe6e6; font-weight: 600; }
   .insight { font-size: 13.5px; color: #9aa2b1; line-height: 1.55; margin: 0 0 26px; padding: 0 2px; }
   .insight::before { content: "✦ "; color: #a07cff; }
 
@@ -738,16 +745,19 @@ beam power      P = photons per second × energy per photon</pre>
   function renderSentence() {
     const r = Math.max(S.aHz, S.bHz) / Math.min(S.aHz, S.bHz);
     const hiM = S.bHz >= S.aHz ? 'b' : 'a', loM = hiM === 'b' ? 'a' : 'b';
-    const hiName = nameOf(hiM) + ' (' + hiM.toUpperCase() + ')';
-    const loName = nameOf(loM) + ' (' + loM.toUpperCase() + ')';
-    if (r < 1.02) {
+    if (r < 1.05) {
       $('sentence').innerHTML = '<b>' + nameOf('a') + '</b> (A) and <b>' + nameOf('b') +
         '</b> (B) sit at almost the same frequency — within ' + ((r - 1) * 100).toFixed(1) +
         '%. Whatever separates them in daily life, it is not their place on the spectrum.';
     } else {
+      // the factor is stated once, big; the prose only says what it moves
       const w = ratioWord(r);
-      $('sentence').innerHTML = '<b>' + hiName + '</b> oscillates <b>' + w + '×</b> faster than <b>' + loName +
-        '</b>. Its wavelength and period are ' + w + '× smaller. Each photon carries ' + w + '× more energy.';
+      const tag = m => '<b class="' + m + '">' + nameOf(m) + ' (' + m.toUpperCase() + ')</b>';
+      $('sentence').innerHTML =
+        '<div class="relratio num"><span class="x">×</span>' + w + '</div>' +
+        '<div class="reldir">' + tag(loM) + '<span class="relarrow">⟶</span>' + tag(hiM) + '</div>' +
+        '<div class="relnote">Along the arrow, <b>frequency</b> and <b>energy per photon</b> climb by ' +
+        'exactly this factor — <b>wavelength</b> and <b>period</b> shrink by it.</div>';
     }
     // pair-specific insight, else a generic but true one
     const pair = [S.aId, S.bId];
