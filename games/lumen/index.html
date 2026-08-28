@@ -10,14 +10,14 @@
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
-    background: #070405; color: #e6d5d5;
+    background: #070406; color: #e6d5de;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     -webkit-font-smoothing: antialiased;
   }
   canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
   #hint {
     position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%);
-    font-size: 10px; letter-spacing: .09em; color: #6b4148; pointer-events: none;
+    font-size: 10px; letter-spacing: .09em; color: #703c56; pointer-events: none;
     white-space: nowrap;
   }
 
@@ -87,10 +87,18 @@
     .gamebar button { padding: 7px 10px; font-size: 12px; }
   }
 
+  /* The rover on the device lost screen: the thing you just lost, shown above
+     its own name. Not .gscreen-art--tall, which is cut for Dust Off's trophy
+     at 513x700; this art is 256x297, near square, so that width rule would
+     make the rover the largest thing on the panel instead of an ornament
+     over the wordmark. */
+  .gscreen-art--rover { width: min(124px, 34%); margin-bottom: 10px; }
+  @media (max-height: 560px) { .gscreen-art--rover { width: min(84px, 26%); } }
+
 </style>
 </head>
 <body>
-<header class="gamebar holopanel" style="--bar-accent: 255 107 120;">
+<header class="gamebar holopanel" style="--bar-accent: 255 107 181;">
   <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
   <img class="gamebar-logo" src="logo.png" alt="Lumen" width="640" height="142">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US7857767B2/en" target="_blank" rel="noopener">US 7,857,767 B2</a>
@@ -120,6 +128,7 @@
 <section class="gscreen" id="gs-over">
   <div class="gscreen-panel">
     <span class="holodialog-rim"></span>
+    <img class="gscreen-art gscreen-art--rover" src="rover.png" alt="The Lumen device" width="256" height="297">
     <img class="gscreen-logo" src="logo.png" alt="Lumen" width="640" height="142">
     <p class="holodialog-eyebrow">Device lost</p>
     <p class="holodialog-desc" id="gs-over-why">&nbsp;</p>
@@ -161,20 +170,26 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rand = (a, b) => a + Math.random() * (b - a);
 const pick = arr => arr[(Math.random() * arr.length) | 0];
 
+// The bed used to sit at 340 to 355 degrees, a plain arterial red. It is at
+// 330 now, hot pink, which is where the Lumen wordmark and the site's rose
+// token already live: the game and the art it is wrapped in were disagreeing
+// about what colour Lumen is. Hue is the only thing that moved on the dark
+// tones; the lit ones also gained 6 to 10 points of saturation, without which
+// a pure rotation just reads as a duller red rather than a deliberate pink.
 const COL = {
-  bg:      '#070405',
-  panel:   '#0d0709',
-  rule:    '#2a151a',
-  text:    '#e6d5d5',
-  dim:     '#8a5c63',
-  faint:   '#5c383e',
+  bg:      '#070406',
+  panel:   '#0d070a',
+  rule:    '#2c1320',
+  text:    '#e6d5de',
+  dim:     '#915573',
+  faint:   '#60344a',
   teal:    '#35e0d0',
   cyan:    '#7ee0ff',   // --holo-cyan, the working accent
-  red:     '#ff4d5e',
-  wallDim: '#2c1016',
-  lumDim:  '#150609',
-  wallLit: '#7a2430',
-  lumLit:  '#3a1018',
+  red:     '#ff4da6',
+  wallDim: '#2e0e1e',
+  lumDim:  '#16050e',
+  wallLit: '#821c4f',
+  lumLit:  '#3e0c25',
 };
 
 const DEV_R     = 7;
@@ -192,6 +207,15 @@ roverImg.onload = () => { roverImg.ready = true; };
 roverImg.src = 'rover.png';
 const ROVER_FX = 0.499, ROVER_FY = 0.389;
 const ROVER_W  = 30;      // sprite width on screen; the hull is 0.661 of that
+// Level 1 is where the game teaches itself, and it was teaching by killing.
+// The lesion sits on the far leaves by design, so the first trip of a run is
+// the longest one in it, taken by someone who has not yet worked out that drag
+// distance is the throttle. Three things ease off for the opening levels and
+// are back to full strength from level 3: how far the first lesion sits, how
+// many clots circulate, and how fast a wall scrape eats the hull.
+// 1 on level 1, 0.5 on level 2, 0 from level 3.
+const ease = lv => Math.max(0, 1 - (lv - 1) / 2);
+
 const MAX_SPEED = 190;
 const ABLATE_R  = 95;
 const LAMP_R    = 250;
@@ -203,6 +227,10 @@ let W = 0, H = 0, dpr = 1, L = {};
 let state = 'title';
 let level = 1, score = 0;
 let integrity = 100, power = 100;
+// how hard a wall scrape bites, set per bed by genWorld. The step loop cannot
+// see genWorld's locals, and the level number alone is not enough because the
+// value has to hold steady for the whole bed.
+let scrapeRate = 1;
 
 let segs = [], leaves = [], bounds = null;
 let lesions = [], cells = [];
@@ -289,6 +317,16 @@ function layout() {
 function genWorld(lv) {
   segs = []; leaves = [];
   const maxDepth = Math.min(7, 4 + Math.floor(lv / 2));
+  const e = ease(lv);
+  // How far the first plaque sits is set here, not by which leaf gets picked.
+  // A bed has only about seven leaves and they all land in a narrow band, 800
+  // to 1060 units out, because every branch grows to much the same radius:
+  // choosing a nearer leaf moved the median trip by 7%, which is nothing. The
+  // trunk length is what actually sets the scale, so the opening beds are
+  // physically smaller. Vessel radius is deliberately left alone, so a level 1
+  // bed also has wider corridors relative to its length, which is the other
+  // half of why it is gentler.
+  const sizeScale = 1 - 0.3 * e;
   let budget = 120;
 
   function grow(x, y, ang, depth, r, len) {
@@ -316,7 +354,7 @@ function genWorld(lv) {
     }
   }
 
-  grow(0, 0, rand(-0.3, 0.3), 0, 46, 300);
+  grow(0, 0, rand(-0.3, 0.3), 0, 46, 300 * sizeScale);
 
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
   for (const s of segs) {
@@ -347,7 +385,7 @@ function genWorld(lv) {
   for (let i = 0; i < 90; i++) {
     const s = pick(segs);
     const t = Math.random();
-    const clot = Math.random() < 0.10 + lv * 0.015;
+    const clot = Math.random() < (0.10 + lv * 0.015) * (1 - 0.75 * e);
     cells.push({
       x: lerp(s.ax, s.bx, t) + rand(-6, 6),
       y: lerp(s.ay, s.by, t) + rand(-6, 6),
@@ -356,6 +394,8 @@ function genWorld(lv) {
       ph: rand(0, TAU),
     });
   }
+
+  scrapeRate = 1 - 0.5 * e;
 
   dev = { x: 0, y: 0, vx: 0, vy: 0, ang: 0, wheel: 0, emit: 0 };
   cam.x = 0; cam.y = 0;
@@ -519,7 +559,7 @@ function update(dt) {
     const into = Math.max(0, dev.vx * nx + dev.vy * ny);
     dev.vx -= nx * into * 1.4;
     dev.vy -= ny * into * 1.4;
-    integrity -= (10 + into * 0.06) * dt + over * 0.05;
+    integrity -= (10 * scrapeRate + into * 0.06) * dt + over * 0.05;
     if (Math.random() < dt * 9) audio.scrape();
   }
 
@@ -607,10 +647,10 @@ function makeTissue() {
   const off = document.createElement('canvas');
   off.width = off.height = s;
   const c = off.getContext('2d');
-  c.fillStyle = '#0b0508';
+  c.fillStyle = '#0c0408';
   c.fillRect(0, 0, s, s);
   for (let i = 0; i < 260; i++) {
-    c.fillStyle = 'rgba(120,50,60,' + (0.03 + Math.random() * 0.05) + ')';
+    c.fillStyle = 'rgba(127,43,85,' + (0.03 + Math.random() * 0.05) + ')';
     c.beginPath();
     c.arc(Math.random() * s, Math.random() * s, Math.random() * 2.2 + 0.4, 0, TAU);
     c.fill();
@@ -669,8 +709,8 @@ function draw(time) {
     ctx.restore();
 
     const g = ctx.createRadialGradient(dp.x, dp.y, LAMP_R * 0.35, dp.x, dp.y, LAMP_R);
-    g.addColorStop(0, 'rgba(7,4,5,0)');
-    g.addColorStop(1, 'rgba(7,4,5,0.92)');
+    g.addColorStop(0, 'rgba(7,4,6,0)');
+    g.addColorStop(1, 'rgba(7,4,6,0.92)');
     ctx.fillStyle = g;
     ctx.beginPath(); ctx.arc(dp.x, dp.y, LAMP_R, 0, TAU); ctx.fill();
 
@@ -690,8 +730,8 @@ function drawCells() {
     const p = toScreen(c.x, c.y);
     if (p.x < L.ch.x - 30 || p.x > L.ch.x + L.ch.w + 30 || p.y < -30 || p.y > H + 30) continue;
     if (c.clot) {
-      ctx.fillStyle = '#1d0509';
-      ctx.strokeStyle = '#5c1119';
+      ctx.fillStyle = '#1e0411';
+      ctx.strokeStyle = '#600d37';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       for (let i = 0; i < 7; i++) {
@@ -702,7 +742,7 @@ function drawCells() {
       }
       ctx.closePath(); ctx.fill(); ctx.stroke();
     } else {
-      ctx.fillStyle = 'rgba(196,54,66,0.55)';
+      ctx.fillStyle = 'rgba(206,44,125,0.55)';
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, c.r * 1.25, c.r, c.ph, 0, TAU);
       ctx.fill();
@@ -889,7 +929,7 @@ function value(t, x, y, size, color) {
   ctx.fillText(t, x, y);
 }
 function bar(x, y, w, h, frac, color) {
-  ctx.fillStyle = '#160a0d';
+  ctx.fillStyle = '#170910';
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = color;
   ctx.fillRect(x, y, w * clamp(frac, 0, 1), h);
@@ -899,7 +939,7 @@ function bar(x, y, w, h, frac, color) {
 }
 
 function drawMap(mx, my, mw, mh) {
-  ctx.fillStyle = 'rgba(10,4,6,0.92)';
+  ctx.fillStyle = 'rgba(10,4,7,0.92)';
   ctx.fillRect(mx, my, mw, mh);
   ctx.strokeStyle = COL.rule;
   ctx.lineWidth = 1;
@@ -911,7 +951,7 @@ function drawMap(mx, my, mw, mh) {
   const oy = my + mh / 2 - ((bounds.miny + bounds.maxy) / 2) * sc;
   ctx.save();
   ctx.beginPath(); ctx.rect(mx, my, mw, mh); ctx.clip();
-  ctx.strokeStyle = '#6b2530';
+  ctx.strokeStyle = '#721e48';
   ctx.lineCap = 'round';
   for (const seg of segs) {
     if (!seg.seen) continue;
@@ -928,7 +968,7 @@ function drawMap(mx, my, mw, mh) {
   }
   ctx.fillStyle = COL.text;
   ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 2.8, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(230,213,213,0.4)';
+  ctx.strokeStyle = 'rgba(230,213,222,0.4)';
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(ox + dev.x * sc, oy + dev.y * sc, 6.5, 0, TAU); ctx.stroke();
   ctx.restore();
@@ -1029,7 +1069,7 @@ function drawPanels(time) {
 // phone layout
 function drawBars(time) {
   const pad = 15;
-  ctx.fillStyle = 'rgba(7,4,5,0.90)';
+  ctx.fillStyle = 'rgba(7,4,6,0.90)';
   ctx.fillRect(0, 0, W, L.topH);
   ctx.strokeStyle = COL.rule;
   ctx.lineWidth = 1;
@@ -1092,7 +1132,7 @@ function drawTouch(time) {
   const b = L.btn;
   const lit = anchored;
   const emit = dev && dev.emit;
-  ctx.fillStyle = lit ? 'rgba(53,224,208,0.16)' : 'rgba(7,4,5,0.72)';
+  ctx.fillStyle = lit ? 'rgba(53,224,208,0.16)' : 'rgba(7,4,6,0.72)';
   ctx.strokeStyle = emit ? COL.cyan : (lit ? COL.teal : 'rgba(53,224,208,0.5)');
   ctx.lineWidth = 2.5;
   ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill(); ctx.stroke();

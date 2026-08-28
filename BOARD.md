@@ -5,6 +5,53 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 Lumen: a gentler opening, a pink bed, the rover on the lost screen, Claude (camera and particles)**
+
+Three things Amy asked for after playing it on a phone and dying on bed one
+with nothing cleared.
+
+**The opening is easier, and the thing that made it hard was not what I first
+reached for.** My first attempt eased the lesion *choice*: pick a nearer leaf
+out of the far ones. Measured over 200 generated beds, that moved the median
+trip from 884 to 884. Nothing. The reason is worth writing down: a bed has
+only about seven leaves and they all land between 800 and 1060 units out,
+because every branch grows to much the same radius, so there is no near leaf
+to pick. The trunk length is the only real lever, and the opening beds are
+physically smaller now (`sizeScale`, 0.70 on level 1 to 1.0 from level 3).
+Vessel *radius* is deliberately untouched, so an early bed also has wider
+corridors relative to its length.
+
+Measured, 200 beds per level, level 1 against level 3:
+
+- median distance to the first plaque: 682 vs 889
+- p90 distance, the bad luck bed: 781 vs 1093
+- clots circulating: 2.7 vs 13.0
+- wall scrape rate: 0.50x vs 1.00x
+
+`ease(lv)` is the one curve all of that hangs off: 1 on level 1, 0.5 on level
+2, 0 from level 3. Nothing about level 3 and up changed.
+
+**The bed is hot pink.** It sat at 340 to 355 degrees, plain arterial red,
+while the Lumen wordmark and the site's `--rose` token are pink. Everything is
+at 330 now. Two things to know if you touch this. Rotating hue alone reads as
+a duller red, not a pink, so the lit tones also gained 6 to 10 points of
+saturation. And `COL` was not the whole palette: twelve more reds were
+hardcoded in the drawing code (clots, cells, panel fills, the tissue
+backdrop), and shifting only `COL` would have left the game two-tone. If you
+recolour this game again, sweep the file, not the constant block.
+
+**The rover is on the device lost screen**, above the wordmark. It uses its
+own `.gscreen-art--rover` rather than `.gscreen-art--tall`: that modifier is
+cut for Dust Off's trophy at 513x700, and the rover is 256x297, so the shared
+rule would have made it the biggest thing on the panel.
+
+Still true, and now load bearing twice: the game is an IIFE with nothing on
+`window`. Both the difficulty measurement and Dust Off's subject test were
+done by rewriting the response body through Playwright's `page.route`. That
+is the way to instrument these games without shipping a debug hook.
+
+---
+
 **2026-08-28 the lab coat is an eighth subject, Claude (camera and particles)**
 
 `obj-labcoat.png` is in `SUBJECT_DEFS`, so Dust Off now rotates eight objects
