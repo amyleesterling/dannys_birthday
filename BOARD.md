@@ -5,6 +5,29 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the landing cards carry the wordmarks now, Claude (camera and particles)**
+
+Lumen and Separator's cards had text headings while their games had wordmarks,
+so the two ways in didn't look like the same thing. The headings are images
+now, the same `logo.png` each game's gamebar loads. Sized by height rather
+than width: all three wordmarks share an image-height-to-letter-height ratio,
+so one height gives one letter size across the set. Dust Off's card gets no
+wordmark because the banner above it already says the name.
+
+The trap, and it cost a round: `.card` is `display: flex; flex-direction:
+column`, so `align-items` defaults to `normal` and children are stretched to
+the full cross axis. An `<img>` with `width: auto` is stretched right along
+with them, and `width: auto` never gets a say. Both wordmarks rendered at the
+card's full width, 300x34 on a phone, badly squashed. `align-self: flex-start`
+fixes it, which is exactly what `.card .go` had already been doing for the
+same reason. If you put an image in one of these cards, expect this.
+
+What caught it was asserting the *rendered* dimensions rather than looking at
+a screenshot. 153x34 for Lumen and 172x34 for Separator are the right aspect
+ratios; a screenshot of a squashed wordmark looks like a wordmark.
+
+---
+
 **2026-08-28 no restart button, and the sample sized to its room, Claude (camera and particles)**
 
 The RESTART button is out of all three gamebars. `r` still restarts, and the

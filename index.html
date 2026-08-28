@@ -89,7 +89,19 @@
   }
   .card:hover .thumb { border-color: rgb(var(--accent) / .6); }
 
-  .card .name { font-size: 26px; margin: 12px 0 8px; font-weight: 600; color: rgb(var(--accent)); }
+  /* The game's wordmark stands in for a text heading, the same art the game's
+     own gamebar carries. Sized by height, like the gamebar's, because all
+     three wordmarks share an image-height-to-letter-height ratio: one height
+     gives one letter size across the set. Dust Off has none here because its
+     banner above already carries its name. */
+  .card .cardlogo {
+    display: block; height: 34px; width: auto;
+    margin: 14px 0 10px;
+    /* the card is a column flex container, so without this the image is
+       stretched to the full cross axis and width:auto never gets a say, which
+       squashes the wordmark. .go needs the same treatment for the same reason. */
+    align-self: flex-start;
+  }
   .card .body { font-size: 15px; color: var(--dim); margin: 0 0 22px; flex: 1; }
   .card .body strong { color: var(--ink); font-weight: 600; }
   .card .go {
@@ -154,7 +166,7 @@
         <path class="lead" d="M255 100 L276 122"/><text x="280" y="126">130</text>
       </svg>
 
-      <div class="name">Lumen</div>
+      <img class="cardlogo" src="games/lumen/logo.png" alt="Lumen" width="640" height="142">
       <p class="body">
         A self propelling microrobot with wall gripping wheels, a sensor for a condition of
         interest, and an active portion that does something about it.
@@ -189,7 +201,7 @@
         <path class="lead" d="M286 29 L286 18"/><text x="266" y="15">220</text>
       </svg>
 
-      <div class="name">Separator</div>
+      <img class="cardlogo" src="games/separator/logo.png" alt="Separator" width="760" height="150">
       <p class="body">
         A radiofrequency field heats mineral grains until the water around them boils, and
         the bubble carries the grain up to a skimmer. Frequency sets the skin depth, which
