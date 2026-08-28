@@ -392,13 +392,13 @@ const traceImg = loadArt('trace.png');
 
 // Every round dusts off a different holographic object, Amy's own renders
 // standing in for whatever an inspection line would actually see: a jacket
-// on its hanger, a test tube rack, a microscope, a pair of sneakers, a set
-// of goggles, a camera, a six vial specimen rack. Local units keep the
-// first jacket's own convention, the floor sits at local y = +86, and each
-// object is fit inside a box up to 150 wide by 185 tall above that,
-// preserving its own aspect ratio, so a tall narrow rack and a wide pair of
-// sneakers both land at a sensible size without one axis ever running away
-// with the other.
+// on its hanger, the full length lab coat that goes with it, a test tube
+// rack, a microscope, a pair of sneakers, a set of goggles, a camera, a six
+// vial specimen rack. Local units keep the first jacket's own convention:
+// the floor sits at local y = +86, and each object is fit inside a box above
+// that, preserving its own aspect ratio, so a tall narrow rack and a wide
+// pair of sneakers both land at a sensible size without one axis ever
+// running away with the other.
 // Raised from 150 x 185. What stops these going bigger still is not the art:
 // on a phone the width runs into the emitter lenses, which sit 17px off each
 // wall, and the height runs into the particle readout above the sample. 165
@@ -406,6 +406,7 @@ const traceImg = loadArt('trace.png');
 const OBJ_MAX_W = 165, OBJ_MAX_H = 200, OBJ_FLOOR = 86;
 const SUBJECT_DEFS = [
   { key: 'jacket',     src: 'obj-jacket.png' },
+  { key: 'labcoat',    src: 'obj-labcoat.png' },
   { key: 'tubes',      src: 'obj-tubes.png' },
   { key: 'microscope', src: 'obj-microscope.png' },
   { key: 'sneakers',   src: 'obj-sneakers.png' },
