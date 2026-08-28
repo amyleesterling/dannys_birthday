@@ -298,6 +298,14 @@ const BEAM_FORCE   = 2800;
 
 const MAX_MISSES = 3;
 
+// how long the jacket takes to slide off screen once a round ends, before
+// Danny fades in to dance through the rest of the result phase
+const JACKET_EXIT = 0.4;
+// the whole between-round interlude never runs longer than this, even if
+// the move picked for the round runs longer; danny.cutCelebration() is what
+// actually stops him when nextRound() outruns his dance
+const MAX_INTERLUDE = 4.5;
+
 // camera shake, in screen px. Ticks up on impact, decays every frame in
 // update(). Capped per source so a flurry of taps cannot fling the world off
 // screen.
@@ -321,31 +329,34 @@ function capsule(p, x1, y1, x2, y2, r) {
   p.closePath();
 }
 
-// Every part is drawn with the same helper so the winding stays consistent and
-// the nonzero fill unions them instead of punching holes.
-function buildBody(pose) {
+// A plain white sheet, cut to a jacket on a hanger: what's actually in the
+// beams now. Every part is drawn with the same helper so the winding stays
+// consistent and the nonzero fill unions them instead of punching holes.
+// Kept inside the same local bounding box the old human silhouette used
+// (crown-ish at -99, hem around 86) so nothing downstream that samples or
+// positions this shape needed to change.
+function buildJacket(pose) {
   const p = new Path2D();
-  const armOut = pose.armOut;     // how far the arms are held from the torso
-  const stance = pose.stance;     // foot separation
-  capsule(p, 0, -85, 0, -77, 14);                                  // head
-  capsule(p, 0, -70, 0, -62, 5.2);                                 // neck
-  capsule(p, -15, -56, 15, -56, 13.5);                             // shoulders
-  capsule(p, 0, -52, 0, -14, 15);                                  // torso
-  capsule(p, -8, -8, 8, -8, 13);                                   // pelvis
+  const splay = pose.armOut * 0.6;   // a little sleeve-to-sleeve variety
+  // the hanger: a hook and the wire triangle it hangs from
+  capsule(p, 0, -99, 0, -90, 2.2);
+  capsule(p, 0, -90, -24, -76, 1.8);
+  capsule(p, 0, -90, 24, -76, 1.8);
+  // shoulders, just under the hanger
+  capsule(p, -23, -75, 23, -75, 7);
+  // the body panel, with a slight flare at the hem
+  capsule(p, 0, -70, 0, 52, 25);
+  capsule(p, 0, 46, 0, 60, 29);
+  // sleeves, hanging straight down off each shoulder
   for (const s of [-1, 1]) {
-    capsule(p, s * 18, -55, s * (23 + armOut), -20, 6.4);          // upper arm
-    capsule(p, s * (23 + armOut), -20, s * (25 + armOut * 1.5), 10, 5.4); // forearm
-    capsule(p, s * (25 + armOut * 1.5), 10, s * (25 + armOut * 1.5), 17, 4.8); // hand
-    capsule(p, s * 8, -6, s * (9 + stance), 34, 9);                // thigh
-    capsule(p, s * (9 + stance), 34, s * (10 + stance), 74, 6.8);  // shin
-    capsule(p, s * (10 + stance), 79, s * (14 + stance), 79, 5.2); // foot
+    capsule(p, s * 27, -73, s * (30 + splay), 42, 10.5);
   }
   return p;
 }
 
 // Virtual Danny lives in danny.js and renders to his own offscreen canvas.
-// He is optional: no WebGL, or the module fails to load, and the subject simply
-// keeps the wireframe head it always had.
+// He shows up between rounds now, not as the subject; this just says whether
+// there's a model to draw at all.
 const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded);
 
 // The wall mount the beams fire from. Drawn nose-first: the lens sits at
@@ -480,29 +491,26 @@ function layout() {
 
 // ---------------------------------------------------------------- subject
 
-// Particles climb faster than the clock does, which is the whole progression.
+// Particles climb faster than the clock does, which is the whole progression:
+// the scan window itself caps out quickly, so more particles in the same
+// six to eight seconds is what actually gets harder.
 const roundCount = n => Math.min(44, 8 + n * 3);
-const roundTime  = n => Math.min(12, 5 + n * 0.45);
+const roundTime  = n => Math.min(8, 6 + (n - 1) * 0.2);
 
 function newSubject() {
   const pose = { armOut: rand(0, 5), stance: rand(0, 4) };
-  const headless = dannyOn();
-  const path = buildBody(pose);
+  const path = buildJacket(pose);
   const count = roundCount(round);
   // a trace compound turns up from round three, worth a lot, but the round is
   // cleared on recovering everything rather than on the red ones alone
   const flagCount = round >= 3 ? Math.min(3, Math.floor(round / 3)) : 0;
 
-  // rejection sample points inside the silhouette, in body local units
+  // rejection sample points inside the silhouette, in local units
   const pts = [];
   let guard = 0;
   while (pts.length < count && guard < count * 300) {
     guard++;
     const x = rand(-34, 34), y = rand(-99, 86);
-    if (Math.abs(x) < 14 && y > -6 && y < 22) continue;   // not there
-    // the model's crown sits at about -93, six units below where the 2D
-    // proxy's head reaches, so keep particles off the empty space above it
-    if (headless && y < -90) continue;
     if (!hitCtx.isPointInPath(path, x, y)) continue;
     pts.push({ x, y });
   }
@@ -673,12 +681,6 @@ function settleRound() {
     const bonus = 200 * round + Math.round(s.scanLeft * 40);
     score += bonus;
     banner = { text: 'ALL RECOVERED', sub: '+' + bonus, ok: true, t: 0 };
-    if (dannyOn()) {
-      // celebrate() picks one of his one-shot moves at random and says how
-      // long it runs, so the result screen holds exactly long enough for it
-      const dur = window.Danny.celebrate();
-      if (dur) { s.resultDur = dur + 0.5; s.holdFor = dur + 0.1; }
-    }
     feed.unshift({ ok: true, text: 'ROUND ' + round + ' CLEARED', age: 0 });
     audio.flagged();
     kick(6);
@@ -690,10 +692,21 @@ function settleRound() {
     kick(13);
   }
   if (feed.length > 9) feed.length = 9;
+
+  // Danny takes the stage between every round, cleared or missed alike: the
+  // dance is the transition to the next one, not a reward for this one.
+  // celebrate() picks a move by round number and says how long it runs, but
+  // a couple of the sillier ones run well past the 6-8s round they'd be
+  // bridging, so the interlude itself is capped and nextRound() cuts the
+  // dance short rather than let a long one drag the pace down.
+  const dur = dannyOn() ? window.Danny.celebrate(round) : 0;
+  s.resultDur = Math.min(MAX_INTERLUDE,
+    Math.max(JACKET_EXIT + 0.6, JACKET_EXIT + (dur || 0) + 0.4));
 }
 
 function nextRound() {
   loose = []; frags = [];
+  if (window.Danny && window.Danny.ok) window.Danny.cutCelebration();
   if (misses >= MAX_MISSES) { state = 'over'; return; }
   round++;
   subject = newSubject();
@@ -722,8 +735,7 @@ function update(dt) {
 
   if (state !== 'play') {
     if (window.Danny && window.Danny.ok) {
-      window.Danny.setRound(round || 1);
-      window.Danny.setMotion('walk');
+      window.Danny.setMotion('idle');
       window.Danny.update(dt, 0);
     }
     updateLoose(dt, 0.4);
@@ -745,15 +757,13 @@ function update(dt) {
                  pointer.x > L.ch.x && pointer.x < L.ch.x + L.ch.w;
 
   if (window.Danny && window.Danny.ok) {
-    window.Danny.setRound(round);
-    // walking while he moves, near still while he is being scanned
-    window.Danny.setMotion(subject && subject.phase === 'scan' ? 'idle' : 'walk');
-    const hx = subject ? toScreen(subject, 0, 0).x : L.ch.cx;
-    window.Danny.update(dt, clamp((pointer.x - hx) / 300, -0.8, 0.8));
+    // idle and out of the way until settleRound() calls celebrate() for him
+    window.Danny.setMotion('idle');
+    window.Danny.update(dt, clamp((pointer.x - L.ch.cx) / 300, -0.8, 0.8));
   }
 
-  // ready, scan, result. The subject walks in under the three two one, so the
-  // clock only starts once they are standing in the beams.
+  // ready, scan, result. The jacket slides in under the three two one, so the
+  // clock only starts once it is hanging in the beams.
   const s = subject;
   const wasCount = s.phase === 'ready' ? Math.ceil(s.readyDur - s.t) : 0;
   s.t += dt;
@@ -772,8 +782,9 @@ function update(dt) {
       s.phase = 'result'; s.t = 0;
     }
   } else {
-    const hold = s.holdFor || 0;
-    const k = easeIn(clamp((s.t - hold) / Math.max(0.35, s.resultDur - hold), 0, 1));
+    // the jacket slides off quickly; Danny takes over the screen for the
+    // rest of the result phase, so his position doesn't ride on s.x at all
+    const k = easeIn(clamp(s.t / JACKET_EXIT, 0, 1));
     s.x = lerp(L.ch.cx, L.ch.x + L.ch.w + 70, k);
     if (s.t >= s.resultDur) { nextRound(); return; }
   }
@@ -973,24 +984,28 @@ function drawChamber(time) {
 }
 
 function drawSubject(s, time) {
-  const t = subjectTransform(s);
-  const hold = s.holdFor || 0;
-  const alpha = s.phase === 'result'
-    ? 1 - clamp((s.t - hold) / Math.max(0.35, s.resultDur - hold), 0, 1) * 0.7 : 1;
-
-  if (dannyOn()) {
-    // the model stands in for the whole subject. The 2D path is still there,
-    // invisible, doing the sampling and the hit testing.
-    const f = window.Danny.frame;
-    const c = toScreen(s, 0, f.cyLocal);
-    const w = f.wLocal * L.figScale, h = f.hLocal * L.figScale;
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(window.Danny.canvas, c.x - w / 2, c.y - h / 2, w, h);
-    ctx.globalAlpha = 1;
-    drawAttached(s, time, alpha);
+  // The jacket fades fast once a round ends; Danny takes the rest of the
+  // result phase to himself, at a fixed spot rather than riding s.x, since
+  // he isn't the thing sliding off screen.
+  if (s.phase === 'result') {
+    const jacketAlpha = 1 - clamp(s.t / JACKET_EXIT, 0, 1);
+    if (jacketAlpha > 0.01) drawJacket(s, time, jacketAlpha);
+    if (s.t >= JACKET_EXIT && dannyOn()) {
+      const danceAlpha = clamp((s.t - JACKET_EXIT) / 0.3, 0, 1);
+      const f = window.Danny.frame;
+      const cx = L.ch.cx, cy = L.floorY - L.figH * (86 / 185);
+      const w = f.wLocal * L.figScale, h = f.hLocal * L.figScale;
+      ctx.globalAlpha = danceAlpha;
+      ctx.drawImage(window.Danny.canvas, cx - w / 2, cy - h / 2, w, h);
+      ctx.globalAlpha = 1;
+    }
     return;
   }
+  drawJacket(s, time, 1);
+}
 
+function drawJacket(s, time, alpha) {
+  const t = subjectTransform(s);
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(t.x, t.y);
@@ -1024,7 +1039,6 @@ function drawSubject(s, time) {
   ctx.strokeStyle = laser.onBody ? '#7ff2e6' : COL.teal;
   ctx.stroke(s.path);
   ctx.restore();
-
 
   drawAttached(s, time, alpha);
 }
@@ -1314,7 +1328,10 @@ function drawBeat(time) {
     ctx.fillText(n <= 0 ? 'GO' : String(n), c.cx, cy);
     ctx.globalAlpha = 1;
   } else if (subject.phase === 'result') {
-    const f = clamp(subject.t / subject.resultDur, 0, 1);
+    // the banner fades fast, Danny's dance is the main event through the
+    // rest of this phase, and the countdown to the next round rides on top
+    // of him the whole time rather than fading with the banner
+    const f = clamp(subject.t / (JACKET_EXIT + 0.6), 0, 1);
     ctx.globalAlpha = clamp(1 - f, 0, 1);
     ctx.fillStyle = banner && banner.ok ? COL.teal : COL.red;
     ctx.font = '600 ' + Math.round(38 * k) + 'px ui-monospace, Menlo, monospace';
@@ -1323,6 +1340,11 @@ function drawBeat(time) {
     ctx.font = Math.round(16 * k) + 'px ui-monospace, Menlo, monospace';
     ctx.fillText(banner ? banner.sub : '', c.cx, cy + 30 * k);
     ctx.globalAlpha = 1;
+
+    const remain = Math.max(0, subject.resultDur - subject.t);
+    ctx.fillStyle = COL.dim;
+    ctx.font = Math.round(13 * k) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText('NEXT ROUND IN ' + remain.toFixed(1) + 's', c.cx, cy + 56 * k);
   }
   ctx.textAlign = 'left';
 }
@@ -1387,7 +1409,7 @@ function drawGoal(time) {
   const k = L.clock;
   if (!L.narrow) drawClock(k.cx, k.cy, k.r, sc.frac, sc.tLeft, time);
 
-  if (state !== 'play' || !subject) return;
+  if (state !== 'play' || !subject || subject.phase === 'result') return;
   const y = (L.narrow ? L.topH : k.cy + k.r) + 46;
   ctx.textAlign = 'center';
   const maxW = c.w - 28;
@@ -1447,16 +1469,7 @@ function drawPanels(time) {
   y += 42;
 
   label('SUBJECT', x, y); y += 24;
-  if (dannyOn()) {
-    value('D. HILLIS', x, y, 17, COL.text); y += 20;
-    label('HAIR', x, y, 11);
-    ctx.textAlign = 'right';
-    value(window.Danny.stageName(), x + bw, y, 12,
-          round >= 4 ? COL.red : (round >= 2 ? COL.cyan : COL.dim));
-    ctx.textAlign = 'left';
-  } else {
-    value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 17, COL.text);
-  }
+  value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 17, COL.text);
 
   // ---- right panel, the analysis feed
   const rx = rp.x + 20;
@@ -1540,10 +1553,9 @@ function drawBars(time) {
   ctx.strokeStyle = COL.rule;
   ctx.beginPath(); ctx.moveTo(0, by + .5); ctx.lineTo(W, by + .5); ctx.stroke();
 
-  if (dannyOn()) {
+  if (subject && state === 'play') {
     ctx.textAlign = 'center';
-    value('D. HILLIS, HAIR ' + window.Danny.stageName(), W / 2, by + 24, 12,
-          round >= 4 ? COL.red : COL.dim);
+    value('SUBJECT ' + subject.id, W / 2, by + 24, 12, COL.dim);
     ctx.textAlign = 'left';
   }
 
