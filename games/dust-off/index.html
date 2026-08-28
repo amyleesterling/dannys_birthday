@@ -255,11 +255,12 @@ const traceImg = loadArt('trace.png');
 // Every round dusts off a different holographic object, Amy's own renders
 // standing in for whatever an inspection line would actually see: a jacket
 // on its hanger, a test tube rack, a microscope, a pair of sneakers, a set
-// of goggles, a camera. Local units keep the first jacket's own convention,
-// the floor sits at local y = +86, and each object is fit inside a box up
-// to 150 wide by 185 tall above that, preserving its own aspect ratio, so a
-// tall narrow rack and a wide pair of sneakers both land at a sensible size
-// without one axis ever running away with the other.
+// of goggles, a camera, a six vial specimen rack. Local units keep the
+// first jacket's own convention, the floor sits at local y = +86, and each
+// object is fit inside a box up to 150 wide by 185 tall above that,
+// preserving its own aspect ratio, so a tall narrow rack and a wide pair of
+// sneakers both land at a sensible size without one axis ever running away
+// with the other.
 const OBJ_MAX_W = 150, OBJ_MAX_H = 185, OBJ_FLOOR = 86;
 const SUBJECT_DEFS = [
   { key: 'jacket',     src: 'obj-jacket.png' },
@@ -268,6 +269,7 @@ const SUBJECT_DEFS = [
   { key: 'sneakers',   src: 'obj-sneakers.png' },
   { key: 'goggles',    src: 'obj-goggles.png' },
   { key: 'camera',     src: 'obj-camera.png' },
+  { key: 'vials',      src: 'obj-vials.png' },
 ];
 for (const def of SUBJECT_DEFS) {
   def.ready = false;
