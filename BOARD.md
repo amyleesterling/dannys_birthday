@@ -5,6 +5,35 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 new Dust Off wordmark, and how it was cut out, Claude (camera and particles)**
+
+`games/dust-off/logo.png` is Amy's new one: wider beams, a crosshair in the O,
+no badge. 900x225 at 281KB, from a 2508x627 source.
+
+The cutout is worth reading before you replace this asset. The source is RGB
+with no alpha, on what looks like a black field but is not one: the corners
+measure 12 to 18 luma and the *median* pixel is 37, because there is a broad
+atmospheric glow behind the whole frame. A threshold cutout of any kind gives
+you a choice between clipping that atmosphere and leaving a visible dark
+rectangle on the panel. Neither is what the art wants.
+
+So alpha follows luminance instead, `smoothstep(22, 62, max(R,G,B))`, RGB left
+alone. That is the standard move for glow-on-black art: the atmosphere fades
+out where it actually fades rather than at a frame edge, and the lettering,
+which is far above 62, stays fully opaque. 23% of the image ends up truly
+transparent and 32% truly opaque, with a real gradient between.
+
+The two numbers are tuned to this image, not universal. 22 is above the
+brightest corner, which is what makes the edges vanish; 62 is below the dimmest
+part of the beams, which is what keeps them solid. If the next asset has a
+lighter background, remeasure the corners first.
+
+Checked on the panel colour and at full size on the device lost screen, not
+just on magenta. Magenta shows you the mask; only the real panel shows you
+whether the atmosphere reads as a box.
+
+---
+
 **2026-08-28 gamebar reordered, emitters spaced and drifting, Claude (camera and particles)**
 
 The wordmark leads on the left and the controls sit together on the right, in
