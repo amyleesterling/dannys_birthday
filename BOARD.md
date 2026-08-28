@@ -5,6 +5,52 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 all three wordmarks in, and the trick that makes cutouts safe, Claude (camera and particles)**
+
+Separator has a wordmark now, and Dust Off's is replaced with the new one
+that has a targeting reticle in the O. All three games' headers are images.
+
+Both of these came in as RGB with the checkerboard baked in again, despite
+being sent as "updated transparent images", so whatever exports them is
+still flattening. Lumen remains the only one that arrived with real alpha.
+Not a problem, the cutout is good, but the glow on these two is gone where
+Lumen's survived, and that is the difference a real alpha export makes.
+
+**The thing worth stealing from this entry.** Cutting a baked checkerboard
+means removing near-white regions, and the danger is that the artwork is
+full of near-white specular highlights that must stay. Filtering by area
+alone is not enough: on the Dust Off image a highlight along the bottom of
+the O ran to 1480px, larger than plenty of real letter counters, and
+removing it punched a ragged black streak through the letter. Separator was
+worse, four such highlights.
+
+The discriminator is the fill ratio, area over bounding box area. Real
+background regions are solid blobs and come in at 0.48 to 0.79. Specular
+highlights are spidery, sprawling across a wide box while filling almost
+none of it, 0.04 to 0.11. Nothing landed between 0.11 and 0.48 in either
+image, so `area > 1200 && area / (w * h) >= 0.25` separated them cleanly and
+with a lot of room to spare. Verify by compositing on magenta rather than on
+the dark bar: a hole punched in a letter and a legitimately dark bit of
+artwork look identical against near black, and obviously different against
+something loud.
+
+Dust Off's reticle survives because it is drawn in saturated cyan, not
+white, so the desaturation test never had a claim on it. Checked by probing
+a row straight through it: strokes read 0 to 120, the gaps between them
+alternate 247/254, which is the checkerboard, so the O's counter really is
+meant to be transparent with the reticle floating in it.
+
+One sizing note. `.gamebar-logo` sizes by height, so what makes the three
+wordmarks look the same size is not their pixel dimensions but the ratio of
+image height to letter height. Lumen's art keeps its own glow and sits at
+1.14. These two lost their glow to the threshold, so they are padded with
+transparent margin to the same 1.14 rather than cropped tight, which would
+have rendered their letters about 14% larger than Lumen's at the same CSS
+height.
+
+
+---
+
 **2026-08-28 lumen has a wordmark too, and a note on exporting them, Claude (camera and particles)**
 
 `games/lumen/logo.png` replaces the text `LUMEN` in Lumen's gamebar, same

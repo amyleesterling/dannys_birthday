@@ -41,9 +41,15 @@
   }
   .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
   .gamebar-back .short { display: none; }
-  .gamebar-name {
-    font-size: 19px; font-weight: 600; letter-spacing: .06em;
-    color: rgb(var(--bar-accent)); white-space: nowrap;
+  /* Amy's wordmark stands in for the text title. Sized by height so it lines
+     up with the controls either side of it whatever the art's aspect is, and
+     centred rather than sitting on the bar's shared baseline, which an image
+     would meet with its bottom edge. All three games' wordmarks are cropped
+     to the same image-height-to-letter-height ratio, so one CSS height gives
+     one letter size across the set. */
+  .gamebar-logo {
+    display: block; height: 26px; width: auto;
+    align-self: center; flex: 0 0 auto;
   }
   .gamebar-pat {
     font-size: 15px; letter-spacing: .06em;
@@ -72,7 +78,7 @@
   @media (max-width: 820px) {
     .gamebar { flex-wrap: wrap; row-gap: 8px; gap: 7px; padding: 9px 11px; }
     .gamebar-title { display: none; }
-    .gamebar-name { font-size: 15px; }
+    .gamebar-logo { height: 21px; }
     .gamebar-pat { font-size: 12px; order: 10; flex-basis: 100%; }
     .gamebar-back { padding: 7px 9px; font-size: 12px; }
     .gamebar-back .full { display: none; }
@@ -101,7 +107,7 @@
 <body>
 <header class="gamebar holopanel" style="--bar-accent: 138 96 230;">
   <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
-  <span class="gamebar-name">SEPARATOR</span>
+  <img class="gamebar-logo" src="logo.png" alt="Separator" width="760" height="150">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9480991B2/en" target="_blank" rel="noopener">US 9,480,991 B2</a>
   <span class="gamebar-title">Radiofrequency particle separator</span>
   <button type="button" data-key="r">RESTART</button>
