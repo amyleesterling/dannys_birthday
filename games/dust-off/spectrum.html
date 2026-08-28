@@ -473,10 +473,16 @@
   const appleCtx = appleCanvas.getContext('2d');
   const AW = appleCanvas.width, AH = appleCanvas.height;
 
-  // photo of a real apple; the procedural one below stays as the fallback
-  // until it loads (and for the x-ray and charred stages, which replace it)
+  // one photo per exposure stage; the procedural drawing below stays as the
+  // fallback for any stage whose photo has not loaded yet
   const appleImg = new Image();
   appleImg.src = 'apple.png';
+  const STAGE_IMGS = { plain: appleImg };
+  for (const [k, src] of [['warm', 'apple-warm.png'], ['burn', 'apple-burn.png'],
+                          ['xray', 'apple-xray.png'], ['char', 'apple-char.png']]) {
+    const im = new Image(); im.src = src; STAGE_IMGS[k] = im;
+  }
+  STAGE_IMGS.warm2 = STAGE_IMGS.warm;
 
   function appleBody(ctx) {
     const cx = AW / 2, cy = AH * 0.56, r = AW * 0.34;
@@ -491,6 +497,14 @@
   function drawApple(stage, t) {
     appleCtx.clearRect(0, 0, AW, AH);
     const { cx, cy, r } = appleBody(appleCtx);
+
+    const photo = STAGE_IMGS[stage.draw];
+    if (photo && photo.complete && photo.naturalWidth) {
+      const s = (AW * 0.92) / Math.max(photo.naturalWidth, photo.naturalHeight);
+      const w = photo.naturalWidth * s, h = photo.naturalHeight * s;
+      appleCtx.drawImage(photo, (AW - w) / 2, (AH - h) / 2, w, h);
+      return;
+    }
 
     if (stage.draw === 'xray') {
       appleCtx.save();
