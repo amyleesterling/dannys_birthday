@@ -179,6 +179,20 @@ const COL = {
 };
 
 const DEV_R     = 7;
+
+// Amy's rover render. Two things about it drive the drawing below. The art is
+// framed nose up, while dev.ang is a plain atan2 heading with zero pointing
+// along +x, so the sprite has to turn by ang plus a right angle. And the hull
+// does not sit in the middle of the sprite, because the legs splay wide and
+// the tail hangs well below it, so the anchor is where the hull centre
+// actually falls: measured as the centre of the largest circle that fits
+// inside the artwork, not guessed from the bounding box.
+const roverImg = new Image();
+roverImg.ready = false;
+roverImg.onload = () => { roverImg.ready = true; };
+roverImg.src = 'rover.png';
+const ROVER_FX = 0.499, ROVER_FY = 0.389;
+const ROVER_W  = 30;      // sprite width on screen; the hull is 0.661 of that
 const MAX_SPEED = 190;
 const ABLATE_R  = 95;
 const LAMP_R    = 250;
@@ -785,29 +799,40 @@ function drawDevice(time, p) {
   ctx.closePath(); ctx.fill();
   ctx.restore();
 
-  // lumen wall engaging wheels
-  ctx.strokeStyle = '#7ea0a6';
-  ctx.lineWidth = 1.4;
-  for (const s of [-1, 1]) {
+  // the treatment head lighting up used to be the body changing colour, which
+  // a fixed render cannot do, so it is a bloom around the hull instead
+  if (dev.emit) {
     ctx.save();
-    ctx.translate(0, s * 7.5);
-    ctx.rotate(dev.wheel * 6);
-    ctx.beginPath(); ctx.arc(0, 0, 4.2, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-4.2, 0); ctx.lineTo(4.2, 0); ctx.stroke();
+    ctx.globalCompositeOperation = 'lighter';
+    const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, 24);
+    gl.addColorStop(0, 'rgba(126,224,255,0.34)');
+    gl.addColorStop(1, 'rgba(126,224,255,0)');
+    ctx.fillStyle = gl;
+    ctx.beginPath(); ctx.arc(0, 0, 24, 0, TAU); ctx.fill();
     ctx.restore();
   }
 
-  ctx.fillStyle = '#0f1c20';
-  ctx.strokeStyle = dev.emit ? COL.cyan : COL.teal;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(9, 0);
-  ctx.lineTo(2, -5.4); ctx.lineTo(-8, -4.4);
-  ctx.lineTo(-8, 4.4); ctx.lineTo(2, 5.4);
-  ctx.closePath(); ctx.fill(); ctx.stroke();
-
-  ctx.fillStyle = dev.emit ? COL.cyan : COL.teal;
-  ctx.beginPath(); ctx.arc(4.5, 0, 1.9, 0, TAU); ctx.fill();
+  if (roverImg.ready) {
+    const w = ROVER_W, h = w * (roverImg.naturalHeight / roverImg.naturalWidth);
+    ctx.save();
+    ctx.rotate(Math.PI / 2);            // art faces up, the heading faces +x
+    // dev.wheel already accumulates distance travelled, so a half pixel of
+    // gait along the sprite's own axis keeps a rigid render from looking like
+    // it is sliding rather than walking
+    ctx.translate(0, Math.sin(dev.wheel * 12) * 0.5);
+    ctx.drawImage(roverImg, -ROVER_FX * w, -ROVER_FY * h, w, h);
+    ctx.restore();
+  } else {
+    // one frame at most, before the render lands
+    ctx.fillStyle = '#0f1c20';
+    ctx.strokeStyle = dev.emit ? COL.cyan : COL.teal;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(9, 0);
+    ctx.lineTo(2, -5.4); ctx.lineTo(-8, -4.4);
+    ctx.lineTo(-8, 4.4); ctx.lineTo(2, 5.4);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
   ctx.restore();
 
   if (anchored && state === 'play') {
