@@ -47,6 +47,9 @@ const HOT  = new THREE.Color(0xffdc94);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
+// One of these plays on a round clear, whichever have finished loading.
+const CELEBRATIONS = ['flip', 'heart', 'dance'];
+
 class Danny {
   constructor() {
     this.canvas = document.createElement('canvas');
@@ -119,10 +122,12 @@ class Danny {
         this.mixer = new THREE.AnimationMixer(this.model);
         this.walk = this.mixer.clipAction(gltf.animations[0]);
         this.walk.play();
-        this.mixer.addEventListener('finished', () => this.backToBase());
+        this.mixer.addEventListener('finished', (e) => this.backToBase(e.action));
       }
       this.loaded = true;
       this.loadExtra('danny_backflip.glb', 'flip');
+      this.loadExtra('danny_heart.glb', 'heart');
+      this.loadExtra('danny_dance.glb', 'dance');
     }, undefined, () => { this.ok = false; });   // no model, the game falls back
   }
 
@@ -140,17 +145,23 @@ class Danny {
     }, undefined, () => {});                     // optional, silence is fine
   }
 
+  // A round clear picks one of whatever one-shot moves have finished
+  // loading, so it is not the backflip every single time. Returns how long
+  // the one it picked runs, so the caller can hold the result screen for it.
   celebrate() {
-    if (!this.flip || this.playingOnce) return;
+    const pool = CELEBRATIONS.filter((k) => this[k]);
+    if (!pool.length || this.playingOnce) return 0;
+    const key = pool[(Math.random() * pool.length) | 0];
     this.playingOnce = true;
     if (this.walk) { this.walk.paused = false; this.walk.fadeOut(0.12); }
     if (this.idle) this.idle.fadeOut(0.12);
-    this.flip.reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.12).play();
+    this[key].reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.12).play();
+    return this[key + 'Dur'];
   }
 
-  backToBase() {
+  backToBase(action) {
     this.playingOnce = false;
-    if (this.flip) this.flip.fadeOut(0.25);
+    if (action) action.fadeOut(0.25);
     const back = this.motion;
     this.motion = null;
     this.setMotion(back || 'walk');

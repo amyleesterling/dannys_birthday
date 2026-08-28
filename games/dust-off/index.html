@@ -647,10 +647,11 @@ function settleRound() {
     const bonus = 200 * round + Math.round(s.scanLeft * 40);
     score += bonus;
     banner = { text: 'ALL RECOVERED', sub: '+' + bonus, ok: true, t: 0 };
-    if (dannyOn() && window.Danny.flip) {
-      window.Danny.celebrate();
-      s.resultDur = window.Danny.flipDur + 0.5;   // let him land it
-      s.holdFor = window.Danny.flipDur + 0.1;
+    if (dannyOn()) {
+      // celebrate() picks one of his one-shot moves at random and says how
+      // long it runs, so the result screen holds exactly long enough for it
+      const dur = window.Danny.celebrate();
+      if (dur) { s.resultDur = dur + 0.5; s.holdFor = dur + 0.1; }
     }
     feed.unshift({ ok: true, text: 'ROUND ' + round + ' CLEARED', age: 0 });
     audio.flagged();
@@ -1639,7 +1640,13 @@ function drawOver() {
 let last = performance.now();
 function step(now) {
   if (document.body.dataset.state !== state) document.body.dataset.state = state;
-  const dt = Math.min(0.05, (now - last) / 1000);
+  // requestAnimationFrame's own timestamp and the setInterval fallback below
+  // can race, so a callback queued against an older frame time can still run
+  // after the interval already moved `last` forward, making now < last. A
+  // one-shot animation reading a negative dt at time 0 reads as "reached the
+  // start while playing backwards" to three.js and ends immediately, so
+  // never a negative dt out of here.
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
   last = now;
   update(dt);
   draw(now / 1000);
