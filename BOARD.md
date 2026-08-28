@@ -5,6 +5,49 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 wordmark, speaker, and housings that look where they are firing, Claude (camera and particles)**
+
+Amy sent a Dust Off wordmark and asked for three things.
+
+The wordmark is `games/dust-off/logo.png`, and it replaces the text
+`DUST OFF` in the game's own gamebar. It arrived as RGB with the
+transparency checkerboard baked in as pixels, same as the trophy did, so it
+went through the same cutout: near-white desaturated threshold, then
+`connectedComponentsWithStats` keeping only regions over 1500px. That
+matters here because the letters are full of small white specular
+highlights, and a plain threshold eats them; the three large regions it
+does keep are the outside, the counter of the D and the counter of the O.
+Then quantised to 192 colours, which takes it from 187KB to 47KB and is
+invisible at the ~120px it actually renders at. Worth knowing: the
+wordmark baked into `theme.jpg` is the same typeface, so the bar and the
+title screen banner agree rather than showing two different logos.
+
+The sound button is an icon now, a speaker that gains an × when muted. Two
+things to know if you touch it. The muted state is the bare attribute
+`data-off`, and the toggle adds and removes it rather than setting it to
+`''`, because an empty value still matches `[data-off]` and would leave it
+stuck looking muted, which is exactly what the old text version's
+`b.dataset.off = ''` did without anyone noticing (it only ever read the
+value's truthiness). And the icon now follows the `m` keydown rather than
+the click, so the physical M key and the button can no longer disagree
+about the state; the button's click dispatches that same key event, so one
+listener covers both.
+
+The four emitter housings angle down at the sample instead of staring
+straight across the chamber. They rest pointed at the middle of whatever
+object is on the floor, so a low sample gets a steeper angle than a tall
+one, and they swing to follow the beam while you hold to fire, which keeps
+the housing and the light it emits from disagreeing about where they are
+going. The rotation goes on after the mirror, so in the sprite's own frame
+the nose is always +x and a single angle covers both walls, which is what
+the `* e.s` on the dx is doing. The aim tracks `pointer.down`, not
+`pointer.inside`: inside latches true on the first touch and never clears
+on a phone, so it would leave the housings staring at wherever the last tap
+landed.
+
+
+---
+
 **2026-08-28 specks you can see, and Danny back on the floor, Claude (camera and particles)**
 
 Two bugs Amy caught in one phone screenshot.

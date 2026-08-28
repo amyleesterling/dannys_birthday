@@ -45,9 +45,13 @@
   }
   .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
   .gamebar-back .short { display: none; }
-  .gamebar-name {
-    font-size: 19px; font-weight: 600; letter-spacing: .06em;
-    color: rgb(var(--bar-accent)); white-space: nowrap;
+  /* Amy's wordmark stands in for the text title. Sized by height so it lines
+     up with the controls either side of it whatever the art's aspect is, and
+     centred rather than sitting on the bar's shared baseline, which an image
+     would meet with its bottom edge. */
+  .gamebar-logo {
+    display: block; height: 26px; width: auto;
+    align-self: center; flex: 0 0 auto;
   }
   .gamebar-pat {
     font-size: 15px; letter-spacing: .06em;
@@ -70,6 +74,19 @@
   }
   .gamebar button:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
 
+  /* The sound control is an icon, so it needs a square-ish box and no text
+     metrics. data-off is the muted state, set as a bare attribute, which is
+     why the toggle adds and removes it rather than setting it to '' (an empty
+     value still matches [data-off] and would leave it stuck muted). */
+  #sndbtn { padding: 6px 9px; line-height: 0; }
+  .ico { display: block; width: 18px; height: 18px;
+    fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round; }
+  .ico .cone { fill: currentColor; }
+  #sndbtn .ico-off { display: none; }
+  #sndbtn[data-off] .ico-on { display: none; }
+  #sndbtn[data-off] .ico-off { display: block; }
+
   .stage { flex: 1 1 auto; position: relative; min-height: 0; }
   /* a direct-child combinator, not a descendant one: the wave teaser below
      nests a second canvas inside .stage, and it must not inherit this */
@@ -83,7 +100,7 @@
        instead of getting clipped or pushed off screen. */
     .gamebar { flex-wrap: wrap; row-gap: 8px; gap: 7px; padding: 9px 11px; }
     .gamebar-title { display: none; }
-    .gamebar-name { font-size: 15px; }
+    .gamebar-logo { height: 21px; }
     .gamebar-pat { font-size: 12px; order: 10; flex-basis: 100%; }
     .gamebar-back { padding: 7px 9px; font-size: 12px; }
     .gamebar-back .full { display: none; }
@@ -138,11 +155,21 @@
 <body>
 <header class="gamebar holopanel" style="--bar-accent: 126 224 255;">
   <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
-  <span class="gamebar-name">DUST OFF</span>
+  <img class="gamebar-logo" src="logo.png" alt="Dust Off" width="800" height="172">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9134205B2/en" target="_blank" rel="noopener">US 9,134,205 B2</a>
   <span class="gamebar-title">System and method for removing surface particles from an object</span>
   <button type="button" data-key="r">RESTART</button>
-  <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
+  <button type="button" data-key="m" id="sndbtn" aria-label="Mute sound" title="Mute sound">
+    <svg class="ico ico-on" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path class="cone" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/>
+      <path d="M15.4 9.2a4 4 0 0 1 0 5.6"/>
+      <path d="M18 6.8a7.4 7.4 0 0 1 0 10.4"/>
+    </svg>
+    <svg class="ico ico-off" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path class="cone" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/>
+      <path d="M16 9.7l5 4.6M21 9.7l-5 4.6"/>
+    </svg>
+  </button>
 </header>
 <div class="stage"><canvas id="c"></canvas>
 <section id="hero"><div class="in">
@@ -175,12 +202,21 @@
 document.querySelectorAll('.gamebar button').forEach(b => {
   b.addEventListener('click', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key }));
-    if (b.id === 'sndbtn') {
-      b.dataset.off = b.dataset.off ? '' : '1';
-      b.textContent = b.dataset.off ? 'SOUND OFF' : 'SOUND ON';
-    }
     b.blur();
   });
+});
+
+// The speaker icon follows the M key rather than the click, so the physical
+// key and the button can never disagree about which one the game is actually
+// in: the button's own click dispatches that same key event.
+const sndbtn = document.getElementById('sndbtn');
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() !== 'm') return;
+  const muted = !sndbtn.hasAttribute('data-off');
+  sndbtn.toggleAttribute('data-off', muted);
+  const label = muted ? 'Unmute sound' : 'Mute sound';
+  sndbtn.setAttribute('aria-label', label);
+  sndbtn.title = label;
 });
 </script>
 
@@ -460,6 +496,12 @@ let frags = [];
 
 const laser = { heat: 0, lock: 0, firing: false, x: 0, y: 0, onBody: false, beamT: 0 };
 const pointer = { x: 0, y: 0, down: false, inside: false };
+
+// Where the four housings are pointing. They rest angled down at the sample
+// on the floor rather than staring straight across the chamber, and swing to
+// follow the beam while you are firing, so the housing and the light it emits
+// never disagree about where they are going. Smoothed, so they sweep.
+const emAim = { x: 0, y: 0, set: false };
 
 function layout() {
   const rect = canvas.getBoundingClientRect();
@@ -748,7 +790,32 @@ function nextRound() {
 
 // ---------------------------------------------------------------- update
 
+// The resting target: the middle of whatever object is on the floor, so the
+// housings sit at a steeper angle for a low sample than a tall one. With no
+// subject loaded, aim where one would be standing.
+function emitterRest() {
+  const def = subject && subject.def;
+  const mid = def ? (def.local.top + def.local.bottom) / 2 : -5;
+  return { x: L.ch.cx, y: L.floorY + (mid - 86) * L.figScale };
+}
+
+// pointer.down rather than pointer.inside: inside latches true on the first
+// touch and never clears on a phone, which would leave the housings aimed at
+// wherever the last tap happened to land.
+function updateEmitterAim(dt) {
+  const rest = emitterRest();
+  const live = state === 'play' && pointer.down && laser.lock <= 0 &&
+               pointer.x > L.ch.x && pointer.x < L.ch.x + L.ch.w;
+  const tx = live ? pointer.x : rest.x;
+  const ty = live ? pointer.y : rest.y;
+  if (!emAim.set) { emAim.x = tx; emAim.y = ty; emAim.set = true; return; }
+  const k = 1 - Math.pow(0.0016, dt);   // settles in ~200ms, frame rate free
+  emAim.x += (tx - emAim.x) * k;
+  emAim.y += (ty - emAim.y) * k;
+}
+
 function update(dt) {
+  updateEmitterAim(dt);
   shake *= Math.pow(0.02, dt);
   for (let i = fx.length - 1; i >= 0; i--) {
     fx[i].t += dt;
@@ -952,25 +1019,30 @@ function drawChamber(time) {
   const hot = laser.lock > 0;
   const art = hot ? emitterHotImg : emitterImg;
   for (const e of L.emitters) {
+    // Rotation happens after the mirror, so in the sprite's own frame the nose
+    // is always +x and one angle covers both walls: mirroring flips the x of
+    // the aim vector, hence the e.s on dx.
+    const aim = Math.atan2(emAim.y - e.y, (emAim.x - e.x) * e.s);
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    if (e.s < 0) ctx.scale(-1, 1);
+    ctx.rotate(aim);
     if (art.ready) {
       const ew = 108, eh = ew * (art.naturalHeight / art.naturalWidth);
-      ctx.save();
-      ctx.translate(e.x, e.y);
-      if (e.s < 0) ctx.scale(-1, 1);
       ctx.drawImage(art, -EMITTER_FX * ew, -EMITTER_FY * eh, ew, eh);
-      ctx.restore();
     } else {
       // the emitter art loads fast, but a plain housing covers the one frame it doesn't
       ctx.fillStyle = '#0b171b';
       ctx.strokeStyle = hot ? COL.red : COL.teal;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(e.x - 9 * e.s, e.y - 13);
-      ctx.lineTo(e.x - 9 * e.s, e.y + 13);
-      ctx.lineTo(e.x + 11 * e.s, e.y + 7);
-      ctx.lineTo(e.x + 11 * e.s, e.y - 7);
+      ctx.moveTo(-9, -13);
+      ctx.lineTo(-9, 13);
+      ctx.lineTo(11, 7);
+      ctx.lineTo(11, -7);
       ctx.closePath(); ctx.fill(); ctx.stroke();
     }
+    ctx.restore();
     // a little extra bloom on the lens itself, breathing gently, flickering
     // fast while it cools down
     const glow = hot ? '255,77,94' : '126,224,255';
