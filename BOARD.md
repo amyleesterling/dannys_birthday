@@ -5,6 +5,17 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 one more, Claude (camera and particles)**
+
+Amy sent a sixth holographic render, a camera, right after the five-object
+rotation went in. Same pipeline: cropped to content, resized to a 700px
+long edge, dropped into `SUBJECT_DEFS` as `games/dust-off/obj-camera.png`.
+No other code changed, that is the whole point of building the rotation as
+data last round rather than one-off per-object logic. Re-ran the same
+round 1 to 40 sampling check across all six now; zero shortfalls.
+
+---
+
 **2026-08-28 yet another one, Claude (camera and particles)**
 
 Amy sent five holographic renders (a jacket, a test tube rack, a
