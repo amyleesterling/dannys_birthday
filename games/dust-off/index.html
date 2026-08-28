@@ -122,6 +122,12 @@
     display: block; width: 100%; height: auto;
     border: 1px solid rgba(196,228,255,.18);
   }
+  #trophy {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+    display: none; padding: 20px 20px 0; text-align: center;
+  }
+  body[data-state="won"] #trophy { display: block; }
+  #trophy img { display: inline-block; width: 50%; max-width: 240px; height: auto; }
   .wavepeek {
     display: block; height: 60px; border: 1px solid rgba(196,228,255,.18);
     background: rgba(4,7,10,.9); overflow: hidden;
@@ -141,6 +147,9 @@
 <div class="stage"><canvas id="c"></canvas>
 <section id="hero"><div class="in">
   <img src="theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose.">
+</div></section>
+<section id="trophy"><div class="in">
+  <img src="trophy.png" alt="Trophy: One With The Lasers">
 </div></section>
 <section id="spectrum"><div class="in">
   <a class="wavepeek" href="spectrum.html" aria-label="Explore the EM spectrum"><canvas id="wavePeek"></canvas></a>
@@ -280,6 +289,11 @@ const BEAM_RADIUS  = 155;
 const BEAM_FORCE   = 2800;
 
 const MAX_MISSES = 3;
+// Clearing this round wins the whole run rather than just starting round 11.
+// Missing it does not end things early either, it holds you at MAX_ROUND and
+// gives you another shot at the same difficulty rather than advancing past
+// the last one that exists.
+const MAX_ROUND = 10;
 
 // how long the object takes to slide off screen once a round ends, before
 // Danny fades in to dance through the rest of the result phase
@@ -651,6 +665,7 @@ canvas.addEventListener('pointerdown', e => {
   pointer.down = true;
   if (state === 'title') { startRun(); return; }
   if (state === 'over')  { startRun(); return; }
+  if (state === 'won')   { startRun(); return; }
   fire();
 });
 canvas.addEventListener('pointermove', updatePointer);
@@ -690,6 +705,7 @@ function settleRound() {
   year++;
   const s = subject;
   const cleared = s.got >= s.total;
+  s.cleared = cleared;
   if (cleared) {
     const bonus = 200 * round + Math.round(s.scanLeft * 40);
     score += bonus;
@@ -720,8 +736,9 @@ function settleRound() {
 function nextRound() {
   loose = []; frags = [];
   if (window.Danny && window.Danny.ok) window.Danny.cutCelebration();
+  if (subject.cleared && round >= MAX_ROUND) { state = 'won'; return; }
   if (misses >= MAX_MISSES) { state = 'over'; return; }
-  round++;
+  round = Math.min(MAX_ROUND, round + 1);
   subject = newSubject();
 }
 
@@ -895,6 +912,7 @@ function draw(time) {
   drawPanels(time);
   if (state === 'title') drawTitle();
   if (state === 'over') drawOver();
+  if (state === 'won') drawWon();
   if (state === 'play' && pointer.inside) drawCursor();
 }
 
@@ -1712,6 +1730,19 @@ function drawOver() {
     'Round ' + round + ', ' + rate + ' per cent recovered overall',
     'Long now year 0' + year,
   ], 'RUN IT AGAIN', COL.teal);
+}
+
+function drawWon() {
+  // the trophy is an HTML overlay above the canvas, same as the title
+  // screen's own hero banner, so the card underneath just reserves room
+  // for it and adds the score, same pattern as drawTitle()
+  const trophyW = Math.min(240, (W - 40) * 0.5);
+  const trophyH = trophyW * (700 / 513);
+  card('HILLIS TEAM', COL.teal,
+    'Welcome. Round ten, cleared. One with the lasers.', [
+    'Score ' + String(score).padStart(6, '0'),
+    'Long now year 0' + year,
+  ], 'PLAY AGAIN', COL.teal, { topY: 20 + trophyH + 26 });
 }
 
 // ---------------------------------------------------------------- loop
