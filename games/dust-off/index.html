@@ -150,8 +150,8 @@
     <img class="gscreen-art" src="theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose." width="1600" height="533">
     <p class="holodialog-eyebrow">US 9,134,205 B2 &middot; Removing surface particles from an object</p>
     <p class="holodialog-desc">
-      A radiofrequency particle separator, except up the spectrum, because we
-      are using light beams. Four of them, crossing where you aim.
+      Radiofrequency particle separator, except up the frequency five million
+      fold because LASERS.
     </p>
     <button class="holobtn" type="button" data-key="r">
       <span class="holobtn-text">Play now</span><span class="holobtn-glow"></span>
@@ -249,27 +249,79 @@ window.addEventListener('keydown', e => {
   new ResizeObserver(size).observe(canvas);
   size();
 
-  const CYCLES_ACROSS = 3.2;
-  const HZ_A = 0.4, HZ_B = 1.0;
-  function drawLane(y0, laneH, color, hz, t) {
+  // The card used to hold two sine waves at fixed wavelengths, scrolling. It
+  // drifts up and down the spectrum now, so the teaser actually previews what
+  // the page behind it is about: the wave bunches up as it climbs, from a few
+  // lazy radio cycles to a dense gamma hash, and the colour follows the band
+  // it is currently sitting in.
+  //
+  // One thing here is deliberate and should stay. What sweeps is the *spatial*
+  // wavelength, how many cycles fit across the card. The scroll rate is held
+  // constant. Driving the temporal rate off the frequency instead is the
+  // honest version and it is a bad idea: it strobes into an unresolvable blur
+  // somewhere around UV and stays there for the top of the bar, which is
+  // useless to look at and a real seizure risk. There is a longer note about
+  // this in BOARD.md.
+  const SWEEP_SECS = 26;          // one full radio to gamma traverse
+  const CYC_LO = 1.1, CYC_HI = 17;  // cycles across the card at each end
+  const SCROLL_A = 0.22, SCROLL_B = 0.34;   // constant, never frequency driven
+
+  // the bands off spectrum.html, in the same order, as stops the sweep
+  // crossfades between rather than snapping at
+  const STOPS = [
+    [0.00, [ 74, 150, 224]],   // radio
+    [0.18, [ 74, 200, 224]],   // microwave
+    [0.42, [196, 116,  84]],   // infrared
+    [0.58, [255, 248, 232]],   // visible
+    [0.68, [138,  96, 230]],   // UV
+    [0.82, [126, 224, 255]],   // x-ray
+    [1.00, [226, 120, 180]],   // gamma
+  ];
+  function bandColor(u, alpha) {
+    let i = 0;
+    while (i < STOPS.length - 2 && u > STOPS[i + 1][0]) i++;
+    const [p0, c0] = STOPS[i], [p1, c1] = STOPS[i + 1];
+    const k = p1 === p0 ? 0 : (u - p0) / (p1 - p0);
+    const c = c0.map((v, j) => Math.round(v + (c1[j] - v) * Math.max(0, Math.min(1, k))));
+    return 'rgba(' + c.join(',') + ',' + alpha + ')';
+  }
+
+  function drawLane(y0, laneH, u, scroll, t, alpha) {
+    const cycles = CYC_LO * Math.pow(CYC_HI / CYC_LO, u);
+    // step finer as the wave bunches up, so a dense one stays a wave rather
+    // than turning into sampling noise
+    const step = Math.max(0.6, Math.min(2, w / (cycles * 26)));
     const amp = laneH * 0.34, mid = y0 + laneH / 2;
     ctx.beginPath();
-    for (let px = 0; px <= w; px += 2) {
-      const yy = mid - Math.sin((px / w) * CYCLES_ACROSS * TAU - t * hz * TAU) * amp;
+    for (let px = 0; px <= w; px += step) {
+      const yy = mid - Math.sin((px / w) * cycles * TAU - t * scroll * TAU) * amp;
       px === 0 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
     }
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = bandColor(u, alpha);
     ctx.lineWidth = 2;
     ctx.stroke();
   }
+
+  // a triangle rather than a sawtooth, so the sweep turns around at the ends
+  // instead of snapping back from gamma to radio every cycle
+  const tri = x => { const f = x - Math.floor(x); return f < 0.5 ? f * 2 : 2 - f * 2; };
+
   const start = performance.now();
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
   function frame(now) {
     if (w) {
       const t = (now - start) / 1000;
+      // held still for anyone who asked for less motion; the card keeps its
+      // colour and shape, it just stops travelling
+      const still = reduce.matches;
+      const phase = still ? 0.25 : t / SWEEP_SECS;
+      const tt = still ? 0 : t;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, w, h);
-      drawLane(0, h / 2, '#7ee0ff', HZ_A, t);
-      drawLane(h / 2, h / 2, '#e8a93a', HZ_B, t);
+      // the lower lane trails the upper one, so the card always shows two
+      // places on the spectrum at once rather than one doubled
+      drawLane(0, h / 2, tri(phase), SCROLL_A, tt, 0.95);
+      drawLane(h / 2, h / 2, tri(phase + 0.22), SCROLL_B, tt, 0.7);
     }
     requestAnimationFrame(frame);
   }
