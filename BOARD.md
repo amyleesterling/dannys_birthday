@@ -5,6 +5,115 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 party prep, Claude (camera and particles)**
+
+Big one: Danny does not stand in the beams anymore. Amy flagged that four
+converging beams on a passive standing figure read as an execution no
+matter how soft the beams themselves got, and separately said the hair
+catching fire was a figure of speech, not a spec, so I pulled the whole
+fire system out of `danny.js`. The beams now hit `buildJacket()`, a white
+sheet cut to a jacket on a hanger, in `index.html`. Danny shows up between
+rounds instead: the jacket fades out, he fades in centered, and dances
+through the rest of the result phase with a live countdown to the next
+round on top of him.
+
+Amy sent eight Meshy exports total across two asks; `danny_bow.glb`,
+`_jump.glb`, `_pop.glb`, `_funny.glb`, `_gangnam.glb` are the five new ones
+(the backflip, heart gesture and cardio dance were already in from before).
+They play by round number now, ordered calmest to wildest, not at random.
+Cherish Pop Dance runs 15.7 seconds on its own, which is longer than the
+6 to 8 second round it would be bridging, so there is now a hard cap on the
+interlude (`MAX_INTERLUDE`) and a `cutCelebration()` that fades a dance out
+early if the round moves on before it finishes.
+
+Also shrank `roundTime()` to the requested 6 to 8 seconds (was up to 12).
+
+**Still open: a global leaderboard for the party.** This is a static site
+with no backend, so a real one needs some external store reachable by
+plain `fetch()`. I could not provision one myself. Whoever picks this up:
+either get Amy an account/API key on something (Supabase, Firebase,
+JSONBin) or get her explicit sign-off on a specific keyless service
+(kvdb.io and similar let you create an anonymous bucket with one HTTP
+call, no login) before wiring it in. Do not create third-party resources
+on her behalf without that.
+
+---
+
+**2026-08-28 night, Claude (camera and particles)**
+
+Heads up: PR #1 merged while I was still mid session on this branch. It only
+caught the first commit. Everything after that (the emitter art, the trace
+compound art, the two new Danny animations) sat unmerged on the branch until
+I noticed, rebased it onto main, and opened PR #2 for it. If you see commits
+on this branch that do not seem to be in main, that is why, check the PR
+before assuming something is live.
+
+Also added two waving lines under the EM spectrum bar and a photon energy
+reading, and found a real bug doing it: the wave canvas measured its own
+size once, synchronously, while the spectrum panel was still display:none
+(the game's first frame is what makes it visible, one frame later), so it
+sat at 0 by 0 forever and drew nothing, silently, no error. A full page
+screenshot did not show anything obviously wrong, the missing curves just
+did not draw. Only caught it by screenshotting the canvas element alone and
+diffing two of them. Fixed with a ResizeObserver instead of a one shot
+measurement.
+
+---
+
+**2026-08-28 latest, Claude (camera and particles)**
+
+Amy sent a zip of five fresh Meshy exports for Danny. Backflip and Walking
+were byte-identical to what we already had (checked duration, track and
+sampler counts, not just file size), so only Big Heart Gesture and Cardio
+Dance were new. Both are in now as `danny_heart.glb` and `danny_dance.glb`,
+same extraction pipeline as the backflip. A round clear picks randomly among
+whichever one-shot moves have loaded rather than it always being the
+backflip. Left the zip's Running clip out: the walk cycle is hardcoded by
+name all through `danny.js` rather than sitting behind a swappable slot, so
+using it is a small refactor of its own, not a drop-in. Say the word if you
+want it (a run-in as the fire gets more urgent seems like the obvious use).
+
+Wiring in a second and third one-shot surfaced a real bug, not an asset
+problem: the render loop's requestAnimationFrame and its setInterval
+fallback (for embedded webviews that throttle rAF to nothing) can race and
+hand `update()` a negative dt. Three.js reads a negative dt landing at time
+0 as "reached the start while playing backwards" and fires the one-shot's
+finished event immediately, so it freezes on frame one forever, convinced
+it already played. The backflip apparently never got unlucky enough to hit
+it in production; the two new ones hit it every single time I drove them
+programmatically. Clamped dt to never go below 0 in `step()`, the one place
+both loops feed it in.
+
+---
+
+**2026-08-28 even later, Claude (camera and particles)**
+
+Amy also handed over a render for the trace compound, the one flagged
+particle worth chasing (rare, 400 points, its own pulsing halo already).
+It was a plain red dot same as everything else; it is `games/dust-off/trace.png`
+now, drawn at the same spot the halo already breathes around. The five
+common types stay plain dots on purpose, only the rare one gets the
+real art, so it earns the second look it is supposed to get.
+
+---
+
+**2026-08-28 later, Claude (camera and particles)**
+
+Amy handed over a render of a wall mount camera for where Dust Off's beams
+originate, so the four outlet housings are that now instead of a flat teal
+wedge: `games/dust-off/emitter.png`, cropped from her render, drawn nose
+first so the lens lands on the emitter's own (x, y), which is already where
+the beam code puts the beam's origin. A right wall emitter is the same
+sprite mirrored around that point, so one asset covers all four.
+
+`emitter-hot.png` is the same render with the lens glow rechannelled from
+blue to red, swapped in while an emitter is locked out cooling down. First
+try was additive red light on top of the stock art. A saturated blue glow
+barely shifts under additive red, so overheat kept reading as blue no
+matter how hard it pulsed. Recoloring the actual pixels was the fix.
+
+---
+
 **2026-08-28, Claude (camera and particles)**
 
 Dust Off's screen shake was already there in name, a `shake` variable that
