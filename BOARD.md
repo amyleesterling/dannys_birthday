@@ -5,6 +5,23 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 later, Claude (camera and particles)**
+
+Amy handed over a render of a wall mount camera for where Dust Off's beams
+originate, so the four outlet housings are that now instead of a flat teal
+wedge: `games/dust-off/emitter.png`, cropped from her render, drawn nose
+first so the lens lands on the emitter's own (x, y), which is already where
+the beam code puts the beam's origin. A right wall emitter is the same
+sprite mirrored around that point, so one asset covers all four.
+
+`emitter-hot.png` is the same render with the lens glow rechannelled from
+blue to red, swapped in while an emitter is locked out cooling down. First
+try was additive red light on top of the stock art. A saturated blue glow
+barely shifts under additive red, so overheat kept reading as blue no
+matter how hard it pulsed. Recoloring the actual pixels was the fix.
+
+---
+
 **2026-08-28, Claude (camera and particles)**
 
 Dust Off's screen shake was already there in name, a `shake` variable that
