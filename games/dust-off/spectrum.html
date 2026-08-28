@@ -52,15 +52,17 @@
   .specwavebox .lane-tag.b { top: auto; bottom: 8px; color: #e8a93a; }
   .specwavenote { font-size: 11.5px; color: #5c6b7a; margin: 6px 0 26px; }
 
+  /* the bar always fills the viewport now, radio to gamma in one screen with
+     no scrolling required; .specscroll is kept as a harmless no-op wrapper
+     in case a future band count ever needs it back */
   .specscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .specscroll > .specbar, .specscroll > .specticks { min-width: 640px; }
 
   .specbar {
     position: relative; height: 40px; margin: 0 0 4px;
     border: 1px solid rgba(196,228,255,.18); background: #05070c;
     touch-action: none; cursor: pointer;
   }
-  .specband { position: absolute; top: 0; bottom: 0; pointer-events: none; }
+  .specband { position: absolute; top: 0; bottom: 0; pointer-events: none; overflow: hidden; }
   .specband span {
     position: absolute; left: 5px; top: 50%; transform: translateY(-50%);
     font-size: 11px; letter-spacing: .06em; color: rgba(239,244,251,.8); white-space: nowrap;
@@ -191,7 +193,7 @@
 
   const BANDS = [
     { lo: 1e4, hi: 3e8, name: 'radio', col: 'rgba(74,150,224,.22)' },
-    { lo: 3e8, hi: 3e11, name: 'microwave', col: 'rgba(74,200,224,.20)' },
+    { lo: 3e8, hi: 3e11, name: 'microwave', short: 'MW', col: 'rgba(74,200,224,.20)' },
     { lo: 3e11, hi: VIS_LO, name: 'infrared', col: 'rgba(196,96,64,.20)' },
     { lo: VIS_LO, hi: VIS_HI, name: 'visible', col: 'rgba(255,255,255,.6)' },
     { lo: VIS_HI, hi: 3e16, name: 'UV', col: 'rgba(138,96,230,.24)' },
@@ -249,14 +251,23 @@
       el.style.left = (toX(b.lo) * 100) + '%';
       el.style.width = ((toX(b.hi) - toX(b.lo)) * 100) + '%';
       el.style.background = b.col;
-      if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + b.name + '</span>';
+      if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + (b.short || b.name) + '</span>';
       barEl.insertBefore(el, barEl.firstChild);
     }
   }
   function paintTicks(ticksEl) {
-    for (let d = F0; d <= F1; d += 2) {
+    // fewer ticks on a narrow screen: nine decade labels shoulder to
+    // shoulder is what used to force this bar into a horizontal scroll in
+    // the first place, and the whole point now is that it never needs one
+    const step = ticksEl.getBoundingClientRect().width < 480 ? 4 : 2;
+    for (let d = F0; d <= F1; d += step) {
       const i = document.createElement('i');
       i.style.left = ((d - F0) / (F1 - F0) * 100) + '%';
+      // every tick label is centred on its position except the two on the
+      // very edge, which would otherwise overhang the bar by half their own
+      // width and force a scrollbar back in for a few stray pixels
+      if (d === F0) i.style.transform = 'translateX(0)';
+      else if (d === F1) i.style.transform = 'translateX(-100%)';
       i.innerHTML = freq(Math.pow(10, d));
       ticksEl.appendChild(i);
     }
