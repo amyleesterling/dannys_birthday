@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the patent works</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #04070a; color: #cfe6e6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  .gamebar {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px; border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+
+  .wrap { max-width: 700px; margin: 0 auto; padding: 26px 20px 60px; }
+  h1 { font-size: 22px; color: #7ee0ff; margin: 0 0 6px; font-weight: 600; }
+  .sub { font-size: 13.5px; color: #9aa2b1; margin: 0 0 30px; }
+  h2 {
+    font-size: 13px; letter-spacing: .12em; color: #6c7c8c;
+    margin: 34px 0 12px; font-weight: 600;
+  }
+  h2:first-of-type { margin-top: 0; }
+  p { font-size: 14.5px; line-height: 1.65; color: #cfe6e6; margin: 0 0 14px; }
+  p.dim { color: #9aa2b1; font-size: 13.5px; }
+  .formula {
+    font-size: 13.5px; color: #7ee0ff; background: #0a0e12;
+    border: 1px solid rgba(196,228,255,.16); padding: 10px 14px; margin: 0 0 16px;
+  }
+  a.inline { color: #7ee0ff; border-bottom: 1px solid rgba(126,224,255,.4); text-decoration: none; }
+  a.inline:hover { border-bottom-color: #7ee0ff; }
+  .patcite {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(196,228,255,.14);
+    font-size: 13px; color: #9aa2b1;
+  }
+  .backrow { margin-top: 34px; }
+  .backrow a {
+    display: inline-block; font-size: 13px; letter-spacing: .1em; color: #7ee0ff;
+    border: 1px solid rgba(126,224,255,.4); padding: 10px 18px; text-decoration: none;
+  }
+  .backrow a:hover { border-color: #7ee0ff; }
+</style>
+</head>
+<body>
+<header class="gamebar holopanel" style="--bar-accent: 126 224 255;">
+  <a class="gamebar-back" href="index.html">← DUST OFF</a>
+  <span class="gamebar-name">HOW THE PATENT WORKS</span>
+</header>
+<div class="wrap">
+  <h1>Find it first, then blast only that</h1>
+  <p class="sub">US 9,134,205 B2, system and method for removing surface particles from an object.</p>
+
+  <h2>THE REAL PATENT</h2>
+  <p>
+    The clever part is not the jet, it is the looking. An image sensor scans the surface,
+    a person, a piece of luggage, whatever, across infrared, visible and ultraviolet light,
+    watching for particles whose spectral signature matches something worth finding:
+    explosive residue, a biological agent, anything with its own optical fingerprint.
+  </p>
+  <p>
+    Only once something is flagged does a steering mechanism aim a fluid jet, gas or
+    liquid, continuous or pulsed, at that exact spot to knock it loose. Whatever comes off
+    is captured and run through mass spectrometry or similar analysis to confirm what it
+    actually was. Everything else on the surface is left alone. The system spends its force
+    on the one particle it already suspects, not on a general sweep.
+  </p>
+
+  <h2>WHAT THE GAME KEEPS</h2>
+  <p>
+    The detect-then-remove shape of it: a mixed field of particles where only some types are
+    worth anything, a scoring split between what you dislodged and what you actually
+    recovered, and an analysis line reporting what the last thing captured turned out to be,
+    the same role the patent's mass spectrometer plays.
+  </p>
+
+  <h2>WHERE THE GAME DIVERGES</h2>
+  <p>
+    The real device uses a fluid jet, not a beam of light. Dust Off moved it up the spectrum
+    to lasers because a beam you can see and aim reads better on a screen than a puff of gas,
+    and the site already had an <a class="inline" href="spectrum.html">EM spectrum</a> to hang
+    that joke on.
+  </p>
+  <p>
+    More importantly, the patent's whole point is that a person does not have to aim it: the
+    sensor spots the target and the jet follows automatically. The game hands you that job
+    instead and puts a clock on it, because watching an algorithm work is not a game, doing
+    its job under pressure is.
+  </p>
+
+  <p class="patcite">
+    <a class="inline" href="https://patents.google.com/patent/US9134205B2/en" target="_blank" rel="noopener">
+      US 9,134,205 B2</a> &middot; Hillis, Hyde, Kare, Ishikawa, Wood &middot; Elwha LLC,
+    granted 15 September 2015.
+  </p>
+  <div class="backrow"><a href="index.html">← BACK TO DUST OFF</a></div>
+</div>
+</body>
+</html>

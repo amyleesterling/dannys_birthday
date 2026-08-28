@@ -104,12 +104,22 @@
   .specmeta { font-size: 12.5px; color: #9aa2b1; margin-top: 4px; }
   .u { text-transform: none; }   /* a unit symbol must never sit inside text-transform: uppercase */
 
-  .specpresets { display: flex; flex-wrap: wrap; gap: 7px; }
+  .specpresets { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 34px; }
   .specpresets button {
     font: inherit; font-size: 12.5px; cursor: pointer; background: none; color: #9aa2b1;
     border: 1px solid rgba(196,228,255,.14); padding: 8px 10px;
   }
   .specpresets button:hover { color: #7ee0ff; border-color: rgba(126,224,255,.5); }
+
+  /* for scale: an apple sitting in the beam for a minute, band by band */
+  .specmark.apple { background: #ff6b5e; color: #ff6b5e; }
+  .applerow { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+  .applecanvas { width: 128px; height: 128px; flex: 0 0 auto; background: #05070c;
+                 border: 1px solid rgba(196,228,255,.14); }
+  .appletext { flex: 1 1 220px; min-width: 220px; }
+  .appleverdict { font-size: 17px; color: #eff4fb; margin-bottom: 5px; }
+  .applenote { font-size: 13px; color: #9aa2b1; line-height: 1.55; }
+  .applecaveat { font-size: 11.5px; color: #5c6b7a; margin: 10px 0 0; }
 </style>
 </head>
 <body>
@@ -151,6 +161,25 @@
   </div>
 
   <div class="specpresets" id="specPresets"></div>
+
+  <p class="cap">For scale, one minute of exposure:</p>
+  <div class="specscroll">
+    <div class="specbar" id="appleBar">
+      <div class="specmark apple" id="markApple" tabindex="0" role="slider" aria-label="Exposure frequency on an apple"></div>
+    </div>
+    <div class="specticks" id="appleTicks"></div>
+  </div>
+  <div class="applerow">
+    <canvas class="applecanvas" id="appleCanvas" width="256" height="256"></canvas>
+    <div class="appletext">
+      <div class="appleverdict" id="appleVerdict"></div>
+      <div class="applenote" id="appleNote"></div>
+    </div>
+  </div>
+  <p class="applecaveat">
+    Illustrative, not a dose calculation: real damage is about total energy absorbed, not
+    just the photon's frequency. The ranking, harmless to harmful as you go right, is real.
+  </p>
 </div>
 <script>
 // Every figure here is derived from the two marker positions, so the readouts
@@ -213,22 +242,27 @@
     return String(Math.round(r));
   }
 
-  for (const b of BANDS) {
-    const el = document.createElement('div');
-    el.className = 'specband';
-    el.style.left = (toX(b.lo) * 100) + '%';
-    el.style.width = ((toX(b.hi) - toX(b.lo)) * 100) + '%';
-    el.style.background = b.col;
-    if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + b.name + '</span>';
-    bar.insertBefore(el, bar.firstChild);
+  function paintBands(barEl) {
+    for (const b of BANDS) {
+      const el = document.createElement('div');
+      el.className = 'specband';
+      el.style.left = (toX(b.lo) * 100) + '%';
+      el.style.width = ((toX(b.hi) - toX(b.lo)) * 100) + '%';
+      el.style.background = b.col;
+      if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + b.name + '</span>';
+      barEl.insertBefore(el, barEl.firstChild);
+    }
   }
-  const ticks = document.getElementById('specTicks');
-  for (let d = F0; d <= F1; d += 2) {
-    const i = document.createElement('i');
-    i.style.left = ((d - F0) / (F1 - F0) * 100) + '%';
-    i.innerHTML = freq(Math.pow(10, d));
-    ticks.appendChild(i);
+  function paintTicks(ticksEl) {
+    for (let d = F0; d <= F1; d += 2) {
+      const i = document.createElement('i');
+      i.style.left = ((d - F0) / (F1 - F0) * 100) + '%';
+      i.innerHTML = freq(Math.pow(10, d));
+      ticksEl.appendChild(i);
+    }
   }
+  paintBands(bar);
+  paintTicks(document.getElementById('specTicks'));
 
   function render() {
     mA.style.left = (toX(fA) * 100) + '%'; mA.dataset.tag = 'A';
@@ -304,11 +338,12 @@
   sizeWave();
   requestAnimationFrame(waveFrame);
 
-  function grab(el, host, set, get) {
+  function grab(el, host, set, get, paint) {
+    paint = paint || render;
     const move = (e) => {
       const r = host.getBoundingClientRect();
       set((e.clientX - r.left) / r.width, null);
-      render();
+      paint();
     };
     el.addEventListener('pointerdown', (e) => {
       e.preventDefault(); e.stopPropagation();
@@ -323,7 +358,7 @@
       e.preventDefault(); e.stopPropagation();
       const step = (e.shiftKey ? 0.5 : 0.1) * (e.key === 'ArrowRight' ? 1 : -1);
       set(null, Math.pow(10, Math.log10(get()) + step));
-      render();
+      paint();
     });
   }
   grab(mA, bar, (x, f) => { fA = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fA);
@@ -352,6 +387,143 @@
 
   render();
   addEventListener('resize', render);
+
+  // ---- for scale: an apple sitting in the beam for a minute --------------
+  // A photon's frequency alone does not decide the outcome, real damage is
+  // about total energy absorbed, but the ranking here (harmless at radio,
+  // ionizing by x-ray) is the real one, so it is a fair thing to show.
+  const appleBar = document.getElementById('appleBar');
+  const markApple = document.getElementById('markApple');
+  paintBands(appleBar);
+  paintTicks(document.getElementById('appleTicks'));
+  let fApple = 2.4e9;
+
+  const APPLE_STAGES = [
+    { hi: 3e8, verdict: 'Nothing happens', draw: 'plain',
+      note: 'Radio photons carry too little energy to do anything to a bond in the peel. They pass straight through.' },
+    { hi: 3e11, verdict: 'A little warm, at oven power', draw: 'warm',
+      note: 'Microwaves shake water molecules. That is how an oven cooks one in minutes; at the power a router puts out, a minute does nothing.' },
+    { hi: VIS_LO, verdict: 'Comfortably warm', draw: 'warm2',
+      note: 'Infrared is radiant heat, the same thing a campfire throws. A minute of it just warms the skin.' },
+    { hi: VIS_HI, verdict: 'Lit up, unharmed', draw: 'plain',
+      note: 'Visible light is what lets you see the apple at all. Each photon still carries too little energy to break anything.' },
+    { hi: 3e16, verdict: 'Sunburned', draw: 'burn',
+      note: 'UV starts breaking chemical bonds at the surface. A minute of strong UV is roughly what a peel gets in an afternoon at the beach.' },
+    { hi: 3e19, verdict: 'A dangerous dose', draw: 'xray',
+      note: 'X-rays are energetic enough to punch through to the core. A real minute at an intensity you could feel would be a medical emergency, for the apple and for whoever is holding it.' },
+    { hi: 1e20, verdict: 'Destroyed', draw: 'char',
+      note: 'Gamma rays ionize all the way through. A minute at a dose strong enough to see here would cook it from the inside out.' },
+  ];
+  const appleStageFor = f => APPLE_STAGES.find(s => f < s.hi) || APPLE_STAGES[APPLE_STAGES.length - 1];
+
+  const appleCanvas = document.getElementById('appleCanvas');
+  const appleCtx = appleCanvas.getContext('2d');
+  const AW = appleCanvas.width, AH = appleCanvas.height;
+
+  function appleBody(ctx) {
+    const cx = AW / 2, cy = AH * 0.56, r = AW * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.9);
+    ctx.bezierCurveTo(cx + r * 1.15, cy - r * 1.35, cx + r * 1.3, cy + r * 0.6, cx, cy + r * 1.15);
+    ctx.bezierCurveTo(cx - r * 1.3, cy + r * 0.6, cx - r * 1.15, cy - r * 1.35, cx, cy - r * 0.9);
+    ctx.closePath();
+    return { cx, cy, r };
+  }
+
+  function drawApple(stage, t) {
+    appleCtx.clearRect(0, 0, AW, AH);
+    const { cx, cy, r } = appleBody(appleCtx);
+
+    if (stage.draw === 'xray') {
+      appleCtx.save();
+      appleCtx.globalAlpha = 0.22;
+      appleCtx.fillStyle = '#7ee0ff';
+      appleBody(appleCtx); appleCtx.fill();
+      appleCtx.restore();
+      appleCtx.strokeStyle = 'rgba(126,224,255,.8)';
+      appleCtx.lineWidth = 1.6;
+      appleBody(appleCtx); appleCtx.stroke();
+      appleCtx.fillStyle = 'rgba(226,240,255,.85)';
+      for (const [dx, dy] of [[-6,-4],[4,-8],[0,4],[8,2],[-8,6]]) {
+        appleCtx.beginPath(); appleCtx.ellipse(cx + dx * 1.6, cy + dy * 1.6, 3.4, 5.2, 0.3, 0, TAU); appleCtx.fill();
+      }
+      appleCtx.strokeStyle = 'rgba(126,224,255,.55)';
+      appleCtx.lineWidth = 1;
+      appleCtx.beginPath(); appleCtx.moveTo(cx, cy - r * 0.9); appleCtx.lineTo(cx, cy + r * 0.5); appleCtx.stroke();
+    } else if (stage.draw === 'char') {
+      appleCtx.fillStyle = '#0c0908';
+      appleBody(appleCtx); appleCtx.fill();
+      appleCtx.strokeStyle = 'rgba(255,90,60,' + (0.35 + 0.25 * Math.sin(t * 6)) + ')';
+      appleCtx.lineWidth = 1.2;
+      for (const [x0,y0,x1,y1] of [[cx-r*0.5,cy-r*0.6,cx-r*0.1,cy+r*0.3],
+                                    [cx+r*0.2,cy-r*0.8,cx+r*0.5,cy],
+                                    [cx-r*0.2,cy+r*0.2,cx+r*0.3,cy+r*0.9]]) {
+        appleCtx.beginPath(); appleCtx.moveTo(x0, y0); appleCtx.lineTo(x1, y1); appleCtx.stroke();
+      }
+      appleCtx.fillStyle = 'rgba(140,150,155,.25)';
+      for (let i = 0; i < 5; i++) {
+        const yy = cy - r * 1.2 - i * 8 - (t * 20 % 24);
+        appleCtx.beginPath(); appleCtx.ellipse(cx + Math.sin(t * 2 + i) * 8, yy, 3, 6, 0, 0, TAU); appleCtx.fill();
+      }
+    } else {
+      const base = stage.draw === 'burn' ? '#a5502e' : '#d33b3b';
+      appleCtx.fillStyle = base;
+      appleBody(appleCtx); appleCtx.fill();
+
+      if (stage.draw === 'warm' || stage.draw === 'warm2') {
+        const g = appleCtx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r * 1.3);
+        const a = stage.draw === 'warm2' ? 0.34 : 0.16;
+        g.addColorStop(0, 'rgba(255,150,60,' + (a + Math.sin(t * 3) * 0.04) + ')');
+        g.addColorStop(1, 'rgba(255,150,60,0)');
+        appleCtx.fillStyle = g;
+        appleBody(appleCtx); appleCtx.fill();
+      }
+      if (stage.draw === 'burn') {
+        appleCtx.fillStyle = 'rgba(70,30,15,.55)';
+        for (const [dx, dy, rr] of [[-10,-6,9],[9,-10,7],[3,10,8],[-8,9,6]]) {
+          appleCtx.beginPath(); appleCtx.ellipse(cx + dx, cy + dy, rr, rr * 0.7, 0.4, 0, TAU); appleCtx.fill();
+        }
+      }
+      // a small highlight so it still reads as an apple, not a ball
+      appleCtx.fillStyle = 'rgba(255,255,255,.28)';
+      appleCtx.beginPath(); appleCtx.ellipse(cx - r * 0.4, cy - r * 0.5, r * 0.18, r * 0.28, -0.5, 0, TAU); appleCtx.fill();
+    }
+
+    // stem and leaf, on every stage but the charred one
+    if (stage.draw !== 'char') {
+      appleCtx.strokeStyle = '#6b4a2c';
+      appleCtx.lineWidth = 3;
+      appleCtx.beginPath(); appleCtx.moveTo(cx, cy - r * 0.9); appleCtx.lineTo(cx + 3, cy - r * 1.25); appleCtx.stroke();
+      appleCtx.fillStyle = stage.draw === 'burn' ? '#5e6b3a' : '#4caf50';
+      appleCtx.beginPath();
+      appleCtx.ellipse(cx + 12, cy - r * 1.18, 9, 5, -0.6, 0, TAU);
+      appleCtx.fill();
+    }
+  }
+
+  function renderApple() {
+    markApple.style.left = (toX(fApple) * 100) + '%';
+    const stage = appleStageFor(fApple);
+    appleVerdict.textContent = stage.verdict;
+    appleNote.textContent = stage.note;
+    markApple.setAttribute('aria-valuetext', freq(fApple).replace(/<[^>]+>/g, ''));
+  }
+  const appleStart = performance.now();
+  function appleFrame(now) {
+    drawApple(appleStageFor(fApple), (now - appleStart) / 1000);
+    requestAnimationFrame(appleFrame);
+  }
+  grab(markApple, appleBar,
+       (x, f) => { fApple = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fApple,
+       renderApple);
+  appleBar.addEventListener('pointerdown', (e) => {
+    const r = appleBar.getBoundingClientRect();
+    fApple = toF((e.clientX - r.left) / r.width);
+    renderApple();
+  });
+
+  renderApple();
+  requestAnimationFrame(appleFrame);
 })();
 </script>
 </body>

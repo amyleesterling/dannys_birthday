@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the patent works</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #07040a; color: #e2e6e4;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  .gamebar {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px; border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+
+  .wrap { max-width: 700px; margin: 0 auto; padding: 26px 20px 60px; }
+  h1 { font-size: 22px; color: #ff6b78; margin: 0 0 6px; font-weight: 600; }
+  .sub { font-size: 13.5px; color: #9aa2b1; margin: 0 0 30px; }
+  h2 {
+    font-size: 13px; letter-spacing: .12em; color: #6c7c8c;
+    margin: 34px 0 12px; font-weight: 600;
+  }
+  h2:first-of-type { margin-top: 0; }
+  p { font-size: 14.5px; line-height: 1.65; color: #e2e6e4; margin: 0 0 14px; }
+  ul { margin: 0 0 14px; padding-left: 20px; }
+  li { font-size: 14.5px; line-height: 1.65; color: #e2e6e4; margin: 0 0 6px; }
+  a.inline { color: #ff8a92; border-bottom: 1px solid rgba(255,107,120,.4); text-decoration: none; }
+  a.inline:hover { border-bottom-color: #ff8a92; }
+  .patcite {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(196,228,255,.14);
+    font-size: 13px; color: #9aa2b1;
+  }
+  .backrow { margin-top: 34px; }
+  .backrow a {
+    display: inline-block; font-size: 13px; letter-spacing: .1em; color: #ff8a92;
+    border: 1px solid rgba(255,107,120,.4); padding: 10px 18px; text-decoration: none;
+  }
+  .backrow a:hover { border-color: #ff8a92; }
+</style>
+</head>
+<body>
+<header class="gamebar holopanel" style="--bar-accent: 255 107 120;">
+  <a class="gamebar-back" href="index.html">← LUMEN</a>
+  <span class="gamebar-name">HOW THE PATENT WORKS</span>
+</header>
+<div class="wrap">
+  <h1>Sense it, decide, treat it, no one steering</h1>
+  <p class="sub">US 7,857,767 B2, lumen traveling device.</p>
+
+  <h2>THE REAL PATENT</h2>
+  <p>
+    A self propelling microdevice built to ride inside a body lumen: a blood vessel, the
+    digestive tract, wherever it is sent. Small rotating wheels, turned by an onboard motor,
+    grip the lumen wall by friction, which is what lets it crawl against a current instead
+    of just drifting with one. Other versions in the patent swap the wheels for an
+    expanding and contracting structure or magnetic actuation, but wheels are the one the
+    game borrows.
+  </p>
+  <p>
+    An onboard sensor watches for what the patent calls, in its own words, a condition of
+    interest, a lesion, plaque, whatever the device is built to find. When it fires, response
+    initiation circuitry decides whether to act, and if it does, an active portion carries
+    out the treatment. The patent lists a whole menu for that part, not just one option:
+  </p>
+  <ul>
+    <li>heating or cooling elements, for thermal treatment</li>
+    <li>a laser or UV source</li>
+    <li>ultrasound</li>
+    <li>a drug reservoir</li>
+    <li>a small cutting or scraping tool</li>
+  </ul>
+  <p>
+    The whole thing is a closed loop by design: sense, decide, treat, with nobody driving it
+    moment to moment.
+  </p>
+
+  <h2>WHAT THE GAME KEEPS</h2>
+  <p>
+    Wheels gripping the vessel wall against the current, which is exactly what anchoring in
+    the game is standing in for. A sensor bearing that leads you to the condition of
+    interest. And one of the patent's own listed treatments, heat, doing the actual work
+    once the device gets there.
+  </p>
+
+  <h2>WHERE THE GAME DIVERGES</h2>
+  <p>
+    In the patent this is autonomous: the sensor finds it, the circuitry decides, the active
+    portion fires, no operator in the loop at all. The game hands all three of those jobs to
+    you, sensing, deciding and steering, which is why the title card calls you the motion
+    control circuitry. Burning used to need a held button too, but that button never existed
+    in the patent, so it is gone now: the device treats a lesion the moment it is close
+    enough, same as the real closed loop would, and anchoring is only there to help you hold
+    position against the current while it does.
+  </p>
+
+  <p class="patcite">
+    <a class="inline" href="https://patents.google.com/patent/US7857767B2/en" target="_blank" rel="noopener">
+      US 7,857,767 B2</a> &middot; Ferren, Hillis, Hyde, Ishikawa, Jung, Leuthardt, Myhrvold,
+    Sweeney, Tegreene, Wood, Wood &middot; Gearbox LLC, granted 28 December 2010.
+  </p>
+  <div class="backrow"><a href="index.html">← BACK TO LUMEN</a></div>
+</div>
+</body>
+</html>

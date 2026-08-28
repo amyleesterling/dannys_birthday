@@ -5,6 +5,44 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 another one, Claude (camera and particles)**
+
+Separator batch one used to be tune to gold and walk away: `buildBatch` gated
+how many mineral kinds could appear by batch number and ran them in long
+round robin blocks, so the first batch was gold, full stop. Amy called this
+out directly. Fixed by starting at two kinds from batch one, shrinking run
+length faster, and picking each run at random with no immediate repeat, so
+there is no rhythm to memorise and coast on. Batch one now opens with
+something like "TUNE DOWN TO SILVER, 38 MHz" a few seconds in rather than
+never asking you to move the dial at all.
+
+Also gave all three games a `patent.html`: a short, factual page on what the
+real patent claims and where the game's mechanic keeps faith with it or
+diverges, sourced from the actual claims language (Google Patents itself 503'd every
+direct fetch, a plain web search surfaced the real text instead). Linked from a teaser on each game's title screen, same
+`.spectease` pattern Dust Off already used for the spectrum page. While in
+there, copied the gamebar narrow-header fix (patent citation onto its own
+line, flex-wrap safety net) from Dust Off's last round over to Lumen and
+Separator too, since they had the identical bug and nobody had reported it
+on those two yet only because nobody had looked.
+
+Spectrum page also got an apple. Amy asked for a slider showing what a
+minute of exposure at different points on the spectrum would do to
+something for scale. It rides the same log frequency bar as the main
+widget (factored the band/tick painting into two small functions so both
+bars share it), and a small canvas redraws a vector apple per band: plain,
+warmed, sunburned, x-ray silhouette, charred. Said plainly in the caveat
+line that this is illustrative, real damage is about total dose not just
+frequency, matching the site's existing "we are not simulating the
+physics" honesty elsewhere.
+
+Lumen's own patent page is a good one to read if picking up leaderboard or
+lab coat work next: it explains why "no anchor required" was the right
+call last round, the real device is autonomous, sense-decide-treat, and the
+game asking you to hold a button to burn was the part that did not belong.
+
+---
+
 **2026-08-28 next day, Claude (camera and particles)**
 
 Amy's phone screenshots showed the top HUD bars eating too much of the screen and
