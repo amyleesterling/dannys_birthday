@@ -112,6 +112,16 @@
   .spectease .s { font-size: 12px; color: #8b98a8; margin-top: 3px; }
   .spectease .go { font-size: 18px; color: #7ee0ff; }
   #spectrum .in { display: flex; flex-direction: column; gap: 8px; }
+  #hero {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+    display: none; padding: 20px 20px 0;
+  }
+  body[data-state="title"] #hero { display: block; }
+  #hero .in { max-width: 720px; margin: 0 auto; }
+  #hero img {
+    display: block; width: 100%; height: auto;
+    border: 1px solid rgba(196,228,255,.18);
+  }
   .wavepeek {
     display: block; height: 60px; border: 1px solid rgba(196,228,255,.18);
     background: rgba(4,7,10,.9); overflow: hidden;
@@ -129,6 +139,9 @@
   <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
 </header>
 <div class="stage"><canvas id="c"></canvas>
+<section id="hero"><div class="in">
+  <img src="theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose.">
+</div></section>
 <section id="spectrum"><div class="in">
   <a class="wavepeek" href="spectrum.html" aria-label="Explore the EM spectrum"><canvas id="wavePeek"></canvas></a>
   <a class="spectease" href="patent.html">
@@ -1627,7 +1640,7 @@ function wrapToWidth(text, maxW, font) {
   return out;
 }
 
-function card(title, titleColor, sub, lines, button, accent) {
+function card(title, titleColor, sub, lines, button, accent, opts) {
   const c = L.ch;
   ctx.fillStyle = OVERLAY;
   ctx.fillRect(c.x, 0, c.w, H);
@@ -1649,16 +1662,21 @@ function card(title, titleColor, sub, lines, button, accent) {
 
   const bw = Math.min(c.w * 0.72, 280 * k), bh = 56 * k;
   const block = 46 * k + 26 * k + bh + 44 * k + wrapped.length * 24 * k;
-  // the title screen carries the spectrum panel below it, so it sits high
-  // rather than centred
-  let y = (title === 'DUST OFF' ? 34 * k : Math.max(40 * k, (H - block) / 2)) + 34 * k;
+  // topY lets a caller reserve room above the card for something drawn
+  // outside the canvas entirely (the Dust Off title screen's hero banner);
+  // everything else still centres in the middle of the stage as before
+  let y = (opts && opts.topY != null ? opts.topY : Math.max(40 * k, (H - block) / 2)) + 34 * k;
 
-  const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
-  put(title, y, tSize, titleColor, '600'); y += 24 * k;
-  for (const sl of wrapToWidth(sub, maxW, (13 * k) + mono)) {
-    put(sl, y, 13, COL.dim); y += 19 * k;
+  if (title) {
+    const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
+    put(title, y, tSize, titleColor, '600'); y += 24 * k;
   }
-  y += 12 * k;
+  if (sub) {
+    for (const sl of wrapToWidth(sub, maxW, (13 * k) + mono)) {
+      put(sl, y, 13, COL.dim); y += 19 * k;
+    }
+    y += 12 * k;
+  }
 
   const bx = c.cx - bw / 2;
   const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
@@ -1676,10 +1694,15 @@ function card(title, titleColor, sub, lines, button, accent) {
 }
 
 function drawTitle() {
-  card('DUST OFF', COL.teal,
+  // the hero banner above the canvas already carries the name, the pitch
+  // and the aim/cross/clean/score legend, so the card underneath only adds
+  // the one line the banner doesn't (the patent connection) and the button,
+  // reserving enough top space for the banner's own responsive height
+  const bannerW = Math.min(720, W - 40);
+  const bannerH = bannerW * (533 / 1600);
+  card('', COL.teal,
     'Radiofrequency particle separator, except up the spectrum bc we are using light beams.',
-    ['Sweep every particle into the intake before the clock runs out.'],
-    'PLAY NOW', COL.teal);
+    [], 'PLAY NOW', COL.teal, { topY: 20 + bannerH + 26 });
 }
 
 function drawOver() {
