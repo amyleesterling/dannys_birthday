@@ -5,6 +5,57 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 dust off has an ending now, Claude (camera and particles)**
+
+Amy sent a trophy render, "One With The Lasers", and Dust Off finally has
+the round 10 win state that was only ever a plan on this board before.
+Clearing round 10 now ends the run in a genuine win screen (`state ===
+'won'`, its own `drawWon()`, the trophy shown as an HTML overlay above the
+canvas the same way the title screen's hero banner already works) instead
+of quietly continuing to round 11 forever. Missing round 10 does not end
+the run early either; it just holds you at round 10 for another attempt
+rather than advancing past the last round that exists, same as any other
+miss counting toward the usual three.
+
+The trophy asset itself needed real cleanup first, and not the kind I
+expected. It came in RGB with no alpha, which I have seen before (the
+first hbdanny.com logo was the same), so I reached for the same
+border-seeded flood fill. That cleared the outer background fine but left
+a visible checkerboard patch inside the portal ring, since that area is
+enclosed by the ring geometry and never touches the border seeds. Turned
+out the checkerboard itself is real baked-in pixel content (two near-white
+tones a few units apart, not a transparency indicator my tools were
+rendering), sitting right at the edge of the flood fill's tolerance, so it
+bridged in some places and not others depending on exactly which two
+neighbouring cells got compared. A global near-white desaturation
+threshold caught all of it but also ate into genuine bright specular
+highlights on the crystal, giving the whole trophy a shattered look. What
+actually worked: run that same threshold, then keep only the LARGE
+connected components of it (`cv2.connectedComponentsWithStats`, area >
+1500px) and discard the small ones. The real background and the enclosed
+hole are both big contiguous blobs; individual glints on the crystal are
+small isolated ones. That distinction is what a pure color threshold
+can't make and connected-component filtering can.
+
+Also found and fixed a title sizing issue while building this: `card()`'s
+heading font size is chosen from a fixed formula off the string length,
+not measured and shrunk to fit like `fitCentered()` elsewhere does, so a
+long win title ("PART OF THE HILLIS TEAM", 24 characters) rendered close
+to the container's full width on desktop. Shortened it to "HILLIS TEAM"
+and moved the fuller sentence into the sub line, which does wrap properly.
+Anyone adding another card() screen should keep titles in the 8-13
+character range the existing ones (SHIFT ENDED, BATCH CLEARED) already
+sit in, or measure it first.
+
+Also worth remembering: `document.body.dataset.state` only reflects the
+internal `state` variable once the game's own `step()` runs on a real
+animation frame; reading it synchronously right after a debug hook changes
+`state` will still show the stale value. Read the variable itself through
+the debug hook, not the DOM attribute, for anything that needs to be exact.
+
+
+---
+
 **2026-08-28 dust off banner, Claude (camera and particles)**
 
 Amy sent a per game theme banner too (title, tagline, and the aim/cross/
