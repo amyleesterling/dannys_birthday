@@ -5,6 +5,57 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 next day, Claude (camera and particles)**
+
+Amy's phone screenshots showed the top HUD bars eating too much of the screen and
+the gamebar header clipping RESTART/SOUND ON. Both were narrow-layout sizing
+bugs: `L.topH` was a flat 198px (clock at r:50) with no regard for how little
+vertical room a phone actually has, and the gamebar had five items in one
+`nowrap` row with no fallback, so past ~375px they just ran off the right edge.
+Shrunk `L.topH` to 140 and the clock to r:34, and gave the gamebar's patent
+citation its own line (`flex-basis:100%`) plus `flex-wrap` as a safety net so a
+row that still does not fit degrades to wrapping instead of clipping. Checked
+320/375/414px in a headless browser; nothing overflows the viewport at any of
+them.
+
+Also fixed Danny's sides getting cropped mid dance. The three.js camera's
+`VIEW` box was `left:-0.5, right:0.5`, tuned against the old standing pose;
+the wilder dances swing an arm past that. Reading back the actual rendered
+pixels (not `Box3.setFromObject`, which reports the static bind pose bounding
+box for a skinned mesh, not the deformed one, and had me chasing a phantom
+fix for an hour) confirmed real clipping on four of the eight dances at the
+old box. Widening left/right alone would have squashed the render, since an
+orthographic camera distorts unless its box keeps the same aspect as the
+340x833 canvas, so top/bottom doubled along with it. Six of the eight dances
+fit clean at that size; Cherish Pop Dance does not, its peak arm throw
+reaches almost 1.3 world units from center at some frames, further than any
+width worth giving the rest just for one clip. Dropped it out of rotation
+rather than shrink Danny for everyone else. Seven dances still climb bow to
+Gangnam.
+
+Lumen: Amy wants the device to destroy plaque automatically on arrival,
+no holding a button. It already had the right radius check (`l.inRange`),
+it was just gated behind `anchored`, which required holding space or the
+touch button. Dropped the gate; burning starts the moment the device is
+close enough, anchoring is now only for holding still against the current
+while it finishes, not a precondition for it to start at all.
+
+Gave Dust Off's landing page card a real thumbnail of Danny (mid dance,
+composited over a dark card background) instead of the patent-style line
+figure the other two still use. Rendered off Danny's own three.js canvas at
+`games/dust-off/thumb.png`.
+
+Also cut out the background from Amy's new "Play the Patents" logo (flat
+`#f5f5f5`, no alpha) with an OpenCV border-seeded flood fill rather than a
+global colour threshold, so it does not eat into the logo's own bright
+white highlights. Not wired into a page yet.
+
+Still open from last time: the lab coat progression (Amy is generating 9
+more to go with the level 1 one she already sent), the round 10 win state,
+and the leaderboard backend.
+
+---
+
 **2026-08-28 later still, Claude (camera and particles)**
 
 The EM spectrum bar, wave, visible-light zoom, readouts and presets moved

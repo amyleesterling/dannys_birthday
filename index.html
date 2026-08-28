@@ -70,6 +70,14 @@
   .fig .dot { fill: rgb(var(--accent) / .85); stroke: none; }
   .card:hover .fig { stroke: rgb(var(--accent)); }
 
+  /* Dust Off gets a real shot of Danny instead of the line figure: he is
+     the whole hook for that game now, between-round dances and all. */
+  .thumb {
+    display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover;
+    margin: 16px 0 4px; border: 1px solid rgb(var(--accent) / .25);
+  }
+  .card:hover .thumb { border-color: rgb(var(--accent) / .6); }
+
   .card .name { font-size: 26px; margin: 10px 0 6px; font-weight: 600; color: rgb(var(--accent)); }
   .card .tag { font-size: 14px; color: var(--dim); margin: 0 0 16px; }
   .card .body { font-size: 15px; color: var(--dim); margin: 0 0 22px; flex: 1; }
@@ -108,24 +116,7 @@
       <span class="holocard-trace"></span>
       <div class="pat">US 9,134,205 B2 &middot; 2015</div>
 
-      <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a subject in a chamber, four outlets, and a capture intake below">
-        <rect x="10" y="10" width="300" height="116"/>
-        <circle cx="160" cy="40" r="9"/>
-        <path d="M160 49 v32 M160 57 l-15 13 M160 57 l15 13 M160 81 l-11 24 M160 81 l11 24"/>
-        <rect x="22" y="28" width="15" height="12"/>
-        <rect x="22" y="54" width="15" height="12"/>
-        <rect x="283" y="28" width="15" height="12"/>
-        <rect x="283" y="54" width="15" height="12"/>
-        <path class="dash" d="M37 34 L160 66 M37 60 L160 66 M283 34 L160 66 M283 60 L160 66"/>
-        <circle class="dot" cx="139" cy="80" r="1.8"/>
-        <circle class="dot" cx="182" cy="86" r="1.8"/>
-        <circle class="dot" cx="147" cy="96" r="1.8"/>
-        <circle class="dot" cx="173" cy="99" r="1.8"/>
-        <rect x="120" y="108" width="80" height="9"/>
-        <path class="lead" d="M160 22 L196 22"/><text x="200" y="25">10</text>
-        <path class="lead" d="M37 28 L52 18"/><text x="56" y="21">20</text>
-        <path class="lead" d="M200 112 L232 112"/><text x="236" y="115">30</text>
-      </svg>
+      <img class="thumb" src="games/dust-off/thumb.png" alt="Danny mid dance, between rounds of Dust Off">
 
       <div class="name">Dust Off</div>
       <p class="tag">System and method for removing surface particles from an object</p>
@@ -236,8 +227,8 @@
       plant from this website, that is between you and your investors.
     </p>
     <p class="note">
-      The three figures above are drawn here, in the style of a patent sheet. They are not
-      the office drawings, and the numerals are ours. Follow the links for the real ones.
+      Lumen and Separator's figures are drawn here, in the style of a patent sheet. They are
+      not the office drawings, and the numerals are ours. Follow the links for the real ones.
     </p>
     <p class="note">
       They run on a phone, and they are happier still on a laptop with a trackpad.

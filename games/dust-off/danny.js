@@ -18,13 +18,27 @@ const W = 340, H = 833;        // offscreen sprite, portrait
 // numbers in its own body-local units to place the sprite. The 2D proxy runs
 // from local -99 at the crown to +86 at the soles for a model 1.7 tall, so one
 // world unit is 185 / 1.7 = 108.8 local units.
-const VIEW = { left: -0.5, right: 0.5, top: 2.35, bottom: -0.1 };
+// Wide enough for a gangnam-style arm swing, not just the idle stance: the
+// old +/-0.5 half-width was tuned against a standing pose and clipped the
+// wilder dances at the shoulders. Widening left/right alone would squash
+// the render (an orthographic camera distorts unless world aspect matches
+// the canvas's own, 340:833), so top/bottom grow by the same factor,
+// doubling the whole box. frame.wLocal/hLocal below scale with this box, so
+// the zoom-out does not change Danny's apparent size once composited, it
+// just adds headroom before his geometry leaves the frustum.
+const VIEW = { left: -1.0, right: 1.0, top: 4.7, bottom: -0.2 };
 const LOCAL_PER_WORLD = 185 / 1.7;
 
 // One of these plays between rounds, picked by round number so it escalates:
-// a bow the first time, working up to full Gangnam by round eight and every
+// a bow the first time, working up to full Gangnam by round seven and every
 // round after. Whichever of these hasn't finished loading yet is skipped.
-const CELEBRATIONS = ['bow', 'heart', 'flip', 'jump', 'dance', 'pop', 'funny', 'gangnam'];
+//
+// Cherish Pop Dance is not in this list on purpose: at its peak the throw
+// is wide enough that no frame short of shrinking Danny to a speck could
+// hold it without cropping (checked by reading back the rendered pixels
+// across the whole clip, at camera widths well past what any other dance
+// needs), and the seven-strong list already climbs from a bow to Gangnam.
+const CELEBRATIONS = ['bow', 'heart', 'flip', 'jump', 'dance', 'funny', 'gangnam'];
 
 class Danny {
   constructor() {
@@ -97,7 +111,6 @@ class Danny {
       this.loadExtra('danny_dance.glb', 'dance');
       this.loadExtra('danny_bow.glb', 'bow');
       this.loadExtra('danny_jump.glb', 'jump');
-      this.loadExtra('danny_pop.glb', 'pop');
       this.loadExtra('danny_funny.glb', 'funny');
       this.loadExtra('danny_gangnam.glb', 'gangnam');
     }, undefined, () => { this.ok = false; });   // no model, the game falls back
