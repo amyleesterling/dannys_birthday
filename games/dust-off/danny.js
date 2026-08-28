@@ -19,6 +19,12 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 const W = 340, H = 833;        // offscreen sprite, portrait
 const EMBERS = 460;
 
+// Until a real standing clip arrives, the idle is the walk cycle held at its
+// passing pose plus a little breathing. 0.889s is where the feet are closest
+// together: measured by stepping the clip and taking the narrowest silhouette
+// across the lower legs, 104px against 178px at the widest.
+const IDLE_POSE = 0.889;
+
 // The camera frames this slice of the world, and the game needs the same
 // numbers in its own body-local units to place the sprite. The 2D proxy runs
 // from local -99 at the crown to +86 at the soles for a model 1.7 tall, so one
@@ -50,7 +56,7 @@ class Danny {
     this.loaded = false;
     this.stage = 0;
     this.t = 0;
-    this.walkRate = 1;
+    this.motion = 'walk';
 
     // what the game needs in order to place the sprite, in its own local units
     this.frame = {
@@ -112,9 +118,8 @@ class Danny {
       if (gltf.animations && gltf.animations.length) {
         this.mixer = new THREE.AnimationMixer(this.model);
         this.walk = this.mixer.clipAction(gltf.animations[0]);
-        this.walk.timeScale = this.walkRate;
         this.walk.play();
-        this.mixer.addEventListener('finished', () => this.backToWalk());
+        this.mixer.addEventListener('finished', () => this.backToBase());
       }
       this.loaded = true;
       this.loadExtra('danny_backflip.glb', 'flip');
@@ -138,14 +143,17 @@ class Danny {
   celebrate() {
     if (!this.flip || this.playingOnce) return;
     this.playingOnce = true;
+    if (this.walk) { this.walk.paused = false; this.walk.fadeOut(0.12); }
+    if (this.idle) this.idle.fadeOut(0.12);
     this.flip.reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.12).play();
-    if (this.walk) this.walk.fadeOut(0.12);
   }
 
-  backToWalk() {
+  backToBase() {
     this.playingOnce = false;
     if (this.flip) this.flip.fadeOut(0.25);
-    if (this.walk) this.walk.reset().fadeIn(0.25).play();
+    const back = this.motion;
+    this.motion = null;
+    this.setMotion(back || 'walk');
   }
 
   buildFire() {
@@ -179,11 +187,26 @@ class Danny {
 
   stageName() { return STAGES[this.stage].name; }
 
-  // The game says what the subject is doing, so he walks in and then stands
-  // rather than marching on the spot through the whole round.
-  setGait(rate) {
-    this.walkRate = rate;
-    if (this.walk && !this.playingOnce) this.walk.timeScale = rate;
+  // The game says what the subject is doing. If a real idle clip has been
+  // loaded it is used; otherwise the walk is held at its passing pose, which
+  // beats marching on the spot at twelve per cent speed.
+  setMotion(name) {
+    if (this.motion === name || !this.walk) return;
+    this.motion = name;
+    if (name === 'idle') {
+      if (this.idle) {
+        this.walk.fadeOut(0.3);
+        this.idle.reset().setLoop(THREE.LoopRepeat, Infinity).fadeIn(0.3).play();
+      } else {
+        this.walk.paused = true;
+        this.walk.time = IDLE_POSE;
+      }
+    } else {
+      if (this.idle) this.idle.fadeOut(0.25);
+      this.walk.paused = false;
+      this.walk.timeScale = 1;
+      if (!this.playingOnce) this.walk.reset().fadeIn(0.25).play();
+    }
   }
 
   update(dt, turn) {
@@ -194,6 +217,19 @@ class Danny {
     if (this.mixer) this.mixer.update(dt);
     if (this.model) {
       this.model.rotation.y = Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
+      // a person standing still is not a still image
+      if (this.motion === 'idle' && !this.playingOnce) {
+        const b = Math.sin(this.t * 1.7);
+        this.model.position.y = b * 0.006;
+        if (!this.spine) {
+          this.model.traverse((o) => {
+            if (!this.spine && /^spine0?2$/i.test(o.name || '')) this.spine = o;
+          });
+        }
+        if (this.spine) this.spine.rotation.x += b * 0.02;
+      } else {
+        this.model.position.y = 0;
+      }
     }
 
     // the fire sits on the head bone, if the rig gave us one

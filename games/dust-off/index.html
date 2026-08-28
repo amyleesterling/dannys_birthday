@@ -662,7 +662,7 @@ function update(dt) {
   if (state !== 'play') {
     if (window.Danny && window.Danny.ok) {
       window.Danny.setRound(round || 1);
-      window.Danny.setGait(1);
+      window.Danny.setMotion('walk');
       window.Danny.update(dt, 0);
     }
     updateLoose(dt, 0.4);
@@ -686,7 +686,7 @@ function update(dt) {
   if (window.Danny && window.Danny.ok) {
     window.Danny.setRound(round);
     // walking while he moves, near still while he is being scanned
-    window.Danny.setGait(subject && subject.phase === 'scan' ? 0.12 : 1);
+    window.Danny.setMotion(subject && subject.phase === 'scan' ? 'idle' : 'walk');
     const hx = subject ? toScreen(subject, 0, 0).x : L.ch.cx;
     window.Danny.update(dt, clamp((pointer.x - hx) / 300, -0.8, 0.8));
   }
