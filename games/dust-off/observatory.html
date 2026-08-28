@@ -979,7 +979,10 @@ beam power      P = photons per second × energy per photon</pre>
       if (e.key === 'Escape') { closePicker(); ch.querySelector('button').focus(); }
       if (e.key === 'Enter') { const first = list.querySelector('button'); if (first) first.click(); }
     });
-    input.focus();
+    // autofocus only where a keyboard is already at hand; on a touch screen
+    // focusing here would throw the on-screen keyboard over the list, so the
+    // search box waits to be tapped
+    if (matchMedia('(pointer: fine)').matches) input.focus();
   }
   for (const [ch, m] of [[chA, 'a'], [chB, 'b']]) {
     ch.querySelector('button').addEventListener('click', () => {
