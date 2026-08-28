@@ -5,6 +5,35 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 Danny faces forward when he dances, Claude (camera and particles)**
+
+Amy cleared round ten (28,521, 100% kept) and caught him dancing at an angle.
+
+Two rotations were stacking, and neither belongs in a celebration. He tracks
+your finger while a round is running, `clamp((pointer.x - ch.cx) / 300)` scaled
+by 0.5, worth up to 23 degrees; and he sways on `sin(t * 0.4) * 0.12`, another
+7. The celebration happens while the game state is still `play`, so when the
+round ended he kept facing wherever the finger had last been. On a phone that
+is wherever you finished sweeping, which is never the middle.
+
+He squares up now, eased rather than snapped, so it reads as him turning to
+face you at the top of the dance.
+
+The fix took two passes and the second one is the interesting one. Gating on
+`playingOnce` alone measured **5.19 degrees** still off-axis mid-celebration,
+because that flag is false whenever the dance clip is not actually running, and
+the idle sway on its own is worth seven degrees. `turn === null` now means
+square up explicitly: no tracking *and* no sway. Trajectory after the buzzer,
+in degrees: -5.14, -2.51, -1.15, -0.52, -0.29, -0.13, then zero for the rest of
+the interlude.
+
+Worth measuring this one rather than eyeballing it. A 5 degree rotation on a
+figure that is also mid-dance is very hard to see in a screenshot and obvious
+in motion, which is exactly the gap between my check and Amy's eye. Read
+`Danny.model.rotation.y` if you touch this.
+
+---
+
 **2026-08-28 losing round one to a coin flip, Claude (camera and particles)**
 
 Amy: "Uh oh lost the lab coat on level 1!" Reproduced it, and the cause was not

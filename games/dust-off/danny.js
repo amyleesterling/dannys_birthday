@@ -180,7 +180,28 @@ class Danny {
     this.t += dt;
     if (this.mixer) this.mixer.update(dt);
     if (this.model) {
-      this.model.rotation.y = Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
+      // Two different jobs, two different facings.
+      //
+      // Most of the time he is a small bystander at the side of a round in
+      // progress, so he tracks your finger and sways a little, which reads as
+      // someone watching. But while a celebration is playing he *is* the thing
+      // on screen, and Amy caught him dancing round ten at an angle: the turn
+      // was still pointed at wherever her finger had last been when the round
+      // ended, plus up to 7 degrees of idle sway on top.
+      //
+      // Eased rather than assigned, so squaring up looks like him turning to
+      // face you rather than snapping round on the first frame of the dance.
+      // turn === null means square up: no tracking and no sway. Gating on
+      // playingOnce alone was not enough, because it is false whenever the
+      // dance clip is not actually running, and the idle sway is itself worth
+      // 7 degrees. Measured at 5.19 off-axis mid-celebration with only the
+      // tracking suppressed.
+      const square = this.playingOnce || turn === null;
+      const target = square
+        ? 0
+        : Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
+      this.model.rotation.y += (target - this.model.rotation.y) *
+                               (1 - Math.pow(0.02, dt));
     }
     this.renderer.render(this.scene, this.camera);
   }

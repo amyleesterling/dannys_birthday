@@ -1105,7 +1105,13 @@ function update(dt) {
   if (window.Danny && window.Danny.ok) {
     // idle and out of the way until settleRound() calls celebrate() for him
     window.Danny.setMotion('idle');
-    window.Danny.update(dt, clamp((pointer.x - L.ch.cx) / 300, -0.8, 0.8));
+    // no finger tracking once the round is over and he has the stage; the
+    // celebration itself is also gated on playingOnce inside danny.js, and
+    // this covers the gap between a short dance ending and the interlude
+    // running on
+    const watching = subject && subject.phase === 'result'
+      ? null : clamp((pointer.x - L.ch.cx) / 300, -0.8, 0.8);
+    window.Danny.update(dt, watching);
   }
 
   // ready, scan, result. The object slides in under the three two one, so
