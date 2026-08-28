@@ -97,6 +97,13 @@
   #spectrum .sub { font-size: 13.5px; color: #9aa2b1; margin: 0 0 18px; }
   #spectrum .sub b { color: #eff4fb; font-weight: 600; }
 
+  /* The bar and its ticks need real width to keep the band and tick labels
+     from overlapping (nine tick labels, some one-word bands), more than a
+     phone viewport has to give. specscroll lets them keep a fixed minimum
+     width and pan horizontally instead of squeezing. */
+  .specscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .specscroll > .specbar, .specscroll > .specticks { min-width: 640px; }
+
   .specbar {
     position: relative; height: 40px; margin: 22px 0 4px;
     border: 1px solid rgba(196,228,255,.18); background: #05070c;
@@ -187,11 +194,13 @@
     frequency. Drag a marker, or pick something.
   </p>
 
-  <div class="specbar" id="specBar">
-    <div class="specmark a" id="markA" tabindex="0" role="slider" aria-label="Marker A frequency"></div>
-    <div class="specmark b" id="markB" tabindex="0" role="slider" aria-label="Marker B frequency"></div>
+  <div class="specscroll">
+    <div class="specbar" id="specBar">
+      <div class="specmark a" id="markA" tabindex="0" role="slider" aria-label="Marker A frequency"></div>
+      <div class="specmark b" id="markB" tabindex="0" role="slider" aria-label="Marker B frequency"></div>
+    </div>
+    <div class="specticks" id="specTicks"></div>
   </div>
-  <div class="specticks" id="specTicks"></div>
 
   <div class="specvis">
     <p class="cap">Everything you can see is that sliver marked visible, under two per cent of the bar. Magnified:</p>
