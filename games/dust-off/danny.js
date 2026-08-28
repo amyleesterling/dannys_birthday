@@ -193,7 +193,7 @@ class Danny {
 
     if (this.mixer) this.mixer.update(dt);
     if (this.model) {
-      this.model.rotation.y = Math.PI + Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
+      this.model.rotation.y = Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
     }
 
     // the fire sits on the head bone, if the rig gave us one
