@@ -1,155 +1,121 @@
-// Virtual Danny, and the state of his hair.
+// Virtual Danny: Amy's Meshy biped, walking into the scanner, with his hair
+// increasingly on fire.
 //
-// He renders to a small offscreen canvas which the game then draws into its own
-// 2D canvas at the subject's head. That ordering matters: it means the beams,
-// the particles and the whole HUD still composite on top of him, which an
-// overlaid WebGL canvas would not allow.
+// He renders to his own offscreen canvas which the game then draws into its 2D
+// canvas. That ordering is deliberate: it means the beams, the particles and
+// the whole HUD still composite on top of him, which an overlaid WebGL canvas
+// would not allow. The 2D silhouette the game already had stays in place,
+// invisible, as the collision proxy for sampling and hit testing.
 //
-// This is a stylised wireframe head in the same idiom as the scanner's body,
-// not a likeness. It is deliberately generic, so tell me what to change.
+// If WebGL is missing or the model fails to load, `ok` goes false and the game
+// simply keeps drawing the wireframe subject it always had.
 //
-// The flames are the one warm thing in the entire site. scifi-ui calls
-// --holo-warm "the single warm accent", and a fire is exactly the case that
-// earns it.
+// The flames are the only warm thing on this site. scifi-ui calls --holo-warm
+// "the single warm accent", and a fire is the case that earns it.
 
-import * as THREE from '../../vendor/three/three.module.min.js';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-const SIZE = 288;              // offscreen square, in device pixels at dpr 1
-const STRANDS = 34;
-const SEGS = 7;                // points per strand
-const EMBERS = 420;
+const W = 340, H = 833;        // offscreen sprite, portrait
+const EMBERS = 460;
 
-// How alight he is, by round. The names show in the HUD.
+// The camera frames this slice of the world, and the game needs the same
+// numbers in its own body-local units to place the sprite. The 2D proxy runs
+// from local -99 at the crown to +86 at the soles for a model 1.7 tall, so one
+// world unit is 185 / 1.7 = 108.8 local units.
+const VIEW = { left: -0.5, right: 0.5, top: 2.35, bottom: -0.1 };
+const LOCAL_PER_WORLD = 185 / 1.7;
+
+// How alight he is, by round.
 export const STAGES = [
-  { name: 'SETTLED',        fire: 0.00, lift: 0.00, embers: 0.00 },
-  { name: 'STATIC',         fire: 0.00, lift: 0.35, embers: 0.05 },
-  { name: 'SMOULDERING',    fire: 0.36, lift: 0.60, embers: 0.30 },
-  { name: 'ALIGHT',         fire: 0.48, lift: 0.85, embers: 0.60 },
-  { name: 'WELL ALIGHT',    fire: 0.74, lift: 1.00, embers: 0.85 },
-  { name: 'FULLY INVOLVED', fire: 1.00, lift: 1.15, embers: 1.00 },
+  { name: 'SETTLED',        fire: 0.00, embers: 0.00, light: 0.0 },
+  { name: 'STATIC',         fire: 0.10, embers: 0.10, light: 0.1 },
+  { name: 'SMOULDERING',    fire: 0.34, embers: 0.34, light: 0.5 },
+  { name: 'ALIGHT',         fire: 0.58, embers: 0.62, light: 1.1 },
+  { name: 'WELL ALIGHT',    fire: 0.80, embers: 0.85, light: 1.9 },
+  { name: 'FULLY INVOLVED', fire: 1.00, embers: 1.00, light: 2.8 },
 ];
 
-const CYAN = new THREE.Color(0x7ee0ff);
-const WARM = new THREE.Color(0xe8a93a);
+const WARM = new THREE.Color(0xffa33c);
 const HOT  = new THREE.Color(0xffdc94);
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const lerp = (a, b, t) => a + (b - a) * t;
 
 class Danny {
   constructor() {
     this.canvas = document.createElement('canvas');
-    this.canvas.width = this.canvas.height = SIZE;
+    this.canvas.width = W;
+    this.canvas.height = H;
     this.ok = false;
+    this.loaded = false;
     this.stage = 0;
     this.t = 0;
+    this.walkRate = 1;
 
-    let renderer;
+    // what the game needs in order to place the sprite, in its own local units
+    this.frame = {
+      wLocal: (VIEW.right - VIEW.left) * LOCAL_PER_WORLD,
+      hLocal: (VIEW.top - VIEW.bottom) * LOCAL_PER_WORLD,
+      cyLocal: 86 - ((VIEW.top + VIEW.bottom) / 2) * LOCAL_PER_WORLD,
+    };
+
     try {
-      renderer = new THREE.WebGLRenderer({
+      this.renderer = new THREE.WebGLRenderer({
         canvas: this.canvas, alpha: true, antialias: true,
       });
     } catch (e) {
       return;                                   // no WebGL, the game copes
     }
-    this.renderer = renderer;
-    renderer.setClearColor(0x000000, 0);
-    renderer.setSize(SIZE, SIZE, false);
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setSize(W, H, false);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
 
     this.scene = new THREE.Scene();
-    // orthographic, so he does not fish eye at this size and the head keeps a
-    // fixed footprint however tall the figure is drawn
-    const v = 1.9;
-    this.camera = new THREE.OrthographicCamera(-v, v, v, -v, 0.1, 40);
-    this.camera.position.set(0, 0, 6);
+    this.camera = new THREE.OrthographicCamera(
+      VIEW.left, VIEW.right, VIEW.top, VIEW.bottom, 0.01, 40);
+    this.camera.position.set(0, 0, 8);
     this.camera.lookAt(0, 0, 0);
 
-    this.group = new THREE.Group();
-    this.scene.add(this.group);
-
-    this.buildHead();
-    this.buildHair();
+    this.buildLights();
     this.buildFire();
+    this.load();
     this.ok = true;
   }
 
-  buildHead() {
-    // the skull, as latitude and longitude lines, which is what the body in the
-    // scanner already looks like
-    const skull = new THREE.Mesh(
-      new THREE.SphereGeometry(0.62, 16, 12),
-      new THREE.MeshBasicMaterial({ color: CYAN, wireframe: true, transparent: true, opacity: 0.5 })
-    );
-    skull.scale.set(1, 1.12, 0.94);
-    this.group.add(skull);
-
-    const shell = new THREE.Mesh(
-      new THREE.SphereGeometry(0.6, 24, 18),
-      new THREE.MeshBasicMaterial({ color: 0x0d2b33, transparent: true, opacity: 0.55 })
-    );
-    shell.scale.set(1, 1.12, 0.94);
-    this.group.add(shell);
-
-    // glasses, two rings and a bridge. The one concession to a person rather
-    // than a mannequin, and the easiest thing here to take back off.
-    const rim = new THREE.MeshBasicMaterial({ color: CYAN, transparent: true, opacity: 0.9 });
-    for (const sx of [-1, 1]) {
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.19, 0.022, 8, 22), rim);
-      ring.position.set(sx * 0.23, 0.06, 0.53);
-      this.group.add(ring);
-    }
-    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.022, 0.022), rim);
-    bridge.position.set(0, 0.06, 0.56);
-    this.group.add(bridge);
-
-    // shoulders, just enough to sit the head on something
-    const neck = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.14, 0.2, 0.3, 10, 1, true),
-      new THREE.MeshBasicMaterial({ color: CYAN, wireframe: true, transparent: true, opacity: 0.35 })
-    );
-    neck.position.set(0, -0.82, 0);
-    this.group.add(neck);
+  // Always light the scene. Now that the Meshy self illumination is off the
+  // model is properly PBR, which means with no lights it renders black.
+  buildLights() {
+    this.scene.add(new THREE.HemisphereLight(0x9fdcf0, 0x0a1a20, 1.05));
+    const key = new THREE.DirectionalLight(0xdff4ff, 1.5);
+    key.position.set(1.4, 2.2, 2.4);
+    this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0x35e0d0, 1.0);
+    rim.position.set(-1.8, 1.2, -1.6);
+    this.scene.add(rim);
+    // the fire is a real light, so it actually lights him as it grows
+    this.fireLight = new THREE.PointLight(0xffa33c, 0, 2.2, 2);
+    this.scene.add(this.fireLight);
   }
 
-  // Hair as strands of line segments rooted on the upper hemisphere. Each one
-  // keeps its rest shape, and the stage decides how far it lifts, how it
-  // colours, and how much of the tip has burned off.
-  buildHair() {
-    this.strands = [];
-    const pos = [];
-    const col = [];
-    for (let i = 0; i < STRANDS; i++) {
-      // a spiral over the scalp, so they distribute without clumping
-      const a = i * 2.39996;
-      const u = (i + 0.5) / STRANDS;
-      const polar = Math.acos(1 - 0.72 * u);      // top cap only
-      const root = new THREE.Vector3(
-        Math.sin(polar) * Math.cos(a),
-        Math.cos(polar),
-        Math.sin(polar) * Math.sin(a)
-      ).multiplyScalar(0.6);
-      root.y *= 1.12;
-      const out = root.clone().normalize();
-      this.strands.push({
-        root, out,
-        len: 0.30 + (i % 5) * 0.045,
-        sway: 0.6 + (i % 7) * 0.13,
-        ph: i * 1.7,
+  load() {
+    const loader = new GLTFLoader();
+    loader.load('danny.glb', (gltf) => {
+      this.model = gltf.scene;
+      this.model.traverse((o) => {
+        if (o.isMesh) o.frustumCulled = false;
+        if (!this.head && /^head$/i.test(o.name || '')) this.head = o;
       });
-      for (let sgi = 0; sgi < SEGS - 1; sgi++) {
-        pos.push(0, 0, 0, 0, 0, 0);
-        col.push(0, 0, 0, 0, 0, 0);
+      this.scene.add(this.model);
+
+      if (gltf.animations && gltf.animations.length) {
+        this.mixer = new THREE.AnimationMixer(this.model);
+        this.walk = this.mixer.clipAction(gltf.animations[0]);
+        this.walk.play();
       }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    this.hairGeo = geo;
-    this.hair = new THREE.LineSegments(
-      geo,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 1 })
-    );
-    this.group.add(this.hair);
+      this.loaded = true;
+    }, undefined, () => { this.ok = false; });   // no model, the game falls back
   }
 
   buildFire() {
@@ -157,97 +123,76 @@ class Danny {
     const col = new Float32Array(EMBERS * 3);
     this.embers = [];
     for (let i = 0; i < EMBERS; i++) {
-      this.embers.push({ s: (i * 7) % STRANDS, life: Math.random(), speed: 0.5 + Math.random() * 0.9,
-                         drift: (Math.random() - 0.5) * 0.5, size: Math.random() });
+      this.embers.push({
+        life: Math.random(),
+        speed: 0.55 + Math.random() * 0.95,
+        ax: Math.random() - 0.5,
+        az: Math.random() - 0.5,
+        ph: Math.random() * 9,
+      });
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     this.fireGeo = geo;
     this.fire = new THREE.Points(geo, new THREE.PointsMaterial({
-      size: 0.085, vertexColors: true, transparent: true, opacity: 0.95,
+      size: 0.055, vertexColors: true, transparent: true, opacity: 0.95,
       blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
     }));
-    this.group.add(this.fire);
+    this.fire.frustumCulled = false;
+    this.scene.add(this.fire);
   }
 
   setRound(round) {
     this.stage = clamp(Math.floor(round) - 1, 0, STAGES.length - 1);
   }
 
-  stageName() {
-    return STAGES[this.stage].name;
-  }
+  stageName() { return STAGES[this.stage].name; }
 
-  update(dt, headTurn) {
+  // The game says what the subject is doing, so he walks in and then stands
+  // rather than marching on the spot through the whole round.
+  setGait(rate) { this.walkRate = rate; }
+
+  update(dt, turn) {
     if (!this.ok) return;
     this.t += dt;
     const S = STAGES[this.stage];
-    const t = this.t;
 
-    this.group.rotation.y = Math.sin(t * 0.5) * 0.3 + (headTurn || 0);
-    this.group.rotation.x = Math.sin(t * 0.37) * 0.06;
-
-    // ---- hair
-    const p = this.hairGeo.attributes.position.array;
-    const c = this.hairGeo.attributes.color.array;
-    let k = 0;
-    const tip = new THREE.Vector3();
-    const prev = new THREE.Vector3();
-    for (let i = 0; i < STRANDS; i++) {
-      const st = this.strands[i];
-      // burned tips: at full fire the last segments are gone
-      const burn = S.fire * (0.10 + ((i * 13) % 7) / 42);
-      prev.copy(st.root);
-      for (let sgi = 1; sgi < SEGS; sgi++) {
-        const f = sgi / (SEGS - 1);
-        const wob = Math.sin(t * (2.4 + st.sway) + st.ph + f * 3.1) * 0.06 * st.sway;
-        const rise = S.lift * f * f * 0.42;
-        tip.copy(st.out).multiplyScalar(0.6 + st.len * f)
-           .add(new THREE.Vector3(wob, rise + st.len * f * 0.25, wob * 0.7));
-        tip.y *= 1.05;
-
-        const charred = f > 1 - burn;
-        p[k] = prev.x; p[k + 1] = prev.y; p[k + 2] = prev.z;
-        p[k + 3] = tip.x; p[k + 4] = tip.y; p[k + 5] = tip.z;
-
-        // cool at the root, warm well before the tip once it is alight
-        const heat = clamp(S.fire * (0.8 + f * 0.9), 0, 1);
-        const base = CYAN.clone().lerp(WARM, heat);
-        if (heat > 0.78) base.lerp(HOT, (heat - 0.78) / 0.22);
-        const dim = charred ? 0.72 : 1;
-        c[k] = base.r * dim; c[k + 1] = base.g * dim; c[k + 2] = base.b * dim;
-        c[k + 3] = base.r * dim; c[k + 4] = base.g * dim; c[k + 5] = base.b * dim;
-        k += 6;
-        prev.copy(tip);
-      }
+    if (this.mixer) this.mixer.update(dt * this.walkRate);
+    if (this.model) {
+      this.model.rotation.y = Math.PI + Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
     }
-    this.hairGeo.attributes.position.needsUpdate = true;
-    this.hairGeo.attributes.color.needsUpdate = true;
 
-    // ---- embers rising off the strands
-    const fp = this.fireGeo.attributes.position.array;
-    const fc = this.fireGeo.attributes.color.array;
+    // the fire sits on the head bone, if the rig gave us one
+    const hp = this._hp || (this._hp = new THREE.Vector3());
+    hp.set(0, 1.52, 0);
+    if (this.head) this.head.getWorldPosition(hp);
+
+    const p = this.fireGeo.attributes.position.array;
+    const c = this.fireGeo.attributes.color.array;
     const live = Math.floor(EMBERS * S.embers);
     for (let i = 0; i < EMBERS; i++) {
       const e = this.embers[i];
       const j = i * 3;
-      if (i >= live) { fc[j] = fc[j + 1] = fc[j + 2] = 0; fp[j + 1] = -99; continue; }
-      e.life += dt * e.speed * (0.5 + S.fire);
+      if (i >= live) { c[j] = c[j + 1] = c[j + 2] = 0; p[j + 1] = -99; continue; }
+      e.life += dt * e.speed * (0.55 + S.fire * 0.9);
       if (e.life > 1) e.life -= 1;
-      const st = this.strands[e.s];
       const f = e.life;
-      const base = st.out.clone().multiplyScalar(0.6 + st.len);
-      fp[j] = base.x + e.drift * f + Math.sin(t * 3 + i) * 0.04;
-      fp[j + 1] = base.y * 1.05 + f * (0.55 + S.fire * 0.5);
-      fp[j + 2] = base.z + e.drift * f * 0.6;
-      // white hot at the root of the flame, warm, then out
-      const col = HOT.clone().lerp(WARM, clamp(f * 1.6, 0, 1));
-      const fade = (0.35 + 0.65 * (1 - f)) * (0.4 + S.fire * 0.6);
-      fc[j] = col.r * fade; fc[j + 1] = col.g * fade; fc[j + 2] = col.b * fade;
+      // rise off the scalp, spreading and guttering as they go
+      const flare = 0.10 + 0.22 * S.fire;
+      p[j]     = hp.x + e.ax * flare * (0.4 + f) + Math.sin(this.t * 4 + e.ph) * 0.012;
+      p[j + 1] = hp.y + 0.07 + f * (0.30 + S.fire * 0.42);
+      p[j + 2] = hp.z + e.az * flare * (0.4 + f);
+      const col = HOT.clone().lerp(WARM, clamp(f * 1.5, 0, 1));
+      const fade = (0.4 + 0.6 * (1 - f)) * (0.35 + S.fire * 0.65);
+      c[j] = col.r * fade; c[j + 1] = col.g * fade; c[j + 2] = col.b * fade;
     }
     this.fireGeo.attributes.position.needsUpdate = true;
     this.fireGeo.attributes.color.needsUpdate = true;
+
+    this.fireLight.position.set(hp.x, hp.y + 0.12, hp.z + 0.15);
+    this.fireLight.intensity = S.light * (0.82 + Math.sin(this.t * 11) * 0.09
+                                               + Math.sin(this.t * 6.3) * 0.09);
 
     this.renderer.render(this.scene, this.camera);
   }
@@ -255,4 +200,3 @@ class Danny {
 
 const danny = new Danny();
 window.Danny = danny;
-window.dispatchEvent(new Event('danny-ready'));

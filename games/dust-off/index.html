@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dust Off</title>
 <script type="importmap">
-{"imports":{"three":"../../vendor/three/three.module.min.js"}}
+{"imports":{"three":"../../vendor/three/three.module.min.js","three/addons/":"../../vendor/three/addons/"}}
 </script>
 <script type="module" src="danny.js"></script>
 <link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
@@ -183,7 +183,7 @@ function buildBody(pose) {
   const p = new Path2D();
   const armOut = pose.armOut;     // how far the arms are held from the torso
   const stance = pose.stance;     // foot separation
-  if (!pose.headless) capsule(p, 0, -85, 0, -77, 14);              // head
+  capsule(p, 0, -85, 0, -77, 14);                                  // head
   capsule(p, 0, -70, 0, -62, 5.2);                                 // neck
   capsule(p, -15, -56, 15, -56, 13.5);                             // shoulders
   capsule(p, 0, -52, 0, -14, 15);                                  // torso
@@ -202,9 +202,7 @@ function buildBody(pose) {
 // Virtual Danny lives in danny.js and renders to his own offscreen canvas.
 // He is optional: no WebGL, or the module fails to load, and the subject simply
 // keeps the wireframe head it always had.
-const dannyOn = () => !!(window.Danny && window.Danny.ok);
-const DANNY_LOCAL = 100;       // body local units the sprite spans
-const DANNY_HEAD_Y = -82;      // where the head centre sits in body local units
+const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded);
 
 // dedicated context for hit tests so the main transform is never disturbed
 const hitCtx = document.createElement('canvas').getContext('2d');
@@ -320,7 +318,7 @@ const roundCount = n => Math.min(44, 8 + n * 3);
 const roundTime  = n => Math.min(12, 5 + n * 0.45);
 
 function newSubject() {
-  const pose = { armOut: rand(0, 5), stance: rand(0, 4), headless: dannyOn() };
+  const pose = { armOut: rand(0, 5), stance: rand(0, 4) };
   const path = buildBody(pose);
   const count = roundCount(round);
   // a trace compound turns up from round three, worth a lot, but the round is
@@ -541,7 +539,11 @@ function update(dt) {
   laser.onBody = false;
 
   if (state !== 'play') {
-    if (dannyOn()) { window.Danny.setRound(round || 1); window.Danny.update(dt, 0); }
+    if (window.Danny && window.Danny.ok) {
+      window.Danny.setRound(round || 1);
+      window.Danny.setGait(1);
+      window.Danny.update(dt, 0);
+    }
     updateLoose(dt, 0.4);
     return;
   }
@@ -560,12 +562,12 @@ function update(dt) {
   const beamOn = pointer.down && pointer.inside && laser.lock <= 0 &&
                  pointer.x > L.ch.x && pointer.x < L.ch.x + L.ch.w;
 
-  if (dannyOn()) {
+  if (window.Danny && window.Danny.ok) {
     window.Danny.setRound(round);
-    const hp = subject ? toScreen(subject, 0, DANNY_HEAD_Y) : { x: L.ch.cx, y: 0 };
-    // he looks toward whatever you are aiming at
-    const turn = clamp((pointer.x - hp.x) / 260, -0.7, 0.7);
-    window.Danny.update(dt, turn);
+    // walking while he moves, near still while he is being scanned
+    window.Danny.setGait(subject && subject.phase === 'scan' ? 0.12 : 1);
+    const hx = subject ? toScreen(subject, 0, 0).x : L.ch.cx;
+    window.Danny.update(dt, clamp((pointer.x - hx) / 300, -0.8, 0.8));
   }
 
   // ready, scan, result. The subject walks in under the three two one, so the
@@ -766,6 +768,19 @@ function drawSubject(s, time) {
   const t = subjectTransform(s);
   const alpha = s.phase === 'result' ? 1 - clamp(s.t / s.resultDur, 0, 1) * 0.7 : 1;
 
+  if (dannyOn()) {
+    // the model stands in for the whole subject. The 2D path is still there,
+    // invisible, doing the sampling and the hit testing.
+    const f = window.Danny.frame;
+    const c = toScreen(s, 0, f.cyLocal);
+    const w = f.wLocal * L.figScale, h = f.hLocal * L.figScale;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(window.Danny.canvas, c.x - w / 2, c.y - h / 2, w, h);
+    ctx.globalAlpha = 1;
+    drawAttached(s, time, alpha);
+    return;
+  }
+
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.translate(t.x, t.y);
@@ -800,17 +815,11 @@ function drawSubject(s, time) {
   ctx.stroke(s.path);
   ctx.restore();
 
-  // Danny's head, drawn into the 2D canvas so the beams, the particles and the
-  // whole HUD still composite on top of him
-  if (dannyOn()) {
-    const hp = toScreen(s, 0, DANNY_HEAD_Y);
-    const sz = DANNY_LOCAL * L.figScale;
-    ctx.globalAlpha = alpha;
-    ctx.drawImage(window.Danny.canvas, hp.x - sz / 2, hp.y - sz / 2, sz, sz);
-    ctx.globalAlpha = 1;
-  }
 
-  // attached particles
+  drawAttached(s, time, alpha);
+}
+
+function drawAttached(s, time, alpha) {
   for (const p of s.parts) {
     const scr = toScreen(s, p.lx, p.ly);
     const r = p.type.size * (0.85 + 0.15 * Math.sin(time * 3 + p.ph));
