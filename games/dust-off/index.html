@@ -207,9 +207,9 @@ const BEAM_FORCE   = 2800;
 
 const MAX_MISSES = 3;
 
-// how long the jacket takes to slide off screen once a round ends, before
+// how long the object takes to slide off screen once a round ends, before
 // Danny fades in to dance through the rest of the result phase
-const JACKET_EXIT = 0.4;
+const OBJECT_EXIT = 0.4;
 // the whole between-round interlude never runs longer than this, even if
 // the move picked for the round runs longer; danny.cutCelebration() is what
 // actually stops him when nextRound() outruns his dance
@@ -223,50 +223,18 @@ const kick = n => { shake = Math.min(SHAKE_MAX, shake + n); };
 
 // ---------------------------------------------------------------- body model
 
-// Local units: figure runs about y = -99 (crown) to y = +86 (soles).
-function capsule(p, x1, y1, x2, y2, r) {
-  const dx = x2 - x1, dy = y2 - y1;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-6) { p.moveTo(x1 + r, y1); p.arc(x1, y1, r, 0, TAU, true); return; }
-  const a = Math.atan2(dy, dx);
-  const nx = -dy / len, ny = dx / len;
-  p.moveTo(x1 + nx * r, y1 + ny * r);
-  p.lineTo(x2 + nx * r, y2 + ny * r);
-  p.arc(x2, y2, r, a + Math.PI / 2, a - Math.PI / 2, true);
-  p.lineTo(x1 - nx * r, y1 - ny * r);
-  p.arc(x1, y1, r, a - Math.PI / 2, a + Math.PI / 2, true);
-  p.closePath();
-}
-
-// A plain white sheet, cut to a jacket on a hanger: what's actually in the
-// beams now. Every part is drawn with the same helper so the winding stays
-// consistent and the nonzero fill unions them instead of punching holes.
-// Kept inside the same local bounding box the old human silhouette used
-// (crown-ish at -99, hem around 86) so nothing downstream that samples or
-// positions this shape needed to change.
-function buildJacket(pose) {
-  const p = new Path2D();
-  const splay = pose.armOut * 0.6;   // a little sleeve-to-sleeve variety
-  // the hanger: a hook and the wire triangle it hangs from
-  capsule(p, 0, -99, 0, -90, 2.2);
-  capsule(p, 0, -90, -24, -76, 1.8);
-  capsule(p, 0, -90, 24, -76, 1.8);
-  // shoulders, just under the hanger
-  capsule(p, -23, -75, 23, -75, 7);
-  // the body panel, with a slight flare at the hem
-  capsule(p, 0, -70, 0, 52, 25);
-  capsule(p, 0, 46, 0, 60, 29);
-  // sleeves, hanging straight down off each shoulder
-  for (const s of [-1, 1]) {
-    capsule(p, s * 27, -73, s * (30 + splay), 42, 10.5);
-  }
-  return p;
-}
-
 // Virtual Danny lives in danny.js and renders to his own offscreen canvas.
 // He shows up between rounds now, not as the subject; this just says whether
 // there's a model to draw at all.
 const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded);
+
+function loadArt(src) {
+  const img = new Image();
+  img.ready = false;
+  img.onload = () => { img.ready = true; };
+  img.src = src;
+  return img;
+}
 
 // The wall mount the beams fire from. Drawn nose-first: the lens sits at
 // (EMITTER_FX, EMITTER_FY) of the sprite, as a fraction of its width and
@@ -275,13 +243,6 @@ const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded)
 // around the same lens point, so the beam still leaves from the right place.
 // emitter-hot.png is the same render with the lens glow rechannelled from
 // blue to red, swapped in while the emitter is locked out cooling down.
-function loadArt(src) {
-  const img = new Image();
-  img.ready = false;
-  img.onload = () => { img.ready = true; };
-  img.src = src;
-  return img;
-}
 const emitterImg = loadArt('emitter.png');
 const emitterHotImg = loadArt('emitter-hot.png');
 const EMITTER_FX = 0.744, EMITTER_FY = 0.276;
@@ -291,8 +252,70 @@ const EMITTER_FX = 0.744, EMITTER_FY = 0.276;
 // round, at most) that drawing the real image instead of a circle is cheap.
 const traceImg = loadArt('trace.png');
 
-// dedicated context for hit tests so the main transform is never disturbed
-const hitCtx = document.createElement('canvas').getContext('2d');
+// Every round dusts off a different holographic object, Amy's own renders
+// standing in for whatever an inspection line would actually see: a jacket
+// on its hanger, a test tube rack, a microscope, a pair of sneakers, a set
+// of goggles. Local units keep the first jacket's own convention, the floor
+// sits at local y = +86, and each object is fit inside a box up to 150 wide
+// by 185 tall above that, preserving its own aspect ratio, so a tall narrow
+// rack and a wide pair of sneakers both land at a sensible size without one
+// axis ever running away with the other.
+const OBJ_MAX_W = 150, OBJ_MAX_H = 185, OBJ_FLOOR = 86;
+const SUBJECT_DEFS = [
+  { key: 'jacket',     src: 'obj-jacket.png' },
+  { key: 'tubes',      src: 'obj-tubes.png' },
+  { key: 'microscope', src: 'obj-microscope.png' },
+  { key: 'sneakers',   src: 'obj-sneakers.png' },
+  { key: 'goggles',    src: 'obj-goggles.png' },
+];
+for (const def of SUBJECT_DEFS) {
+  def.ready = false;
+  def.img = new Image();
+  def.img.onload = () => {
+    const iw = def.img.naturalWidth, ih = def.img.naturalHeight;
+    const fit = Math.min(OBJ_MAX_W / iw, OBJ_MAX_H / ih);
+    def.iw = iw; def.ih = ih;
+    def.local = { w: iw * fit, h: ih * fit, top: OBJ_FLOOR - ih * fit, bottom: OBJ_FLOOR };
+    // an alpha mask at the image's own resolution, so hit tests and the
+    // "on body" check read the real silhouette, not its bounding box
+    const mc = document.createElement('canvas');
+    mc.width = iw; mc.height = ih;
+    const mctx = mc.getContext('2d');
+    mctx.drawImage(def.img, 0, 0);
+    def.alpha = mctx.getImageData(0, 0, iw, ih).data;
+    // redrawn each frame the object is visible: the base art plus the
+    // animated sensor sweep, composited with 'source-atop' so the sweep
+    // never spills past the object's own pixels into empty margin
+    def.scanCanvas = document.createElement('canvas');
+    def.scanCanvas.width = iw; def.scanCanvas.height = ih;
+    def.ready = true;
+  };
+  def.img.src = def.src;
+}
+
+// true if the point, in that subject's own local units, lands on a visible
+// pixel of its art. With no art loaded yet (a slow connection on round one)
+// a plain box stands in, so a round never ships with zero particles.
+function hitsSubjectArt(def, lx, ly) {
+  if (!def) return Math.abs(lx) < 40 && ly > -90 && ly < 80;
+  const fit = def.local.w / def.iw;
+  const px = Math.round(lx / fit + def.iw / 2);
+  const py = Math.round((ly - def.local.top) / fit);
+  if (px < 0 || px >= def.iw || py < 0 || py >= def.ih) return false;
+  return def.alpha[(py * def.iw + px) * 4 + 3] > 40;
+}
+
+// picked at random each round, never the one that just ran, so the same
+// object does not turn up twice in a row
+let lastSubjectKey = null;
+function pickSubjectDef() {
+  const ready = SUBJECT_DEFS.filter(d => d.ready);
+  if (!ready.length) return null;
+  const pool = ready.length > 1 ? ready.filter(d => d.key !== lastSubjectKey) : ready;
+  const def = pool[(Math.random() * pool.length) | 0];
+  lastSubjectKey = def.key;
+  return def;
+}
 
 // ---------------------------------------------------------------- audio
 
@@ -410,20 +433,21 @@ const roundCount = n => Math.min(120, 8 + n * 4);
 const roundTime  = n => Math.min(8, 6 + (n - 1) * 0.2);
 
 function newSubject() {
-  const pose = { armOut: rand(0, 5), stance: rand(0, 4) };
-  const path = buildJacket(pose);
+  const def = pickSubjectDef();
   const count = roundCount(round);
   // a trace compound turns up from round three, worth a lot, but the round is
   // cleared on recovering everything rather than on the red ones alone
   const flagCount = round >= 3 ? Math.min(3, Math.floor(round / 3)) : 0;
 
   // rejection sample points inside the silhouette, in local units
+  const halfW = def ? def.local.w / 2 : 40;
+  const top = def ? def.local.top : -90, bottom = def ? def.local.bottom : 80;
   const pts = [];
   let guard = 0;
   while (pts.length < count && guard < count * 300) {
     guard++;
-    const x = rand(-34, 34), y = rand(-99, 86);
-    if (!hitCtx.isPointInPath(path, x, y)) continue;
+    const x = rand(-halfW, halfW), y = rand(top, bottom);
+    if (!hitsSubjectArt(def, x, y)) continue;
     pts.push({ x, y });
   }
   const parts = pts.map((pt, i) => ({
@@ -438,7 +462,7 @@ function newSubject() {
 
   const t = roundTime(round);
   return {
-    path, pose, parts,
+    def, parts,
     id: 'SB' + String(1740 + round * 7 + ((Math.random() * 60) | 0)).padStart(4, '0'),
     phase: 'ready', t: 0,
     readyDur: 2.6, walkDur: 1.0, resultDur: 1.3,
@@ -613,7 +637,7 @@ function settleRound() {
   // dance short rather than let a long one drag the pace down.
   const dur = dannyOn() ? window.Danny.celebrate(round) : 0;
   s.resultDur = Math.min(MAX_INTERLUDE,
-    Math.max(JACKET_EXIT + 0.6, JACKET_EXIT + (dur || 0) + 0.4));
+    Math.max(OBJECT_EXIT + 0.6, OBJECT_EXIT + (dur || 0) + 0.4));
 }
 
 function nextRound() {
@@ -674,8 +698,8 @@ function update(dt) {
     window.Danny.update(dt, clamp((pointer.x - L.ch.cx) / 300, -0.8, 0.8));
   }
 
-  // ready, scan, result. The jacket slides in under the three two one, so the
-  // clock only starts once it is hanging in the beams.
+  // ready, scan, result. The object slides in under the three two one, so
+  // the clock only starts once it is sitting in the beams.
   const s = subject;
   const wasCount = s.phase === 'ready' ? Math.ceil(s.readyDur - s.t) : 0;
   s.t += dt;
@@ -694,9 +718,9 @@ function update(dt) {
       s.phase = 'result'; s.t = 0;
     }
   } else {
-    // the jacket slides off quickly; Danny takes over the screen for the
+    // the object slides off quickly; Danny takes over the screen for the
     // rest of the result phase, so his position doesn't ride on s.x at all
-    const k = easeIn(clamp(s.t / JACKET_EXIT, 0, 1));
+    const k = easeIn(clamp(s.t / OBJECT_EXIT, 0, 1));
     s.x = lerp(L.ch.cx, L.ch.x + L.ch.w + 70, k);
     if (s.t >= s.resultDur) { nextRound(); return; }
   }
@@ -704,7 +728,7 @@ function update(dt) {
   // pointer over the body?
   if (s.phase !== 'exit') {
     const lp = toLocal(s, pointer.x, pointer.y);
-    laser.onBody = hitCtx.isPointInPath(s.path, lp.x, lp.y);
+    laser.onBody = hitsSubjectArt(s.def, lp.x, lp.y);
   }
 
   // the beam keeps ablating while held
@@ -896,14 +920,14 @@ function drawChamber(time) {
 }
 
 function drawSubject(s, time) {
-  // The jacket fades fast once a round ends; Danny takes the rest of the
+  // The object fades fast once a round ends; Danny takes the rest of the
   // result phase to himself, at a fixed spot rather than riding s.x, since
   // he isn't the thing sliding off screen.
   if (s.phase === 'result') {
-    const jacketAlpha = 1 - clamp(s.t / JACKET_EXIT, 0, 1);
-    if (jacketAlpha > 0.01) drawJacket(s, time, jacketAlpha);
-    if (s.t >= JACKET_EXIT && dannyOn()) {
-      const danceAlpha = clamp((s.t - JACKET_EXIT) / 0.3, 0, 1);
+    const objAlpha = 1 - clamp(s.t / OBJECT_EXIT, 0, 1);
+    if (objAlpha > 0.01) drawSubjectArt(s, time, objAlpha);
+    if (s.t >= OBJECT_EXIT && dannyOn()) {
+      const danceAlpha = clamp((s.t - OBJECT_EXIT) / 0.3, 0, 1);
       const f = window.Danny.frame;
       const cx = L.ch.cx, cy = L.floorY - L.figH * (86 / 185);
       const w = f.wLocal * L.figScale, h = f.hLocal * L.figScale;
@@ -913,43 +937,61 @@ function drawSubject(s, time) {
     }
     return;
   }
-  drawJacket(s, time, 1);
+  drawSubjectArt(s, time, 1);
 }
 
-function drawJacket(s, time, alpha) {
-  const t = subjectTransform(s);
+// Amy's holographic renders, one per round: a jacket, a test tube rack, a
+// microscope, sneakers, goggles. Each one redraws into its own small scan
+// buffer first, base art plus the animated sensor sweep composited with
+// 'source-atop' so the sweep can never spill past the object's own pixels,
+// then that buffer is what actually lands on the chamber.
+function drawSubjectArt(s, time, alpha) {
+  const def = s.def;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.translate(t.x, t.y);
-  ctx.scale(t.s, t.s);
-  ctx.lineWidth = 1.6 / t.s;
 
-  // body fill
-  ctx.fillStyle = 'rgba(20,58,64,0.55)';
-  ctx.fill(s.path);
-
-  // sensor scan lines inside the silhouette
-  ctx.save();
-  ctx.clip(s.path);
-  ctx.strokeStyle = 'rgba(53,224,208,0.16)';
-  ctx.lineWidth = 0.8 / t.s;
-  const off = (time * 9) % 6;
-  for (let y = -104; y < 92; y += 6) {
-    ctx.beginPath(); ctx.moveTo(-40, y + off); ctx.lineTo(40, y + off); ctx.stroke();
+  if (!def) {
+    // the art has not finished loading yet (a slow connection on round
+    // one); same floor-at-+86 footprint as the real thing, just empty
+    const a = toScreen(s, -40, -90), b = toScreen(s, 40, 80);
+    ctx.fillStyle = 'rgba(20,58,64,0.55)';
+    ctx.strokeStyle = laser.onBody ? '#7ff2e6' : COL.teal;
+    ctx.lineWidth = 1.6;
+    ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.restore();
+    drawAttached(s, time, alpha);
+    return;
   }
-  // moving sensor bar
-  const bar = -104 + ((time * 52) % 200);
-  const bg = ctx.createLinearGradient(0, bar - 14, 0, bar + 14);
-  bg.addColorStop(0, 'rgba(53,224,208,0)');
-  bg.addColorStop(0.5, 'rgba(53,224,208,0.22)');
-  bg.addColorStop(1, 'rgba(53,224,208,0)');
-  ctx.fillStyle = bg;
-  ctx.fillRect(-40, bar - 14, 80, 28);
-  ctx.restore();
 
-  // outline
-  ctx.strokeStyle = laser.onBody ? '#7ff2e6' : COL.teal;
-  ctx.stroke(s.path);
+  const sctx = def.scanCanvas.getContext('2d');
+  sctx.clearRect(0, 0, def.iw, def.ih);
+  sctx.drawImage(def.img, 0, 0);
+  sctx.save();
+  sctx.globalCompositeOperation = 'source-atop';
+  const onBody = laser.onBody;
+  sctx.strokeStyle = onBody ? 'rgba(127,242,230,0.5)' : 'rgba(53,224,208,0.30)';
+  sctx.lineWidth = Math.max(1, def.ih * 0.0025);
+  const spacing = def.ih / 18;
+  const off = (time * spacing * 1.5) % spacing;
+  for (let y = -spacing; y < def.ih + spacing; y += spacing) {
+    sctx.beginPath(); sctx.moveTo(0, y + off); sctx.lineTo(def.iw, y + off); sctx.stroke();
+  }
+  // a sensor bar sweeping top to bottom, same 2.86 second lap regardless of
+  // the source image's own resolution
+  const barY = ((time * 0.35) % 1) * def.ih;
+  const bandH = def.ih * 0.16;
+  const bg = sctx.createLinearGradient(0, barY - bandH / 2, 0, barY + bandH / 2);
+  bg.addColorStop(0, 'rgba(53,224,208,0)');
+  bg.addColorStop(0.5, onBody ? 'rgba(127,242,230,0.5)' : 'rgba(53,224,208,0.35)');
+  bg.addColorStop(1, 'rgba(53,224,208,0)');
+  sctx.fillStyle = bg;
+  sctx.fillRect(0, barY - bandH / 2, def.iw, bandH);
+  sctx.restore();
+
+  const p0 = toScreen(s, -def.local.w / 2, def.local.top);
+  const p1 = toScreen(s, def.local.w / 2, def.local.bottom);
+  ctx.drawImage(def.scanCanvas, p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
   ctx.restore();
 
   drawAttached(s, time, alpha);
@@ -1243,7 +1285,7 @@ function drawBeat(time) {
     // the banner fades fast, Danny's dance is the main event through the
     // rest of this phase, and the countdown to the next round rides on top
     // of him the whole time rather than fading with the banner
-    const f = clamp(subject.t / (JACKET_EXIT + 0.6), 0, 1);
+    const f = clamp(subject.t / (OBJECT_EXIT + 0.6), 0, 1);
     ctx.globalAlpha = clamp(1 - f, 0, 1);
     ctx.fillStyle = banner && banner.ok ? COL.teal : COL.red;
     ctx.font = '600 ' + Math.round(38 * k) + 'px ui-monospace, Menlo, monospace';

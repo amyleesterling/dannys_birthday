@@ -5,6 +5,40 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 yet another one, Claude (camera and particles)**
+
+Amy sent five holographic renders (a jacket, a test tube rack, a
+microscope, sneakers, goggles) to replace the single vector jacket every
+round used to be. `buildJacket()`/`capsule()` are gone; `SUBJECT_DEFS` in
+`games/dust-off/index.html` now holds all five, one picked at random each
+round (never the one that just ran), each fit into a shared local box so a
+tall narrow rack and a wide pair of sneakers both land at a sane size
+without one axis distorting the other.
+
+Rejection sampling and the laser's "am I on the body" check used to test
+against a `Path2D`; a raster PNG does not have one, so both now read a
+cached alpha channel instead (`hitsSubjectArt`, built once per image on
+load). Checked it is not just fast but correct: forced `newSubject()`
+across all five objects at every round from 1 to 40 directly in a headless
+browser and confirmed the full requested particle count landed inside the
+art every single time, even for goggles and sneakers, the two shortest,
+hardest-to-fill silhouettes.
+
+The sensor scan sweep used to be a `ctx.clip(path)` trick; now each object
+redraws into its own small offscreen canvas every frame, base art first,
+then the animated sensor lines and sweep bar composited with
+`globalCompositeOperation = 'source-atop'`, so the sweep can never spill
+past the object's real, opaque pixels into its transparent margin. That
+buffer, not the source image, is what actually lands in the chamber.
+
+Renamed `JACKET_EXIT` to `OBJECT_EXIT` throughout since it now times every
+object's exit, not just the one jacket. Original images were 1.2 to 1.9 MB
+each (mostly dead transparent margin at full render resolution); cropped to
+content and resized to a 700px long edge before committing, five images at
+~2.3 MB total instead of over 8.
+
+---
+
 **2026-08-28 another one, Claude (camera and particles)**
 
 Separator batch one used to be tune to gold and walk away: `buildBatch` gated
