@@ -272,6 +272,12 @@ const BEAM_FORCE   = 2800;
 
 const MAX_MISSES = 3;
 
+// camera shake, in screen px. Ticks up on impact, decays every frame in
+// update(). Capped per source so a flurry of taps cannot fling the world off
+// screen.
+const SHAKE_MAX = 16;
+const kick = n => { shake = Math.min(SHAKE_MAX, shake + n); };
+
 // ---------------------------------------------------------------- body model
 
 // Local units: figure runs about y = -99 (crown) to y = +86 (soles).
@@ -554,14 +560,17 @@ function fire() {
   laser.beamT = 1;
   audio.pulse();
   fx.push({ k: 'ring', x, y, t: 0, dur: 0.3, r: PULSE_RADIUS });
+  kick(2);
 
   const n = subject ? dislodge(x, y, PULSE_RADIUS) : 0;
   released += n;
+  if (n) kick(n * 1.4);
 
   if (laser.heat >= 100) {
     laser.heat = 100;
     laser.lock = OVERHEAT_LOCK;
     audio.overheat();
+    kick(10);
   }
 }
 
@@ -622,11 +631,13 @@ function settleRound() {
     }
     feed.unshift({ ok: true, text: 'ROUND ' + round + ' CLEARED', age: 0 });
     audio.flagged();
+    kick(6);
   } else {
     misses++;
     banner = { text: 'MISSED ' + (s.total - s.got), sub: 'RECOVER EVERY ONE', ok: false, t: 0 };
     feed.unshift({ warn: true, text: (s.total - s.got) + ' LEFT ON SUBJECT', age: 0 });
     audio.miss();
+    kick(13);
   }
   if (feed.length > 9) feed.length = 9;
 }
@@ -675,7 +686,7 @@ function update(dt) {
     laser.heat = Math.max(0, laser.heat - dt * (100 / OVERHEAT_LOCK));
   } else if (pointer.down && pointer.inside) {
     laser.heat += BEAM_HEAT * dt;
-    if (laser.heat >= 100) { laser.heat = 100; laser.lock = OVERHEAT_LOCK; audio.overheat(); }
+    if (laser.heat >= 100) { laser.heat = 100; laser.lock = OVERHEAT_LOCK; audio.overheat(); kick(10); }
   } else {
     laser.heat = Math.max(0, laser.heat - COOL_RATE * dt);
   }
@@ -727,7 +738,9 @@ function update(dt) {
   if (beamOn) {
     // held, the beams strip whatever they pass over, so one sweep down the
     // body both knocks particles off and carries them to the intake
-    released += dislodge(pointer.x, pointer.y, PULSE_RADIUS * 0.85);
+    const n = dislodge(pointer.x, pointer.y, PULSE_RADIUS * 0.85);
+    released += n;
+    if (n) kick(n * 1.1);
   }
 
   updateLoose(dt, s.turb, beamOn);
@@ -794,6 +807,7 @@ function draw(time) {
   ctx.fillRect(0, 0, W, H);
 
   ctx.save();
+  if (shake > 0.05) ctx.translate(rand(-shake, shake), rand(-shake, shake));
   drawChamber(time);
   if (subject && state !== 'title') drawSubject(subject, time);
   drawLoose(time);
@@ -989,7 +1003,7 @@ function drawFrags() {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const f of frags) {
-    const k = 1 - f.t / f.life;
+    const k = clamp(1 - f.t / f.life, 0, 1);
     ctx.globalAlpha = k;
     ctx.fillStyle = f.c;
     ctx.beginPath(); ctx.arc(f.x, f.y, f.r * (0.35 + k * 0.65), 0, TAU); ctx.fill();
@@ -1001,7 +1015,7 @@ function drawFx() {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const f of fx) {
-    const k = f.t / f.dur;
+    const k = clamp(f.t / f.dur, 0, 1);
     if (f.k === 'ring') {
       ctx.strokeStyle = `rgba(126,224,255,${(1 - k) * 0.8})`;
       ctx.lineWidth = 2.5 * (1 - k) + 0.5;
