@@ -120,7 +120,10 @@
   .handlehit:focus-visible + .handleline { stroke-width: 4; }
 
   /* ---- table ----------------------------------------------------------- */
-  .qtable { width: 100%; border-collapse: collapse; margin: 0 0 28px; font-size: 14px; }
+  /* the table scrolls inside its own container if it must; the page never
+     scrolls sideways, whatever gets picked as A and B */
+  .tscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 28px; }
+  .qtable { width: 100%; border-collapse: collapse; font-size: 14px; }
   .qtable th, .qtable td { text-align: left; padding: 9px 12px; border: 1px solid rgba(196,228,255,.12); }
   .qtable th { font-size: 11.5px; letter-spacing: .1em; color: #6c7c8c; font-weight: 600; text-transform: uppercase; }
   .qtable td { color: #eff4fb; font-variant-numeric: tabular-nums; }
@@ -196,6 +199,7 @@
     .swap { align-self: stretch; }
     .qtable { font-size: 12.5px; }
     .qtable th, .qtable td { padding: 7px 8px; }
+    .qtable td.rel { white-space: normal; }
   }
   @media (prefers-reduced-motion: no-preference) {
     .chooser > button, .ctl, .swap, .picker li button { transition: border-color .15s, color .15s, background .15s; }
@@ -252,10 +256,12 @@
        aria-label="Magnified spectrum ruler. Drag the A and B handles, click to move the active marker, scroll to zoom."></svg>
   <p class="focnote">Click moves the <b id="activeNote"></b> marker · drag a handle · scroll or pinch to zoom · double-click a landmark to center it.</p>
 
+  <div class="tscroll">
   <table class="qtable">
     <thead><tr><th></th><th class="a" id="thA"></th><th class="b" id="thB"></th><th>Relationship (B vs A)</th></tr></thead>
     <tbody id="qBody"></tbody>
   </table>
+  </div>
 
   <p class="scalecap">Wavelength, for scale</p>
   <div class="scalerow">
