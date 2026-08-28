@@ -83,6 +83,8 @@
     display: flex; gap: 10px; align-items: baseline;
   }
   .picker li button:hover, .picker li button:focus-visible { background: rgba(126,224,255,.09); }
+  .picker li.sel button { background: rgba(126,224,255,.1); border-left: 2px solid #7ee0ff; color: #eff4fb; }
+  .picker li.sel .val::after { content: " ✓"; color: #7ee0ff; }
   .picker li .cat { font-size: 10.5px; letter-spacing: .08em; color: #5c6b7a; text-transform: uppercase; }
   .picker li .val { margin-left: auto; color: #8b98a8; font-size: 12px; }
   .picker li.custom button { color: #a07cff; }
@@ -954,10 +956,13 @@ beam power      P = photons per second × energy per photon</pre>
       }
       const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
       const ql = norm(q);
+      const curId = m === 'a' ? S.aId : S.bId;
       for (const l of LANDMARKS) {
         if (ql && !(norm(l.name).includes(ql) || norm(l.cat).includes(ql))) continue;
         const li = document.createElement('li');
+        if (l.id === curId) li.className = 'sel';
         const b = document.createElement('button'); b.type = 'button'; b.title = l.why;
+        if (l.id === curId) b.setAttribute('aria-current', 'true');
         b.innerHTML = '<span class="cat">' + l.cat + '</span>' + l.name +
           '<span class="val num">' + (l.type === 'band' ? 'band · ' : l.type === 'spectrum' ? 'peak ' : '') + freq(l.hz) + '</span>';
         b.addEventListener('click', () => { setMarker(m, l.hz, l.id); closePicker(); render(); });
@@ -965,6 +970,10 @@ beam power      P = photons per second × energy per photon</pre>
       }
     }
     fill('');
+    // reopen where you left off: the current selection arrives centered
+    const sel = list.querySelector('li.sel');
+    if (sel) list.scrollTop = Math.max(0,
+      sel.offsetTop - list.offsetTop - list.clientHeight / 2 + sel.clientHeight / 2);
     input.addEventListener('input', () => fill(input.value));
     input.addEventListener('keydown', e => {
       if (e.key === 'Escape') { closePicker(); ch.querySelector('button').focus(); }
