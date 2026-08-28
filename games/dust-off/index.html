@@ -45,6 +45,11 @@
     padding: 7px 12px; align-self: center; white-space: nowrap;
   }
   .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  /* The wordmark leads on the left and the controls sit together on the right.
+     margin-left:auto rather than leaning on .gamebar-title to absorb the slack,
+     because the title and the citation are both display:none on a phone, which
+     would leave the controls stranded next to the logo. */
+  .gamebar-back { margin-left: auto; }
   .gamebar-back .short { display: none; }
   /* Amy's wordmark stands in for the text title. Sized by height so it lines
      up with the controls either side of it whatever the art's aspect is, and
@@ -127,10 +132,10 @@
 </head>
 <body>
 <header class="gamebar holopanel" style="--bar-accent: 126 224 255;">
-  <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
   <img class="gamebar-logo" src="logo.png" alt="Dust Off" width="647" height="150">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9134205B2/en" target="_blank" rel="noopener">US 9,134,205 B2</a>
   <span class="gamebar-title">System and method for removing surface particles from an object</span>
+  <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
   <button type="button" data-key="m" id="sndbtn" aria-label="Mute sound" title="Mute sound">
     <svg class="ico ico-on" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path class="cone" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/>
@@ -572,7 +577,7 @@ const pointer = { x: 0, y: 0, down: false, inside: false };
 // on the floor rather than staring straight across the chamber, and swing to
 // follow the beam while you are firing, so the housing and the light it emits
 // never disagree about where they are going. Smoothed, so they sweep.
-const emAim = { x: 0, y: 0, set: false };
+const emAim = { x: 0, y: 0, set: false, idle: 1 };
 
 function layout() {
   const rect = canvas.getBoundingClientRect();
@@ -623,14 +628,18 @@ function layout() {
   // the point you aim at, which is where the intensity finally gets high
   // enough to lift anything. Two photon, or four, since it is a birthday.
   const inset = L.ch.x + (narrow ? 17 : 30);
-  const hiY = narrow ? L.topH + 32 : H * 0.10;
-  const loY = hiY + H * (narrow ? 0.09 : 0.11);
+  const hiY = narrow ? L.topH + 26 : H * 0.09;
+  // The two housings per wall sat close enough together to read as one lump
+  // with two barrels. Spread further apart, and drawn smaller, so the arm in
+  // the art has room to swing without the pair colliding.
+  const loY = hiY + H * (narrow ? 0.15 : 0.17);
+  L.emW = narrow ? 74 : 92;
   // The sample is scaled to the room it actually has rather than to Danny's
   // height, which is what L.figScale is for. Two things bound it: sideways, the
   // emitter lenses on each wall, and vertically, the bottom of the particle
   // readout. Tying it to figScale meant the tall objects were drawn straight
   // through that readout on a desktop, where the block sits lowest.
-  const lensGap = (inset - L.ch.x) + 14;
+  const lensGap = (inset - L.ch.x) + L.emW * 0.13;
   const readoutBottom = (narrow ? L.topH + 30 : L.clock.cy + L.clock.r * 1.56 + 16)
                         + Math.round((narrow ? 38 : 42) * L.hud) * 0.72 + 56;
   L.objScale = Math.max(0.8, Math.min(
@@ -898,6 +907,21 @@ function updateEmitterAim(dt) {
   const k = 1 - Math.pow(0.0016, dt);   // settles in ~200ms, frame rate free
   emAim.x += (tx - emAim.x) * k;
   emAim.y += (ty - emAim.y) * k;
+  // Fades in over about a second when you stop firing, out over the same when
+  // you start. Multiplying the sweep by this rather than switching it off is
+  // what keeps a housing from snapping back to true the instant you touch the
+  // screen.
+  emAim.idle += ((live ? 0 : 1) - emAim.idle) * (1 - Math.pow(0.02, dt));
+}
+
+// The housings track your aim while you fire, and drift when they are not.
+// The art has a jointed arm behind the lens, which reads as a machine idling
+// rather than a sprite wobbling, so the drift is worth having. Each one gets
+// its own phase and a slightly different rate, because four arms sweeping in
+// lockstep looks like a screensaver.
+const EM_SWEEP = 0.20;   // radians, about 11 degrees either side
+function emitterSweep(i, time) {
+  return emAim.idle * EM_SWEEP * Math.sin(time * (0.44 + i * 0.06) + i * 1.9);
 }
 
 function update(dt) {
@@ -1102,17 +1126,18 @@ function drawChamber(time) {
   // the four outlet housings, fixed to the side walls
   const hot = laser.lock > 0;
   const art = hot ? emitterHotImg : emitterImg;
-  for (const e of L.emitters) {
+  for (let ei = 0; ei < L.emitters.length; ei++) {
+    const e = L.emitters[ei];
     // Rotation happens after the mirror, so in the sprite's own frame the nose
     // is always +x and one angle covers both walls: mirroring flips the x of
     // the aim vector, hence the e.s on dx.
-    const aim = Math.atan2(emAim.y - e.y, (emAim.x - e.x) * e.s);
+    const aim = Math.atan2(emAim.y - e.y, (emAim.x - e.x) * e.s) + emitterSweep(ei, time);
     ctx.save();
     ctx.translate(e.x, e.y);
     if (e.s < 0) ctx.scale(-1, 1);
     ctx.rotate(aim);
     if (art.ready) {
-      const ew = 108, eh = ew * (art.naturalHeight / art.naturalWidth);
+      const ew = L.emW, eh = ew * (art.naturalHeight / art.naturalWidth);
       ctx.drawImage(art, -EMITTER_FX * ew, -EMITTER_FY * eh, ew, eh);
     } else {
       // the emitter art loads fast, but a plain housing covers the one frame it doesn't
