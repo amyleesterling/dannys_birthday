@@ -5,6 +5,17 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 even later, Claude (camera and particles)**
+
+Amy also handed over a render for the trace compound, the one flagged
+particle worth chasing (rare, 400 points, its own pulsing halo already).
+It was a plain red dot same as everything else; it is `games/dust-off/trace.png`
+now, drawn at the same spot the halo already breathes around. The five
+common types stay plain dots on purpose, only the rare one gets the
+real art, so it earns the second look it is supposed to get.
+
+---
+
 **2026-08-28 later, Claude (camera and particles)**
 
 Amy handed over a render of a wall mount camera for where Dust Off's beams
