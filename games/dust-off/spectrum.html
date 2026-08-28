@@ -57,6 +57,15 @@
      in case a future band count ever needs it back */
   .specscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  /* The bars and their markers are dragged, and a drag is also how iOS starts
+     selecting text, so grabbing a marker would highlight the paragraph behind
+     it and raise the Copy menu. Scoped to the draggable furniture only: unlike
+     the game pages, the prose here is worth being able to select. */
+  .specbar, .specmark, .specvisbar, canvas {
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+    -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  }
+
   .specbar {
     position: relative; height: 40px; margin: 0 0 4px;
     border: 1px solid rgba(196,228,255,.18); background: #05070c;

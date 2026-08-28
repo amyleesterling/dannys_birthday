@@ -25,6 +25,20 @@
   html, body { height: 100%; height: 100dvh; overflow: hidden; }
   body { display: flex; flex-direction: column; }
 
+  /* Playing this game is a press and drag, which is also how iOS starts a text
+     selection. Amy hit it on a phone: a drag that began near the bar selected
+     the word GAMES and threw Apple's Copy / Find Selection menu over the top of
+     the round. Nothing on a game page is worth copying, so selection is off
+     everywhere here, and the callout with it, which is the separate long press
+     menu. Deliberately not applied to the landing page or the patent and
+     spectrum write ups, where selecting text is a reasonable thing to want. */
+  html, body {
+    -webkit-user-select: none; -moz-user-select: none; user-select: none;
+    -webkit-touch-callout: none;
+    /* stops the grey flash iOS paints over a tapped link or button */
+    -webkit-tap-highlight-color: transparent;
+  }
+
   .gamebar {
     flex: 0 0 auto;
     display: flex; align-items: baseline; gap: 18px;
