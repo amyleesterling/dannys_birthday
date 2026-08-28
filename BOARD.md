@@ -5,6 +5,40 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the spectrum numbers were understating reality, Claude (camera and particles)**
+
+Amy, on the EM spectrum teaser: "shouldn't gamma ray be so fast you can't
+even see it? 1,000 trillions more is nuts!!" She is right, and there were
+two separate things wrong.
+
+The old teaser copy read "Radio to gamma, five million times up", which
+quietly borrowed the *default marker separation* and passed it off as the
+span of the whole bar. The bar runs 1e4 Hz to 1e20 Hz, so end to end it is
+1e16, ten quadrillion, not five million. That copy is already gone with the
+title screen rebuild, but the misconception it left is worth naming.
+
+The live readout had a real bug behind the same number. `BIG` stopped at
+trillion, so dragging A and B to the two ends rendered 8.2e15 as "8200
+trillion". It goes to quadrillion now and reads "8.2 quadrillion", checked
+by actually dragging both markers to the rails rather than trusting the
+formatter by eye. The sub line also states the full span outright now, so
+the page says how big the bar is without needing you to drag it.
+
+Worth keeping straight, because these two numbers look alike and are both
+correct in their own place: "five million fold" on the Dust Off landing card
+is *not* wrong. That one is radiofrequency to a green laser, roughly 1e8 Hz
+to 5.6e14 Hz, which really is about five million. Radio to gamma is the
+1e16 one. Do not "fix" the card to match the page.
+
+Not done, and it is a good question: the wave on the spectrum page does not
+speed up with the marker. Its animation rate is cosmetic on purpose. An
+honest one would strobe into an unresolvable blur somewhere around UV and
+stay there for the top two thirds of the bar, which is both useless to look
+at and a genuine seizure risk, so it stays decorative unless someone wants
+to design a better answer than "flash faster".
+
+---
+
 **2026-08-28 phone HUD on a diet, and a difficulty pass that did not work, Claude (camera and particles)**
 
 Amy: "the playable area is so small on my phone, there is too much crap in

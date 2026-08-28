@@ -131,7 +131,7 @@
 </header>
 <div class="wrap">
   <h1>Radio to gamma</h1>
-  <p class="sub">A to B: <b id="specRatio">5.6 million</b>&times; apart. Drag a marker, or pick something.</p>
+  <p class="sub">A to B: <b id="specRatio">5.6 million</b>&times; apart, on a bar that runs ten quadrillion times end to end. Drag a marker, or pick something.</p>
 
   <div class="specwavebox">
     <span class="lane-tag a">A</span>
@@ -237,7 +237,10 @@
     for (const b of BANDS) if (f >= b.lo && f < b.hi) return b.name;
     return f < 1e4 ? 'below radio' : 'gamma';
   }
-  const BIG = [[1e12,'trillion'],[1e9,'billion'],[1e6,'million'],[1e3,'thousand']];
+  // The bar runs 1e4 Hz to 1e20 Hz, so dragging A and B to the two ends gives
+  // a ratio of 1e16. Stopping at 'trillion' rendered that as '10000 trillion'.
+  const BIG = [[1e15,'quadrillion'],[1e12,'trillion'],[1e9,'billion'],
+               [1e6,'million'],[1e3,'thousand']];
   function ratio(r) {
     if (r < 1000) return r < 10 ? r.toFixed(2) : String(Math.round(r));
     for (const [d, w] of BIG) if (r >= d) { const v = r / d; return (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + w; }
