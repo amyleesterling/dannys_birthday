@@ -497,6 +497,10 @@ function layout() {
 
   L.ch.cx = L.ch.x + L.ch.w / 2;
   L.figScale = L.figH / 185;
+  // Specks are drawn at a fixed pixel size rather than scaled with the
+  // subject, so on a phone a lint mote is a five pixel dot sitting on the
+  // brightest part of the art. The narrow layout gets a bigger speck.
+  L.pScale = narrow ? 1.55 : 1.15;
   L.intake = { w: Math.min(480, L.ch.w * (narrow ? 0.76 : 0.56)), h: 24, y: L.floorY + 8 };
   // Two outlets per side wall, fixed, near the top. Four beams that cross at
   // the point you aim at, which is where the intensity finally gets high
@@ -1024,7 +1028,13 @@ function drawSubject(s, time) {
     if (s.t >= OBJECT_EXIT && dannyOn()) {
       const danceAlpha = clamp((s.t - OBJECT_EXIT) / 0.3, 0, 1);
       const f = window.Danny.frame;
-      const cx = L.ch.cx, cy = L.floorY - L.figH * (86 / 185);
+      // The sprite is placed by its own centre, and widening the camera moved
+      // that centre well above Danny's body: the frame now runs to 4.7 world
+      // units while he is only 1.7 tall, so it is mostly headroom. f.cyLocal
+      // is where that centre sits in body-local units, and using it is what
+      // puts his soles back on the floor line. Assuming the centre was local
+      // zero, as this did, dropped him a whole screen height too low.
+      const cx = L.ch.cx, cy = L.floorY + (f.cyLocal - 86) * L.figScale;
       const w = f.wLocal * L.figScale, h = f.hLocal * L.figScale;
       ctx.globalAlpha = danceAlpha;
       ctx.drawImage(window.Danny.canvas, cx - w / 2, cy - h / 2, w, h);
@@ -1104,29 +1114,65 @@ function drawTrace(x, y, r, fl) {
   ctx.drawImage(traceImg, x - d / 2, y - d / 2, d, d);
 }
 
+// A speck has to read against two very different backdrops: the near black
+// chamber floor, and Amy's holographic renders, which are full of white hot
+// highlights. A flat coloured dot vanishes into the second one. So each speck
+// sits on a dark disc and carries a faint rim of its own colour, the same
+// halo trick a map label uses to stay legible over aerial photography.
+function drawSpeck(x, y, r, color) {
+  const a = ctx.globalAlpha;
+  ctx.beginPath(); ctx.arc(x, y, r + 2.1, 0, TAU);
+  ctx.fillStyle = 'rgba(0,7,11,0.7)';
+  ctx.fill();
+  ctx.globalAlpha = a * 0.45;
+  ctx.beginPath(); ctx.arc(x, y, r + 1.1, 0, TAU);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.globalAlpha = a;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
 function drawAttached(s, time, alpha) {
   for (const p of s.parts) {
     const scr = toScreen(s, p.lx, p.ly);
-    const r = p.type.size * (0.85 + 0.15 * Math.sin(time * 3 + p.ph));
+    const r = p.type.size * L.pScale * (0.85 + 0.15 * Math.sin(time * 3 + p.ph));
     ctx.globalAlpha = alpha;
     if (p.type.flagged) {
       const fl = 0.5 + 0.5 * Math.sin(time * 6 + p.ph);
+      // the flagged one still gets its dark seat, under the red halo
+      ctx.fillStyle = 'rgba(0,7,11,0.62)';
+      ctx.beginPath(); ctx.arc(scr.x, scr.y, r + 5 + fl * 2.5, 0, TAU); ctx.fill();
       ctx.fillStyle = `rgba(255,77,94,${0.35 + fl * 0.45})`;
       ctx.beginPath(); ctx.arc(scr.x, scr.y, r + 4 + fl * 2.5, 0, TAU); ctx.fill();
       drawTrace(scr.x, scr.y, r, fl);
     } else {
-      ctx.fillStyle = p.type.color;
-      ctx.beginPath(); ctx.arc(scr.x, scr.y, r, 0, TAU); ctx.fill();
+      drawSpeck(scr.x, scr.y, r, p.type.color);
     }
   }
   ctx.globalAlpha = 1;
 }
 
 function drawLoose(time) {
+  // The dark seats go down first, in normal blending. The glow pass below is
+  // additive and cannot darken anything, so a halo drawn inside it would do
+  // nothing at all on the bright parts of the art.
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,7,11,0.6)';
+  for (const p of loose) {
+    const r = p.type.size * L.pScale;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r + (p.type.flagged ? 5 : 2.1), 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const p of loose) {
-    const r = p.type.size;
+    const r = p.type.size * L.pScale;
     if (p.type.flagged) {
       const fl = 0.5 + 0.5 * Math.sin(time * 7 + p.ph);
       ctx.fillStyle = `rgba(255,77,94,${0.30 + fl * 0.35})`;

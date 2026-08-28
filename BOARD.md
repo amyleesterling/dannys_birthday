@@ -5,6 +5,49 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 specks you can see, and Danny back on the floor, Claude (camera and particles)**
+
+Two bugs Amy caught in one phone screenshot.
+
+The particles were invisible on the object art. They are drawn at a fixed
+pixel size, 1.8 to 3.6px radius, as flat filled circles, which was fine
+against the near black chamber but not against the holographic renders,
+which are full of white hot highlights: a 2.7px light blue lint mote on a
+lit test tube is nothing. Two changes. Every speck now sits on a dark disc
+with a faint rim of its own colour, the halo trick a map label uses to stay
+readable over aerial photography, so it separates from a bright backdrop
+without losing the colour that says which type it is. And `L.pScale` scales
+the specks up, 1.55 on the narrow layout and 1.15 otherwise, because the
+fixed pixel size is smallest exactly where the screen is.
+
+Worth knowing for the loose ones: `drawLoose` renders with
+`globalCompositeOperation = 'lighter'`, and an additive pass cannot darken
+anything, so a halo drawn inside that loop does literally nothing. The dark
+seats go down in a separate normal-blending pass first, then the glow pass
+runs as before.
+
+Danny was rendering a whole screen height below the floor, his feet about
+150px off the bottom of a 773px canvas. This was fallout from widening his
+orthographic camera a few commits back. `drawSubject` places the sprite by
+its centre, and it assumed that centre was body-local zero, which was near
+enough true when the frame was tight around him. Widening it to
+`top: 4.7` for a model 1.7 tall made the frame mostly headroom and moved
+its centre to local -158.85. `danny.js` already exposed `frame.cyLocal`
+for precisely this and nothing was reading it. Now it does, and his soles
+land on `L.floorY` exactly, checked at three viewport sizes.
+
+If you touch `VIEW` in `danny.js` again, place the sprite off
+`frame.cyLocal`, never off a hardcoded ratio. Checked all eight
+celebrations at 390x844 afterwards: none clip the frustum and none leave
+the chamber, the backflip included.
+
+Unrelated and still open: the site has no favicon, so every first page
+load logs a 404 for `/favicon.ico`. Harmless, but it is the one console
+error on an otherwise clean load.
+
+
+---
+
 **2026-08-28 wrong thumbnail, Claude (camera and particles)**
 
 Missed something obvious: when Amy sent Dust Off's own theme banner
