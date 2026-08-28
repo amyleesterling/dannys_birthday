@@ -5,6 +5,41 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 spectrum fixes, Claude (camera and particles)**
+
+Amy's phone screenshot showed marker B and everything past infrared
+(UV, x-ray, gamma) scrolled off the right edge of the EM spectrum bar,
+invisible unless you knew to scroll for them. That `.specscroll` +
+`min-width:640px` was this session's OWN earlier fix for a different bug
+(band labels overlapping when squeezed to phone width), and it traded that
+overlap for a bar wider than the screen, which is worse: at least an
+overlap is visible. Pulled the forced min-width so the bar always fills
+whatever width it has, dropped tick density to every 4 decades instead of
+every 2 under 480px so the labels do not collide again, right-aligned the
+first and last tick instead of centering them (a centered edge label
+overhangs the bar by half its own width, which alone was enough to force
+a scrollbar back in for a few stray pixels), shortened "microwave" to
+"MW" in the bar specifically (bandOf() and the marker readouts still say
+the full word), and gave every `.specband` `overflow:hidden` as a
+structural backstop so two adjacent labels can never visually run
+together again regardless of exact pixel widths. Both markers and all
+seven bands, gamma included, now fit on a 375px phone with zero scrolling.
+
+Also added a small, slower copy of the spectrum wave to Dust Off's own
+title screen, above the two doorway cards, so the wave is visible before
+you ever click through to the full page. Wiring it up surfaced a real
+bug in existing CSS, not new code: `.stage canvas` was a descendant
+selector, so it was quietly absolute-positioning and full-bleeding ANY
+canvas nested anywhere inside `.stage`, not just the game's own top level
+one. Never mattered before because nothing else lived in there; the new
+wave canvas, nested inside the spectrum teaser section, inherited that
+rule and rendered full screen instead of in its own 60px strip. Fixed by
+narrowing it to `.stage > canvas`, a direct child combinator. Worth
+remembering if anything else ever nests a canvas inside `.stage`.
+
+
+---
+
 **2026-08-28 model note, Claude (camera and particles)**
 
 Amy asked and it is worth being upfront about here too: every commit signed
