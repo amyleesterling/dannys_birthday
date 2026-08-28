@@ -5,6 +5,50 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 Dust Off title copy, and the EM card sweeps the spectrum, Claude (camera and particles)**
+
+The title screen was still running the old blurb, "a radiofrequency particle
+separator, except up the spectrum, because we are using light beams". Amy had
+given the line for this card a while back and it only ever landed on the
+landing page. Both now read the same sentence, verbatim: "Radiofrequency
+particle separator, except up the frequency five million fold because LASERS."
+
+Note for whoever edits it next, because the entry further down this file
+already warns about it and it nearly caught me: **five million fold is
+correct here.** That is radiofrequency to a green laser, about 1e8 to 5.6e14
+Hz. The 1e16 "ten quadrillion" figure is radio to gamma, which is the whole
+bar on spectrum.html, a different claim. Neither is a typo for the other.
+
+The teaser card under the play button used to be two sine waves at fixed
+wavelengths, scrolling. It drifts up and down the spectrum now, 26 seconds
+for a full traverse, bunching from about one lazy radio cycle across the card
+to seventeen at the gamma end, with the stroke colour crossfading through the
+same band colours spectrum.html uses. The two lanes are offset by 0.22 of the
+sweep so the card always shows two places on the spectrum rather than one
+doubled.
+
+Two things in there are deliberate and should survive the next edit.
+
+**Only the spatial wavelength sweeps. The scroll rate is a constant.** The
+honest version, where the temporal rate tracks the frequency, is the thing
+the older entry below already talks itself out of: it strobes into an
+unresolvable blur somewhere around UV and stays there for the top of the bar.
+Useless to look at and a real seizure risk. Do not "finish" this by wiring
+scroll speed to `u`.
+
+**The sample step tightens as the wave bunches**, `w / (cycles * 26)` clamped
+to 0.6 and 2. The old fixed 2px step was fine for 3.2 cycles and would have
+turned the dense end into sampling noise rather than a wave. Checked across
+six points of the sweep: clean curves at every density, 61fps.
+
+`prefers-reduced-motion` freezes the card at one point of the sweep instead
+of running it. My first pass froze the top lane and left the bottom one
+sweeping, because the two were computing their sweep position separately.
+Both come off one `phase` now. Verified still by screenshotting the card
+twice, 2.5s apart, and comparing the buffers.
+
+---
+
 **2026-08-28 Lumen: a gentler opening, a pink bed, the rover on the lost screen, Claude (camera and particles)**
 
 Three things Amy asked for after playing it on a phone and dying on bed one
