@@ -473,7 +473,17 @@ beam power      P = photons per second × energy per photon</pre>
     if (parent) parent.appendChild(e);
     return e;
   }
-  const OW = 1000;
+  // The svg coordinate width tracks the element's real CSS width, so one svg
+  // unit is one pixel and text renders at its nominal size on every screen —
+  // a fixed 1000-unit ruler squeezed into a phone made every label microscopic.
+  let OW = 1000;
+  function syncWidth() {
+    const w = Math.round(ovSvg.getBoundingClientRect().width);
+    if (w > 0) OW = Math.max(300, w);
+    ovSvg.setAttribute('viewBox', '0 0 ' + OW + ' 96');
+    focSvg.setAttribute('viewBox', '0 0 ' + OW + ' 150');
+    matterSvg.setAttribute('viewBox', '0 0 ' + OW + ' 190');
+  }
   const ovX  = f => S.linear ? (f / FMAX) * OW : (log(f) - F0) / (F1 - F0) * OW;
   const focX = f => (log(f) - S.focLo) / (S.focHi - S.focLo) * OW;
   const focF = x => Math.pow(10, S.focLo + clamp(x / OW, 0, 1) * (S.focHi - S.focLo));
@@ -525,10 +535,14 @@ beam power      P = photons per second × energy per photon</pre>
     for (const [m, f, col] of marks) {
       const x = ovX(f);
       el('line', { x1: x, x2: x, y1: 18, y2: 70, stroke: col, 'stroke-width': 2, 'pointer-events': 'none' }, ovSvg);
-      const label = m.toUpperCase() + ' · ' + nameOf(m).toUpperCase();
-      const wpx = label.length * 6.4;
+      let label = m.toUpperCase() + ' · ' + nameOf(m).toUpperCase();
+      let wpx = label.length * 6.4;
+      // a long name on a narrow screen falls back to the bare tag rather
+      // than clipping off the edge or shoving its neighbor out of view
+      if (wpx > OW * 0.46) { label = m.toUpperCase(); wpx = 10; }
       let lx = clamp(x - wpx / 2, 2, OW - wpx - 2);
       if (lx < lastEnd + 8) lx = lastEnd + 8;
+      if (lx + wpx > OW - 2) { label = m.toUpperCase(); wpx = 10; lx = clamp(x - 5, lastEnd + 8, OW - 12); }
       el('text', { x: lx, y: 12, 'font-size': 10.5, fill: col, 'pointer-events': 'none' }, ovSvg, label);
       lastEnd = lx + wpx;
     }
@@ -575,23 +589,24 @@ beam power      P = photons per second × energy per photon</pre>
       }
       return;
     }
-    if (sp > 2.5) {                       // decade ticks
-      const step = sp > 9 ? 2 : 1;
-      for (let d = Math.ceil(S.focLo); d <= Math.floor(S.focHi); d += step) {
-        const x = focX(Math.pow(10, d));
-        el('line', { x1: x, x2: x, y1: 96, y2: 104, stroke: '#3a4756' }, g);
-        el('text', { x: clamp(x, 24, OW - 24), y: 118, 'font-size': 10, fill: '#6c7c8c', 'text-anchor': 'middle' },
-           g, freq(Math.pow(10, d)));
+    // a label only lands where it has ~70px of room; ticks stay denser
+    let lastLbl = -1e9;
+    const tick = f => {
+      const x = focX(f);
+      el('line', { x1: x, x2: x, y1: 96, y2: 104, stroke: '#3a4756' }, g);
+      if (x - lastLbl > 70 && x > 26 && x < OW - 26) {
+        el('text', { x, y: 118, 'font-size': 10, fill: '#6c7c8c', 'text-anchor': 'middle' }, g, freq(f));
+        lastLbl = x;
       }
+    };
+    if (sp > 2.5) {                       // decade ticks
+      const step = Math.max(1, Math.ceil(sp / (OW / 70)));
+      for (let d = Math.ceil(S.focLo); d <= Math.floor(S.focHi); d += step) tick(Math.pow(10, d));
     } else {                              // 1-2-5 mantissa ticks
       for (let d = Math.floor(S.focLo) - 1; d <= Math.ceil(S.focHi); d++) {
         for (const m of (sp < 0.7 ? [1,1.5,2,3,4,5,6,7,8,9] : [1,2,5])) {
           const f = m * Math.pow(10, d);
-          if (log(f) < S.focLo || log(f) > S.focHi) continue;
-          const x = focX(f);
-          el('line', { x1: x, x2: x, y1: 96, y2: 104, stroke: '#3a4756' }, g);
-          el('text', { x: clamp(x, 24, OW - 24), y: 118, 'font-size': 10, fill: '#6c7c8c', 'text-anchor': 'middle' },
-             g, freq(f));
+          if (log(f) >= S.focLo && log(f) <= S.focHi) tick(f);
         }
       }
     }
@@ -880,6 +895,7 @@ beam power      P = photons per second × energy per photon</pre>
 
   // ---- master render -------------------------------------------------------
   function render() {
+    syncWidth();
     renderComposer(); renderSentence(); renderTable(); renderScale(); renderPower();
     renderOverview(); renderFocus(); renderMatter(); renderWaveText();
     encodeState();
@@ -1132,7 +1148,7 @@ beam power      P = photons per second × energy per photon</pre>
   applyLayer();
   render();
   if (wantTest) selfTest();
-  addEventListener('resize', () => { renderOverview(); renderFocus(); });
+  addEventListener('resize', () => { syncWidth(); renderOverview(); renderFocus(); renderMatter(); });
 })();
 </script>
 </body>
