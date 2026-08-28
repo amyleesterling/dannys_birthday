@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the patent works</title>
+<link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
+<link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: #07090a; color: #e2e6e4;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  .gamebar {
+    display: flex; align-items: baseline; gap: 18px;
+    padding: 11px 18px; border-radius: 0;
+    border-left: 0; border-right: 0; border-top: 0;
+    font-family: inherit;
+  }
+  .gamebar a { text-decoration: none; }
+  .gamebar-back {
+    font-size: 13px; letter-spacing: .12em;
+    color: rgb(var(--holo-dim, 154 162 177));
+    border: 1px solid rgb(var(--holo-line, 196 228 255) / .18);
+    padding: 7px 12px; align-self: center; white-space: nowrap;
+  }
+  .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  .gamebar-name {
+    font-size: 19px; font-weight: 600; letter-spacing: .06em;
+    color: rgb(var(--bar-accent)); white-space: nowrap;
+  }
+
+  .wrap { max-width: 700px; margin: 0 auto; padding: 26px 20px 60px; }
+  h1 { font-size: 22px; color: #a07cff; margin: 0 0 6px; font-weight: 600; }
+  .sub { font-size: 13.5px; color: #9aa2b1; margin: 0 0 30px; }
+  h2 {
+    font-size: 13px; letter-spacing: .12em; color: #6c7c8c;
+    margin: 34px 0 12px; font-weight: 600;
+  }
+  h2:first-of-type { margin-top: 0; }
+  p { font-size: 14.5px; line-height: 1.65; color: #e2e6e4; margin: 0 0 14px; }
+  .formula {
+    font-size: 13.5px; color: #c9b6ff; background: #0d0a14;
+    border: 1px solid rgba(160,124,255,.22); padding: 10px 14px; margin: 0 0 16px;
+  }
+  a.inline { color: #c9b6ff; border-bottom: 1px solid rgba(160,124,255,.4); text-decoration: none; }
+  a.inline:hover { border-bottom-color: #c9b6ff; }
+  .patcite {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(196,228,255,.14);
+    font-size: 13px; color: #9aa2b1;
+  }
+  .backrow { margin-top: 34px; }
+  .backrow a {
+    display: inline-block; font-size: 13px; letter-spacing: .1em; color: #c9b6ff;
+    border: 1px solid rgba(160,124,255,.4); padding: 10px 18px; text-decoration: none;
+  }
+  .backrow a:hover { border-color: #c9b6ff; }
+</style>
+</head>
+<body>
+<header class="gamebar holopanel" style="--bar-accent: 138 96 230;">
+  <a class="gamebar-back" href="index.html">← SEPARATOR</a>
+  <span class="gamebar-name">HOW THE PATENT WORKS</span>
+</header>
+<div class="wrap">
+  <h1>Tune the frequency, let the grain sort itself</h1>
+  <p class="sub">US 9,480,991 B2, radiofrequency particle separator.</p>
+
+  <h2>THE REAL PATENT</h2>
+  <p>
+    No mesh, no filter, no chemical reagent. A radiofrequency field is aimed into a fluid
+    carrying mixed mineral grains, and the one thing that decides which grains heat up is
+    where the field's skin depth lands, the shell near a particle's surface the field can
+    actually reach.
+  </p>
+  <div class="formula">skin depth &prop; 1 / &radic;frequency</div>
+  <p>
+    Higher frequency means a shallower shell, lower frequency reaches deeper. Tune the
+    field so that shell lands at roughly a tenth of one particle size, and energy
+    concentrates right where it counts instead of spreading through the whole grain, so
+    that size heats efficiently while everything of a different size mostly does not.
+  </p>
+  <p>
+    Once a targeted grain gets hot enough, the fluid touching it flashes to vapor. That
+    bubble is less dense than the fluid around it, so it floats, and the grain rides it up
+    to a skimmer waiting at the surface. Cooler, wrong sized grains never get their own
+    bubble and stay behind. The patent also describes a second method for conductive
+    particles, using the field to induce an electromagnetic force directly, but the bubble
+    lift is the one the game shows.
+  </p>
+
+  <h2>WHAT THE GAME KEEPS</h2>
+  <p>
+    The one real relationship: skin depth falling with the square root of frequency, so a
+    bigger grain always wants a lower frequency and a finer one always wants a higher one.
+    Every number on the dial and in the assay table, gold's 18 MHz, platinum's 152, comes
+    off that same formula, never a second, independent number.
+  </p>
+
+  <h2>WHERE THE GAME DIVERGES</h2>
+  <p>
+    The constant tying frequency to grain size is invented for the game. The real number
+    depends on the fluid and the mineral's own conductivity, which the patent works out in
+    far more depth than five bands on a dial ever could. The patent also describes an
+    automated system sweeping frequency according to a set pattern, hands off, the same way
+    the lumen device treats on its own once it senses something. The game puts a person on
+    that dial instead, tracking a feed that keeps switching under them, because that is the
+    part worth playing.
+  </p>
+
+  <p class="patcite">
+    <a class="inline" href="https://patents.google.com/patent/US9480991B2/en" target="_blank" rel="noopener">
+      US 9,480,991 B2</a> &middot; Baym, Briggs, Gilbert, Hillis, Hyde, Ishikawa, Kare,
+    Myhrvold, Myhrvold, Pan, Tegreene, Whitmer, Wood, Wood &middot; Elwha LLC,
+    granted 1 November 2016.
+  </p>
+  <div class="backrow"><a href="index.html">← BACK TO SEPARATOR</a></div>
+</div>
+</body>
+</html>
