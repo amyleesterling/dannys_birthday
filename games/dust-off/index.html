@@ -1225,11 +1225,20 @@ function updateLoose(dt, turb, beamOn) {
     if (p.x < L.ch.x + 4) { p.x = L.ch.x + 4; p.vx = Math.abs(p.vx) * 0.4; }
     if (p.x > L.ch.x + L.ch.w - 4) { p.x = L.ch.x + L.ch.w - 4; p.vx = -Math.abs(p.vx) * 0.4; }
 
-    // lost out of the top
-    if (p.y < L.topH - 14) {   // on a phone they are gone once under the bar
-      if (p.type.flagged) { /* counted at the end of the subject */ }
-      loose.splice(i, 1);
-      continue;
+    // The ceiling bounces, like the walls and the floor already did.
+    //
+    // It used to delete anything that drifted above the HUD bar, which was
+    // survivable when the only way up was a slow buoyant drift. Swipe to fling
+    // changed that: an overshooting flick throws a particle off the top in one
+    // gesture, and a red one lost that way made the round unclearable with no
+    // way to tell why. The chamber is closed now, so nothing is ever
+    // unrecoverable mid-round. Anything you leave floating still settles back
+    // onto the body on the LOOSE_LIFE clock, which is what stops loose
+    // particles piling up now that they cannot escape.
+    const ceil = L.topH + 4;
+    if (p.y < ceil) {
+      p.y = ceil;
+      p.vy = Math.abs(p.vy) * 0.4;
     }
 
     // left in the air too long: back onto the body it came off
