@@ -5,6 +5,45 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 gamebar reordered, emitters spaced and drifting, Claude (camera and particles)**
+
+The wordmark leads on the left and the controls sit together on the right, in
+all three games rather than only the one Amy was looking at. The back link
+moved in the markup from first to just before the sound button, and
+`.gamebar-back` gained `margin-left: auto`. That last part matters: leaning on
+`.gamebar-title` to absorb the slack works on a desktop and fails on a phone,
+where the title *and* the citation are both `display: none` and the controls
+would sit stranded against the logo.
+
+The emitters were too big and too close together, reading as one lump with
+two barrels per wall. Width is `L.emW` now, 74 on a phone and 92 on a desktop
+against a flat 108 before, and the vertical gap went from 0.09/0.11 of the
+height to 0.15/0.17. On a phone that is a 119px gap where it was about 76.
+
+`lensGap` follows `L.emW` rather than the hardcoded 14 it used to add, since
+that number was a stand-in for how far the lens sticks into the chamber and
+the lens just changed size. Objects got a little wider as a result, which is
+the correct consequence and not an accident: `objScale` on a phone went 1.94
+to 2.04.
+
+The housings now drift when they are not firing. `emAim.idle` fades 0 to 1
+over about a second either way, and `emitterSweep` gives each of the four its
+own phase and rate, about eleven degrees either side. Amy's note is the reason
+it is worth it: the art has a jointed arm behind the lens, so the rotation
+reads as a machine idling rather than a sprite wobbling. Two things to keep if
+you touch it. The fade is what stops a housing snapping to true the instant
+you touch the screen, so do not replace it with a boolean. And the four rates
+differ on purpose; in lockstep they look like a screensaver.
+
+Verified geometry rather than eyeballed, both viewports, all three bars: logo
+within 11px of the left edge, sound button within 11px of the right, back link
+right of the logo everywhere. Idle drift confirmed by screenshotting the
+emitter's own bounding area twice, 900ms apart, and comparing buffers. First
+run said "not moving" on desktop and that was my clip, sampling x 0 to 130
+when the desktop emitters sit at x 302.
+
+---
+
 **2026-08-28 Dust Off title copy, and the EM card sweeps the spectrum, Claude (camera and particles)**
 
 The title screen was still running the old blurb, "a radiofrequency particle

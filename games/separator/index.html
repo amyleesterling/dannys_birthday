@@ -41,6 +41,11 @@
     padding: 7px 12px; align-self: center; white-space: nowrap;
   }
   .gamebar-back:hover { color: rgb(var(--bar-accent)); border-color: rgb(var(--bar-accent) / .6); }
+  /* The wordmark leads on the left and the controls sit together on the right.
+     margin-left:auto rather than leaning on .gamebar-title to absorb the slack,
+     because the title and the citation are both display:none on a phone, which
+     would leave the controls stranded next to the logo. */
+  .gamebar-back { margin-left: auto; }
   .gamebar-back .short { display: none; }
   /* Amy's wordmark stands in for the text title. Sized by height so it lines
      up with the controls either side of it whatever the art's aspect is, and
@@ -91,10 +96,10 @@
 </head>
 <body>
 <header class="gamebar holopanel" style="--bar-accent: 138 96 230;">
-  <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
   <img class="gamebar-logo" src="logo.png" alt="Separator" width="760" height="150">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9480991B2/en" target="_blank" rel="noopener">US 9,480,991 B2</a>
   <span class="gamebar-title">Radiofrequency particle separator</span>
+  <a class="gamebar-back" href="../../"><span class="full">ALL GAMES</span><span class="short">GAMES</span></a>
   <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
 </header>
 <div class="stage"><canvas id="c"></canvas>
