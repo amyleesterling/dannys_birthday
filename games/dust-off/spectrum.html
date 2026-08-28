@@ -321,15 +321,52 @@
     waveW = r.width; waveH = r.height;
   }
 
-  const CYCLES_ACROSS = 3.2;   // fixed spatial period, purely cosmetic
-  function drawLane(y0, laneH, color, hz, t) {
+  // The spatial period used to be fixed at 3.2 cycles, which meant a marker
+  // dragged to gamma drew exactly the same wave as one sitting on radio, only
+  // scrolling faster. Amy's note was that gamma should be too fast to see, and
+  // the fixed period is precisely what stopped that from ever happening.
+  //
+  // It follows the marker now, and past a point the wave stops being drawable
+  // at all and becomes a band you cannot pick cycles out of. That is the
+  // honest picture and it is also the safe one: what climbs is the *spatial*
+  // frequency, so nothing flashes. A strobe is what you get when something is
+  // slow enough to resolve; too fast to see is a smear.
+  //
+  // Temporal speed still runs on the bounded visualHz ramp above, untouched.
+  const CYC_LO = 1.2, CYC_HI = 240;
+  const RES_LO = 3.2, RES_HI = 7;   // pixels per cycle: gone, and untouched
+  const cyclesAt = f => CYC_LO * Math.pow(CYC_HI / CYC_LO, toX(f));
+
+  // A sinusoid dwells at its turning points and crosses the middle fast, so a
+  // smeared one is two bright rails with a dim centre, not a flat bar. That is
+  // the arcsine density, approximated with gradient stops.
+  const SMEAR_STOPS = [0, .08, .2, .35, .5, .65, .8, .92, 1];
+  function smear(mid, amp, color, alpha) {
+    const g = waveCtx.createLinearGradient(0, mid - amp, 0, mid + amp);
+    for (const p of SMEAR_STOPS) {
+      const y = (p - 0.5) * 2;
+      const d = 1 / Math.sqrt(Math.max(0.02, 1 - y * y));
+      g.addColorStop(p, color + Math.min(1, alpha * d * 0.42).toFixed(3) + ')');
+    }
+    waveCtx.fillStyle = g;
+    waveCtx.fillRect(0, mid - amp, waveW, amp * 2);
+  }
+
+  function drawLane(y0, laneH, rgb, hz, t, cycles) {
     const amp = laneH * 0.34, mid = y0 + laneH / 2;
+    const res = Math.max(0, Math.min(1, (waveW / cycles - RES_LO) / (RES_HI - RES_LO)));
+    const head = 'rgba(' + rgb + ',';
+
+    if (res < 0.999) smear(mid, amp, head, 1 - res * 0.75);
+    if (res <= 0.01) return;
+
+    const step = Math.max(0.3, Math.min(2, waveW / (cycles * 26)));
     waveCtx.beginPath();
-    for (let px = 0; px <= waveW; px += 2) {
-      const yy = mid - Math.sin((px / waveW) * CYCLES_ACROSS * TAU - t * hz * TAU) * amp;
+    for (let px = 0; px <= waveW; px += step) {
+      const yy = mid - Math.sin((px / waveW) * cycles * TAU - t * hz * TAU) * amp;
       if (px === 0) waveCtx.moveTo(px, yy); else waveCtx.lineTo(px, yy);
     }
-    waveCtx.strokeStyle = color;
+    waveCtx.strokeStyle = head + res.toFixed(3) + ')';
     waveCtx.lineWidth = 2;
     waveCtx.stroke();
   }
@@ -340,8 +377,8 @@
       const t = (now - waveStart) / 1000;
       waveCtx.setTransform(waveDpr, 0, 0, waveDpr, 0, 0);
       waveCtx.clearRect(0, 0, waveW, waveH);
-      drawLane(0, waveH / 2, '#7ee0ff', visualHz(fA), t);
-      drawLane(waveH / 2, waveH / 2, '#e8a93a', visualHz(fB), t);
+      drawLane(0, waveH / 2, '126,224,255', visualHz(fA), t, cyclesAt(fA));
+      drawLane(waveH / 2, waveH / 2, '232,169,58', visualHz(fB), t, cyclesAt(fB));
     }
     requestAnimationFrame(waveFrame);
   }

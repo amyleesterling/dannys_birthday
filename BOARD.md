@@ -5,6 +5,48 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 gamma is unresolvable now, and my earlier reasoning was wrong, Claude (camera and particles)**
+
+Amy, twice: gamma should be so fast you cannot see it. The note further down
+this file argued that meant strobing, refused on seizure grounds, and left it
+there. That refusal was reasoning about the wrong thing.
+
+**A strobe is what you see when something is slow enough to resolve.**
+Genuinely too fast to see is a smear, not a flicker. So the honest render and
+the safe render are the same render, and the whole objection dissolves. What
+climbs is the *spatial* frequency; nothing on either page flashes.
+
+Two places changed, both the same way.
+
+`spectrum.html` is the one that mattered and the one I had missed. Its
+`CYCLES_ACROSS` was a **fixed** 3.2, so a marker dragged to gamma drew exactly
+the same wave as one parked on radio, only scrolling faster. That constant was
+the entire reason her ask could never be satisfied. Cycles follow `toX(f)` now,
+1.2 up to 240 across the lane. Measured by dragging marker A and counting
+midline crossings: radio 6, microwave 30, infrared 128, x-ray 434, gamma **1**,
+with ink coverage going 0.03 to 0.68. That last row is the ask, met.
+
+The Dust Off title card got the same treatment for consistency.
+
+Where the wave stops being drawn is a measured threshold, not taste. Nyquist
+puts the hard floor at two pixels per cycle, but a *stroked* line needs more
+headroom than a sample does: at 2.2 the trace was still drawn and came out as
+aliasing teeth, which reads as a broken wave rather than a fast one. I saw that
+in the first render and moved it to 3.2, where the last drawable cycles still
+look like cycles. The step floor went 0.6 to 0.3 for the same reason, since 0.6
+left only about three samples per cycle up there.
+
+The smear is not a flat bar. A sinusoid dwells at its turning points and
+crosses the middle fast, so a blurred one is two bright rails with a dim
+centre, the arcsine density. It is approximated with nine gradient stops
+rather than integrated per frame.
+
+Cost: 61fps to 50 on the card during the dense part of the sweep. Acceptable
+for decoration; if it ever matters, the gradient is rebuilt every frame and
+could be cached against a quantised `u`.
+
+---
+
 **2026-08-28 new Dust Off wordmark, and how it was cut out, Claude (camera and particles)**
 
 `games/dust-off/logo.png` is Amy's new one: wider beams, a crosshair in the O,

@@ -254,21 +254,28 @@ window.addEventListener('keydown', e => {
   new ResizeObserver(size).observe(canvas);
   size();
 
-  // The card used to hold two sine waves at fixed wavelengths, scrolling. It
-  // drifts up and down the spectrum now, so the teaser actually previews what
-  // the page behind it is about: the wave bunches up as it climbs, from a few
-  // lazy radio cycles to a dense gamma hash, and the colour follows the band
-  // it is currently sitting in.
+  // The card drifts up and down the spectrum, and the point of it is what
+  // happens at the top: past a certain frequency the wave stops being a wave
+  // you can look at and becomes a band you cannot pick cycles out of.
   //
-  // One thing here is deliberate and should stay. What sweeps is the *spatial*
-  // wavelength, how many cycles fit across the card. The scroll rate is held
-  // constant. Driving the temporal rate off the frequency instead is the
-  // honest version and it is a bad idea: it strobes into an unresolvable blur
-  // somewhere around UV and stays there for the top of the bar, which is
-  // useless to look at and a real seizure risk. There is a longer note about
-  // this in BOARD.md.
+  // That is the correction Amy asked for, and the earlier note here had it
+  // backwards. It argued that "too fast to see" meant strobing, refused to do
+  // it on seizure grounds, and left the top of the spectrum looking like a
+  // slightly busier version of the bottom. But a strobe is what you see when
+  // something is slow *enough* to resolve. Genuinely too fast to see is a
+  // smear. So the honest render and the safe one are the same render, and
+  // nothing here flashes: what climbs is the spatial frequency, and the wave
+  // dissolves once the cycles are finer than the display can draw.
+  //
+  // The dissolve threshold is not a taste call. Nyquist puts the hard floor at
+  // two pixels per cycle, but a stroked line needs more headroom than a sample
+  // does: at 2.2 the trace was still being drawn and came out as aliasing teeth,
+  // which reads as a broken wave rather than a fast one. It is abandoned at 3.2
+  // instead, where the last drawable cycles still look like cycles. The fade
+  // starts at seven, where the eye has already given up counting them.
   const SWEEP_SECS = 26;          // one full radio to gamma traverse
-  const CYC_LO = 1.1, CYC_HI = 17;  // cycles across the card at each end
+  const CYC_LO = 1.1, CYC_HI = 240; // cycles across the card at each end
+  const RES_LO = 3.2, RES_HI = 7;   // pixels per cycle: smear fully, smear not at all
   const SCROLL_A = 0.22, SCROLL_B = 0.34;   // constant, never frequency driven
 
   // the bands off spectrum.html, in the same order, as stops the sweep
@@ -291,18 +298,42 @@ window.addEventListener('keydown', e => {
     return 'rgba(' + c.join(',') + ',' + alpha + ')';
   }
 
+  // What a sine looks like once it is too fast to resolve. Not a uniform bar:
+  // a sinusoid spends most of its time near the turning points and crosses the
+  // middle quickly, so a smeared one is two bright rails with a dim centre.
+  // That is the arcsine density, 1/sqrt(1 - (y/amp)^2), approximated here with
+  // gradient stops because a real integral per frame is not worth it.
+  const SMEAR_STOPS = [0, .08, .2, .35, .5, .65, .8, .92, 1];
+  function smear(mid, amp, u, alpha) {
+    const g = ctx.createLinearGradient(0, mid - amp, 0, mid + amp);
+    for (const p of SMEAR_STOPS) {
+      const y = (p - 0.5) * 2;                       // -1 at the rails, 0 mid
+      const d = 1 / Math.sqrt(Math.max(0.02, 1 - y * y));
+      g.addColorStop(p, bandColor(u, Math.min(1, alpha * d * 0.42)));
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(0, mid - amp, w, amp * 2);
+  }
+
   function drawLane(y0, laneH, u, scroll, t, alpha) {
     const cycles = CYC_LO * Math.pow(CYC_HI / CYC_LO, u);
-    // step finer as the wave bunches up, so a dense one stays a wave rather
-    // than turning into sampling noise
-    const step = Math.max(0.6, Math.min(2, w / (cycles * 26)));
     const amp = laneH * 0.34, mid = y0 + laneH / 2;
+    // how much of this wave the screen can still actually draw
+    const res = Math.max(0, Math.min(1, (w / cycles - RES_LO) / (RES_HI - RES_LO)));
+
+    if (res < 0.999) smear(mid, amp, u, alpha * (1 - res * 0.75));
+    if (res <= 0.01) return;   // nothing resolvable left to trace
+
+    // step finer as the wave bunches up, so a dense one stays a wave rather
+    // than turning into sampling noise. The 0.3 floor matters at the top of the
+    // resolvable range: 0.6 left only about three samples per cycle there.
+    const step = Math.max(0.3, Math.min(2, w / (cycles * 26)));
     ctx.beginPath();
     for (let px = 0; px <= w; px += step) {
       const yy = mid - Math.sin((px / w) * cycles * TAU - t * scroll * TAU) * amp;
       px === 0 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
     }
-    ctx.strokeStyle = bandColor(u, alpha);
+    ctx.strokeStyle = bandColor(u, alpha * res);
     ctx.lineWidth = 2;
     ctx.stroke();
   }
