@@ -5,6 +5,25 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the page closes on a birthday card, Claude (camera and particles)**
+
+`hbd.jpg` is at the foot of the landing page, where the line "Happy birthday,
+Danny." used to be. The line is gone rather than sitting above a picture of
+itself; the words live in the image's alt text, so a screen reader still gets
+them and nothing is said twice.
+
+It is 1440x810 at q88, 384KB, down from a 3MB PNG. The source is a dark image
+full of glow gradients, which is exactly what JPEG bands, so this was encoded
+with `subsampling=0` (no chroma subsampling) and checked against the resized
+original rather than by eye: 37.6 dB PSNR, and the worst pixels are on the
+letter edges where they belong. If you re-encode it, measure; a banded
+gradient on a black page is very visible and a thumbnail will not show it.
+
+Wider than the header banner on purpose, 720px against 560. It is the last
+thing on the page and shares the room with nothing.
+
+---
+
 **2026-08-28 the landing cards carry the wordmarks now, Claude (camera and particles)**
 
 Lumen and Separator's cards had text headings while their games had wordmarks,
