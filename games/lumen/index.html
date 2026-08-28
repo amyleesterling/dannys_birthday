@@ -6,6 +6,7 @@
 <title>Lumen</title>
 <link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
 <link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<link rel="stylesheet" href="../screen.css">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -86,22 +87,6 @@
     .gamebar button { padding: 7px 10px; font-size: 12px; }
   }
 
-  /* the patent explainer, on the title screen only */
-  .patwrap {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
-    display: none; padding: 0 20px 24px;
-  }
-  body[data-state="title"] .patwrap { display: block; }
-  .patwrap .in { max-width: 560px; margin: 0 auto; }
-  .patlink {
-    display: flex; align-items: center; justify-content: space-between; gap: 14px;
-    border: 1px solid rgba(196,228,255,.18); background: rgba(7,4,5,.9);
-    padding: 14px 18px; text-decoration: none; color: inherit;
-  }
-  .patlink:hover { border-color: rgba(255,107,120,.5); }
-  .patlink .t { font-size: 14px; color: #ff8a92; font-weight: 600; }
-  .patlink .s { font-size: 12px; color: #8b98a8; margin-top: 3px; }
-  .patlink .go { font-size: 18px; color: #ff8a92; }
 </style>
 </head>
 <body>
@@ -114,20 +99,48 @@
   <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
 </header>
 <div class="stage"><canvas id="c"></canvas>
-<div class="patwrap"><div class="in">
-  <a class="patlink" href="patent.html">
-    <span>
-      <span class="t">HOW THE PATENT ACTUALLY WORKS</span>
-      <span class="s">Wheels, a sensor, and a whole menu of treatments, no one steering it.</span>
-    </span>
-    <span class="go">&rarr;</span>
-  </a>
-</div></div>
+<section class="gscreen" id="gs-title">
+  <div class="gscreen-panel">
+    <span class="holodialog-rim"></span>
+    <img class="gscreen-logo" src="logo.png" alt="Lumen" width="640" height="142">
+    <p class="holodialog-eyebrow">US 7,857,767 B2 &middot; Lumen traveling device</p>
+    <p class="holodialog-desc">
+      A self propelling device in a vessel bed. It follows your cursor, and how
+      far you drag is the throttle. Follow the sensor bearing to the gold
+      plaque, which burns on its own once you arrive.
+    </p>
+    <button class="holobtn" type="button" data-key="r">
+      <span class="holobtn-text">Deploy</span><span class="holobtn-glow"></span>
+    </button>
+    <p class="gscreen-foot">Or press R</p>
+    <div class="gscreen-links">
+      <a href="patent.html">How the patent actually works <span>&rarr;</span></a>
+    </div>
+  </div>
+</section>
+<section class="gscreen" id="gs-over">
+  <div class="gscreen-panel">
+    <span class="holodialog-rim"></span>
+    <img class="gscreen-logo" src="logo.png" alt="Lumen" width="640" height="142">
+    <p class="holodialog-eyebrow">Device lost</p>
+    <p class="holodialog-desc" id="gs-over-why">&nbsp;</p>
+    <div class="gscreen-stats">
+      <div class="gscreen-stat"><span class="k">Score</span><span class="v" id="gs-over-score">000000</span></div>
+      <div class="gscreen-stat"><span class="k">Beds cleared</span><span class="v" id="gs-over-beds">0</span></div>
+    </div>
+    <button class="holobtn" type="button" data-key="r">
+      <span class="holobtn-text">Deploy again</span><span class="holobtn-glow"></span>
+    </button>
+    <p class="gscreen-foot">Or press R</p>
+  </div>
+</section>
 </div>
 <script>
-// The bar talks to the game the same way a keyboard does, so the game needs no
-// hook of its own and the two stay independent.
-document.querySelectorAll('.gamebar button').forEach(b => {
+// The bar and the play/restart screens both talk to the game the same way a
+// keyboard does, so the game needs no hook of its own and the three stay
+// independent. The screens are plain HTML over the canvas; dispatching the key
+// they carry is the whole of their wiring.
+document.querySelectorAll('.gamebar button, .gscreen button').forEach(b => {
   b.addEventListener('click', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key }));
     if (b.id === 'sndbtn') {
@@ -237,7 +250,12 @@ function layout() {
     L.topH  = 108;
     L.hud   = clamp(W / 300, 1.2, 1.8);
     L.btn   = { x: W - 74, y: H - 78, r: 50 };
-    L.map   = { x: W - 136, y: L.topH + 12, w: 124, h: 124 };
+    // Bottom left, not top right. The device drives toward the sensor bearing,
+    // which means you are usually looking ahead and up the field, and a survey
+    // map parked in that corner sits exactly where you are trying to see. The
+    // bottom left is the one corner nothing else claims: the anchor thumb is
+    // bottom right, and the readouts are along the top.
+    L.map   = { x: 12, y: H - 136, w: 124, h: 124 };
   } else {
     const padL = W >= 1180 ? 272 : 236;
     const padR = W >= 1180 ? 304 : 252;
@@ -650,8 +668,7 @@ function draw(time) {
 
   drawTouch(time);
   drawPanels(time);
-  if (state === 'title') drawTitle();
-  if (state === 'over') drawOver();
+  // title and game over are HTML now, see #gs-title and #gs-over
   if (state === 'play' && pointer.inside && !L.narrow) drawCursor();
 }
 
@@ -1062,7 +1079,6 @@ function drawTouch(time) {
   ctx.textAlign = 'left';
 }
 
-const OVERLAY = 'rgba(7,4,5,0.975)';
 
 // Measure before drawing. A centred string that does not fit gets shrunk, down
 // to a floor of 12px, below which it is not worth reading.
@@ -1079,89 +1095,23 @@ function fitCentered(text, cx, y, maxW, size, color) {
   return f;
 }
 
-function wrapToWidth(text, maxW, font) {
-  ctx.font = font;
-  const words = text.split(' ');
-  const out = [];
-  let line = '';
-  for (const w of words) {
-    const t = line ? line + ' ' + w : w;
-    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; }
-    else { line = t; }
-  }
-  if (line) out.push(line);
-  return out;
-}
-
-function card(title, titleColor, sub, lines, button, accent) {
-  const c = L.ch;
-  ctx.fillStyle = OVERLAY;
-  ctx.fillRect(c.x, 0, c.w, H);
-  ctx.textAlign = 'center';
-
-  const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
-  const mono = 'px ui-monospace, Menlo, monospace';
-  const maxW = c.w - 36;
-  const put = (t, y, size, color, weight) => {
-    ctx.fillStyle = color;
-    ctx.font = (weight ? weight + ' ' : '') + (size * k) + mono;
-    ctx.fillText(t, c.cx, y);
-  };
-
-  // wrap first, so the block height knows how tall it really is
-  const bodyFont = (14 * k) + mono;
-  const wrapped = [];
-  for (const t of lines) for (const w of wrapToWidth(t, maxW, bodyFont)) wrapped.push(w);
-
-  const bw = Math.min(c.w * 0.72, 280 * k), bh = 56 * k;
-  const block = 46 * k + 26 * k + bh + 44 * k + wrapped.length * 24 * k;
-  let y = Math.max(40 * k, (H - block) / 2) + 34 * k;
-
-  const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
-  put(title, y, tSize, titleColor, '600'); y += 24 * k;
-  for (const sl of wrapToWidth(sub, maxW, (13 * k) + mono)) {
-    put(sl, y, 13, COL.dim); y += 19 * k;
-  }
-  y += 12 * k;
-
-  const bx = c.cx - bw / 2;
-  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
-  ctx.fillStyle = 'rgba(126,224,255,' + (0.08 + pulse * 0.07) + ')';
-  ctx.fillRect(bx, y, bw, bh);
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
-  ctx.textAlign = 'center';
-  put(button, y + bh / 2 + 7 * k, 19, accent, '700');
-  y += bh + 40 * k;
-
-  for (const t of wrapped) { put(t, y, 14, COL.dim); y += 24 * k; }
-  ctx.textAlign = 'left';
-}
-
-function drawTitle() {
-  const touch = L.narrow;
-  card('LUMEN', COL.teal, 'A SELF PROPELLING DEVICE IN A VESSEL BED', [
-    touch ? 'Drag to drive. How far you drag is the throttle.'
-          : 'The device follows the cursor. Distance is the throttle.',
-    'Follow the sensor bearing to the gold plaque. It burns on its own once you arrive.',
-    touch ? 'Hold the big button to anchor against the current while it burns.'
-          : 'Hold the mouse button to anchor against the current while it burns.',
-  ], 'PLAY NOW', COL.teal);
-}
-
-function drawOver() {
-  card('DEVICE LOST', COL.red, dev && dev.deadReason ? dev.deadReason : '', [
-    'Score ' + String(score).padStart(6, '0'),
-    (level - 1) + ' vessel beds cleared',
-  ], 'DEPLOY AGAIN', COL.teal);
-}
-
 // ---------------------------------------------------------------- loop
 
 let last = performance.now();
+// The over screen is HTML, so its numbers are pushed once as the state opens
+// rather than redrawn every frame.
+function syncOverScreen() {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('gs-over-score', String(score).padStart(6, '0'));
+  set('gs-over-beds', String(level - 1));
+  set('gs-over-why', dev && dev.deadReason ? dev.deadReason : 'The device did not make it back.');
+}
+
 function step(now) {
-  if (document.body.dataset.state !== state) document.body.dataset.state = state;
+  if (document.body.dataset.state !== state) {
+    document.body.dataset.state = state;
+    if (state === 'over') syncOverScreen();
+  }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   update(dt);

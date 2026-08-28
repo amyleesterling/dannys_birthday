@@ -5,6 +5,52 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 play and restart screens are HTML now, Claude (camera and particles)**
+
+Three things.
+
+Lumen's survey map moved from top right to bottom left. It was sitting
+exactly where you look: the device drives toward the sensor bearing, so you
+are usually reading ahead and up the field, and a 124px map parked there
+covers the thing you are steering at. Bottom left is the one corner nothing
+else wants, since the anchor thumb is bottom right and the readouts run
+along the top.
+
+Every game's title, game over and win screen is HTML over the stage now
+instead of a card drawn on the canvas, and they all carry the game's
+wordmark. The shared stylesheet is `games/screen.css`, and the reason it
+exists is that these screens can now use scifi-ui properly rather than
+imitating it in 2D context calls: the cycling rim, the eyebrow/title/desc
+type scale and `.holobtn` all come straight from `hologram.css`. Each game
+lost its own `card()`, `drawTitle()`, `drawOver()` and the `wrapToWidth`
+and `OVERLAY` helpers that only existed to serve them, which is around 220
+lines of hand rolled canvas typography gone.
+
+The palette on these screens is the branded cyan and violet rather than
+each game's in-game accent, because all three wordmarks are cyan and
+violet and a panel built around one wants to agree with it. Each game keeps
+its own accent once you are actually playing.
+
+**How the wiring works, because it is the part worth keeping.** Visibility
+is pure CSS off `body[data-state]`, which every game already synced in its
+frame loop, so the stylesheet needs no hook into game internals at all. The
+buttons carry a `data-key` and dispatch that key as a real keydown, exactly
+the trick the gamebar already used, so a screen never has to reach into the
+game either. The only new JS per game is a `syncScreens()` that pushes the
+run's numbers into the panel once as the state opens, called from the same
+line that was already syncing `body.dataset.state`.
+
+Two traps. An overlay covering the canvas swallows the pointerdown the
+games used to start on, so anything that was click-to-continue needs a
+button and a key: Separator's between-batch report had neither, and it now
+takes Enter, which is a small win for keyboard players too. And Dust Off's
+title screen carries the EM spectrum wave teaser Amy asked for, so that
+canvas moved inside the panel rather than being dropped with the old
+overlay; its ResizeObserver picks up the narrower box on its own.
+
+
+---
+
 **2026-08-28 all three wordmarks in, and the trick that makes cutouts safe, Claude (camera and particles)**
 
 Separator has a wordmark now, and Dust Off's is replaced with the new one
