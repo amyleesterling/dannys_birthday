@@ -432,9 +432,13 @@ const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const PART_TYPE = TYPE_BY_ID.trace;
 const GRIT_TYPE = TYPE_BY_ID.grit;
 
-// Roughly two in five are the valuable red, so a round always has both to
-// choose between.
-const GRIT_FRAC = 0.58;
+// The red share is *dealt*, not rolled per particle. Rolling it meant round one,
+// with only seven particles, came up with exactly one red 11% of the time and
+// none at all 2.5% of the time. Since clearing is measured on the red, a round
+// like that is decided by whether you happened to sweep over one dot on a large
+// object: Amy lost the lab coat on level one to precisely this. A floor of
+// three means no round is ever a coin flip.
+const REDS_PER_ROUND = n => Math.max(3, Math.round(n * 0.42));
 
 // laser + heat
 // A cleared round used to take under a second: 28 particles gone off a single
@@ -472,6 +476,9 @@ const PULSE_RADIUS = 74;   // screen px
 // not a clock you are meant to race. It was 4.6, which left a 0.2s margin and
 // would have had particles settling back for no reason a player could see.
 const LOOSE_LIFE  = 6.0;   // seconds in the air
+// after the buzzer, how long the vent gets to finish drawing in whatever is
+// already travelling before the round is scored
+const LOOSE_GRACE = 2.5;
 const LOOSE_WARN  = 1.2;   // it starts flickering this long before settling
 const BEAM_RADIUS  = 132;  // how far the held beam can reach for loose grit
 
@@ -777,7 +784,10 @@ const roundCount = n => Math.min(90, Math.round(7 + (n - 1) * 4));
 // The scan window used to grow with the round, from 6s to 8s, which meant the
 // only thing getting harder was the count and the clock was quietly getting
 // kinder. It shrinks now: more to recover, less time to do it in.
-const roundTime  = n => Math.max(5, 6.8 - (n - 1) * 0.2);
+// 6.8s was set when a held sweep both dislodged and delivered. The beam now
+// only dislodges and the trip to the intake takes its own time, so the early
+// rounds need room to cover a big object like the lab coat.
+const roundTime  = n => Math.max(5.5, 8.5 - (n - 1) * 0.3);
 
 function newSubject() {
   const def = pickSubjectDef();
@@ -794,9 +804,16 @@ function newSubject() {
     if (!hitsSubjectArt(def, x, y)) continue;
     pts.push({ x, y });
   }
-  const parts = pts.map(pt => ({
+  // deal the reds, then shuffle which points get them, so the split is exact
+  const nRed = Math.min(pts.length, REDS_PER_ROUND(pts.length));
+  const deck = pts.map((_, i) => i < nRed);
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+  const parts = pts.map((pt, i) => ({
     lx: pt.x, ly: pt.y,
-    type: Math.random() < GRIT_FRAC ? GRIT_TYPE : PART_TYPE,
+    type: deck[i] ? PART_TYPE : GRIT_TYPE,
     ph: rand(0, TAU),
   }));
   // Clearing is measured on the red only. Yellow left on the object at the
@@ -809,7 +826,7 @@ function newSubject() {
     id: 'SB' + String(1740 + round * 7 + ((Math.random() * 60) | 0)).padStart(4, '0'),
     phase: 'ready', t: 0,
     readyDur: 2.6, walkDur: 1.0, resultDur: 1.3,
-    scanTime: t, scanLeft: t,
+    scanTime: t, scanLeft: t, grace: 0,
     total: wanted, got: 0,
     x: L.ch.x - 70,
     turb: 0.34 + round * 0.07,
@@ -1105,8 +1122,16 @@ function update(dt) {
   } else if (s.phase === 'scan') {
     s.x = L.ch.cx + Math.sin(s.t * 1.4) * 1.6;
     s.scanLeft -= dt;
+    // Particles take a couple of seconds to reach the intake under their own
+    // steam, which is new: with a swipe they arrived the moment you threw them.
+    // Scoring the instant the clock hits zero would mark everything still in
+    // transit as missed, so the buzzer stops the clock and then waits for the
+    // chamber to drain. Only what is still stuck on the object counts against
+    // you.
     const anyLeft = s.parts.length > 0 || loose.length > 0;
-    if (s.scanLeft <= 0 || !anyLeft) {
+    if (s.scanLeft > 0) s.scanLeft -= dt; else s.grace += dt;
+    const drained = loose.length === 0 || s.grace >= LOOSE_GRACE;
+    if ((s.scanLeft <= 0 && drained) || !anyLeft) {
       s.scanLeft = Math.max(0, s.scanLeft);
       settleRound();
       s.phase = 'result'; s.t = 0;
