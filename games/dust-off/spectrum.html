@@ -124,6 +124,12 @@
 
   /* for scale: an apple sitting in the beam for a minute, band by band */
   .specmark.apple { background: #ff6b5e; color: #ff6b5e; }
+  /* locator: the full spectrum in miniature, with the zoomed window marked */
+  .specmini { position: relative; height: 10px; margin: 0 0 8px;
+              border: 1px solid rgba(196,228,255,.14); background: #05070c; }
+  .specmini .specband span { display: none; }
+  .specmini-win { position: absolute; top: -3px; bottom: -3px; z-index: 1;
+                  border: 1px solid rgba(126,224,255,.8); background: rgba(126,224,255,.1); }
   .applerow { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
   .applecanvas { width: 128px; height: 128px; flex: 0 0 auto; background: #05070c;
                  border: 1px solid rgba(196,228,255,.14); }
@@ -179,7 +185,8 @@
 
   <div class="specpresets" id="specPresets"></div>
 
-  <p class="cap">For scale, one minute of exposure:</p>
+  <p class="cap">For scale, one minute of exposure. The eventful stretch is the high end, so this bar is zoomed &mdash; the strip shows where it sits on the full spectrum:</p>
+  <div class="specmini" id="appleMini" aria-hidden="true"><div class="specmini-win" id="appleMiniWin"></div></div>
   <div class="specscroll">
     <div class="specbar" id="appleBar">
       <div class="specmark apple" id="markApple" tabindex="0" role="slider" aria-label="Exposure frequency on an apple"></div>
@@ -262,30 +269,37 @@
     return String(Math.round(r));
   }
 
-  function paintBands(barEl) {
+  // both bars share the painters; a bar narrower than the full window passes
+  // its own scale function and the bands are clipped to what it can show
+  function paintBands(barEl, xf, labels) {
+    xf = xf || toX;
     for (const b of BANDS) {
+      const lo = clamp(xf(b.lo), 0, 1), hi = clamp(xf(b.hi), 0, 1);
+      if (hi - lo <= 0.001) continue;
       const el = document.createElement('div');
       el.className = 'specband';
-      el.style.left = (toX(b.lo) * 100) + '%';
-      el.style.width = ((toX(b.hi) - toX(b.lo)) * 100) + '%';
+      el.style.left = (lo * 100) + '%';
+      el.style.width = ((hi - lo) * 100) + '%';
       el.style.background = b.col;
-      if (toX(b.hi) - toX(b.lo) > 0.07) el.innerHTML = '<span>' + (b.short || b.name) + '</span>';
+      if (labels !== false && hi - lo > 0.07) el.innerHTML = '<span>' + (b.short || b.name) + '</span>';
       barEl.insertBefore(el, barEl.firstChild);
     }
   }
-  function paintTicks(ticksEl) {
+  function paintTicks(ticksEl, d0, d1) {
+    if (d0 == null) d0 = F0;
+    if (d1 == null) d1 = F1;
     // fewer ticks on a narrow screen: nine decade labels shoulder to
     // shoulder is what used to force this bar into a horizontal scroll in
     // the first place, and the whole point now is that it never needs one
     const step = ticksEl.getBoundingClientRect().width < 480 ? 4 : 2;
-    for (let d = F0; d <= F1; d += step) {
+    for (let d = d0; d <= d1; d += step) {
       const i = document.createElement('i');
-      i.style.left = ((d - F0) / (F1 - F0) * 100) + '%';
+      i.style.left = ((d - d0) / (d1 - d0) * 100) + '%';
       // every tick label is centred on its position except the two on the
       // very edge, which would otherwise overhang the bar by half their own
       // width and force a scrollbar back in for a few stray pixels
-      if (d === F0) i.style.transform = 'translateX(0)';
-      else if (d === F1) i.style.transform = 'translateX(-100%)';
+      if (d === d0) i.style.transform = 'translateX(0)';
+      else if (d === d1) i.style.transform = 'translateX(-100%)';
       i.innerHTML = freq(Math.pow(10, d));
       ticksEl.appendChild(i);
     }
@@ -458,10 +472,22 @@
   // A photon's frequency alone does not decide the outcome, real damage is
   // about total energy absorbed, but the ranking here (harmless at radio,
   // ionizing by x-ray) is the real one, so it is a fair thing to show.
+  //
+  // Everything eventful happens in the top decades, so this bar is zoomed to
+  // 100 MHz-100 EHz; the mini strip above it shows where that window sits on
+  // the full spectrum.
+  const AF0 = 8;
+  const aX = f => (Math.log10(f) - AF0) / (F1 - AF0);
+  const aF = x => Math.pow(10, AF0 + clamp(x, 0, 1) * (F1 - AF0));
   const appleBar = document.getElementById('appleBar');
   const markApple = document.getElementById('markApple');
-  paintBands(appleBar);
-  paintTicks(document.getElementById('appleTicks'));
+  paintBands(appleBar, aX);
+  paintTicks(document.getElementById('appleTicks'), AF0, F1);
+  const mini = document.getElementById('appleMini');
+  paintBands(mini, toX, false);
+  const miniWin = document.getElementById('appleMiniWin');
+  miniWin.style.left = (toX(Math.pow(10, AF0)) * 100) + '%';
+  miniWin.style.width = ((1 - toX(Math.pow(10, AF0))) * 100) + '%';
   let fApple = 2.4e9;
 
   const APPLE_STAGES = [
@@ -475,8 +501,10 @@
       note: 'Visible light is what lets you see the apple at all. Each photon still carries too little energy to break anything.' },
     { hi: 3e16, verdict: 'Sunburned', draw: 'burn',
       note: 'UV starts breaking chemical bonds at the surface. A minute of strong UV is roughly what a peel gets in an afternoon at the beach.' },
-    { hi: 3e19, verdict: 'A dangerous dose', draw: 'xray',
+    { hi: 1e18, verdict: 'A dangerous dose', draw: 'xray',
       note: 'X-rays are energetic enough to punch through to the core. A real minute at an intensity you could feel would be a medical emergency, for the apple and for whoever is holding it.' },
+    { hi: 3e19, verdict: 'Ionized through', draw: 'ion',
+      note: 'Hard x-rays tear electrons off atoms all the way through the flesh. Chemistry starts failing everywhere at once, not just at the skin.' },
     { hi: 1e20, verdict: 'Destroyed', draw: 'char',
       note: 'Gamma rays ionize all the way through. A minute at a dose strong enough to see here would cook it from the inside out.' },
   ];
@@ -490,9 +518,11 @@
   // fallback for any stage whose photo has not loaded yet
   const appleImg = new Image();
   appleImg.src = 'apple.png';
+  // sunburn has no photo on purpose: the charred one read as an x-ray dose,
+  // so UV keeps the mild tinted rendering and the photos start at x-ray
   const STAGE_IMGS = { plain: appleImg };
-  for (const [k, src] of [['warm', 'apple-warm.png'], ['burn', 'apple-burn.png'],
-                          ['xray', 'apple-xray.png'], ['char', 'apple-char.png']]) {
+  for (const [k, src] of [['warm', 'apple-warm.png'], ['xray', 'apple-burn.png'],
+                          ['ion', 'apple-xray.png'], ['char', 'apple-char.png']]) {
     const im = new Image(); im.src = src; STAGE_IMGS[k] = im;
   }
   STAGE_IMGS.warm2 = STAGE_IMGS.warm;
@@ -613,7 +643,7 @@
   }
 
   function renderApple() {
-    markApple.style.left = (toX(fApple) * 100) + '%';
+    markApple.style.left = (aX(fApple) * 100) + '%';
     const stage = appleStageFor(fApple);
     appleVerdict.textContent = stage.verdict;
     appleNote.textContent = stage.note;
@@ -625,11 +655,11 @@
     requestAnimationFrame(appleFrame);
   }
   grab(markApple, appleBar,
-       (x, f) => { fApple = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fApple,
+       (x, f) => { fApple = clamp(f != null ? f : aF(x), Math.pow(10, AF0), 1e20); }, () => fApple,
        renderApple);
   appleBar.addEventListener('pointerdown', (e) => {
     const r = appleBar.getBoundingClientRect();
-    fApple = toF((e.clientX - r.left) / r.width);
+    fApple = aF((e.clientX - r.left) / r.width);
     renderApple();
   });
 
