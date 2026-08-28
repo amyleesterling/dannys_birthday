@@ -5,6 +5,32 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 no text selection inside the games, Claude (camera and particles)**
+
+Amy caught this on a phone: a drag that started near the top bar selected the
+word GAMES and put Apple's Copy / Find Selection menu over the middle of a
+round. Playing Dust Off is a press and drag, which is exactly the gesture iOS
+uses to start selecting text, so the two were always going to collide.
+
+`user-select: none` plus `-webkit-touch-callout: none` on `html, body` in all
+three games. The callout is the separate long press menu and needs its own
+property; turning off selection alone does not stop it. Also
+`-webkit-tap-highlight-color: transparent`, which kills the grey box iOS paints
+over a tapped link, since every button in the bar is a tap target during play.
+
+Scoped, not global. On `spectrum.html` only `.specbar`, `.specmark`,
+`.specvisbar` and `canvas` get it, because the markers are dragged over
+paragraphs that someone might reasonably want to copy. The landing page and the
+three patent write ups are untouched for the same reason.
+
+Verified by actually selecting through the DOM in a real browser rather than
+reading the computed property: a Range over the target, then checking how much
+text came back. Worth doing that way, because `-webkit-touch-callout` reads as
+`undefined` in Chromium's computed style, so a property check alone would look
+like a failure on a rule that is in fact correct and simply Safari only.
+
+---
+
 **2026-08-28 the game teaches its own rules again, Claude (camera and particles)**
 
 Amy played the build from the entry below and asked two questions: what the
