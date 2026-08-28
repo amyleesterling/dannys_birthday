@@ -5,6 +5,65 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 model note, Claude (camera and particles)**
+
+Amy asked and it is worth being upfront about here too: every commit signed
+"Claude (camera and particles)" this session ran on Sonnet 5, not Opus,
+confirmed against the session's own `configured_model`. Nothing in this
+file implies otherwise, but if a future session reads this board and
+assumes the work above was Opus-authored, it was not. Model choice is a
+per-session setting (`/model` in the CLI), not something a running session
+can change on itself.
+
+Also left below: a first-pass idea for the level 1 to 10 lab coat visual
+progression, since Amy is generating that art now and asked for a
+direction before committing to nine more prompts.
+
+### Lab coat progression, levels 1 to 10
+
+The coat Amy already sent (front facing, transparent background, teal
+hologram) is the level 1 baseline: bare and clean, one atom badge, one DNA
+patch, nothing else lit up. The idea is to escalate three things in
+parallel across the run, not just "make it fancier":
+
+1. **Badges and patches** — start at the two the level 1 coat already has,
+   add one new discipline icon every couple of levels (hexagon/chemistry,
+   circuit board, a small flask, a wave/spectrum symbol) so the coat visibly
+   accumulates credentials as the player clears rounds.
+2. **Circuitry density and glow** — the level 1 coat's inner lining is a
+   quiet hex grid. Have the glowing lines spread further up the lapels and
+   sleeves each level, and let the glow itself get brighter/faster, so a
+   level 9 coat visibly hums even in a still image.
+3. **Palette** — hold teal/cyan through the early and middle levels to
+   match the rest of the site's chrome, then let violet and rose bleed in
+   around level 7 to 8, the same two accent colors Lumen and Separator
+   already use, so the late coats read as "everything the site has learned"
+   converging on one garment. Level 10 goes full prismatic, the same
+   rainbow-chrome look the "Play the Patents" logo already has, since that
+   is the moment the player is being welcomed as a peer, not a trainee.
+
+Concretely, something like:
+
+- **1** bare hologram, teal only, two badges (already have this one)
+- **2** three badges, lining glow reaches the collar
+- **3** four badges, faint circuit lines start on the chest panel
+- **4** circuit lines reach the sleeves
+- **5** glow brightens a step, cuffs get a metallic highlight
+- **6** five badges, a rank-style hex insignia appears center chest
+- **7** violet starts mixing into the teal at the seams
+- **8** rose joins violet and teal, three-color hologram now
+- **9** full chest and sleeve circuit coverage, small orbiting spark
+  particles around the shoulders (matching the atom/camera renders' look)
+- **10** full prismatic rainbow chrome, the Hillis Team hex emblem front
+  and center, replacing the plain atom badge rather than sitting beside it
+
+Still need, separately from the art: the actual round 10 win screen and
+"you are part of the Hillis team now" moment in `index.html`, which does
+not exist yet, only the endless-until-3-misses loop does.
+
+
+---
+
 **2026-08-28 last one for now, Claude (camera and particles)**
 
 Seventh Dust Off subject: a six vial specimen rack, `obj-vials.png`, added
