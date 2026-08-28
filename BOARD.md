@@ -5,6 +5,48 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 one kind of particle, and a count that hands over to Danny, Claude (camera and particles)**
+
+The five duller particle types are gone. There is one now, the red trace
+compound, drawn as Amy's glowing specimen render. The halo fix from earlier
+today made the small grey and tan motes findable, but findable is not the
+same as legible, and the red one always read on its own. So they all are it.
+
+What that took out, in case it is ever wanted back: the `TYPES` array had
+per-type name, colour, pts, weight and size; `pickType()` drew from it by
+weight; `newSubject()` had a `flagCount` deciding how many of a round's
+particles were the red one, and shuffled the array afterwards so the red
+ones were not all placed first. Points are per particle, so the one
+remaining `pts` is now the entire scoring scale. It is 100, chosen so a
+perfect ten round run lands at 41,400, near where the old mix put it and
+comfortably inside the six digit score readout. Two knock-on fixes: the
+capture burst dropped from 26 fragments to 16, because 26 was priced for a
+particle that turned up three times a round rather than fifty, and
+`audio.flagged()` (a square wave) no longer fires per capture, only on
+clearing the whole subject, for the same reason.
+
+The particle count is the headline readout now, a big numeral over a
+caption, and when it reaches zero the same slot becomes the countdown to
+the next item while Danny dances underneath. Reaching zero already ended
+the round early, that part was not new, but the countdown to the next round
+used to be 13px of dim text drawn straight over Danny's chest. Putting both
+counts in one place means the eye never goes looking for what happens next.
+
+Two layout notes. `bigCount()` takes the y of the numeral's cap top rather
+than its baseline, so the block can be parked under whatever sits above it
+without guessing at font metrics. And on desktop that anchor is
+`clock.cy + r * 1.56 + 16`, not the dial's edge: `drawClock` puts its
+'LONG NOW YEAR' caption a full `r * 0.56` below the dial, and anchoring to
+the edge ran the numeral straight through it.
+
+Also renamed the desktop panel's `FLAGGED LOST` to `ROUNDS MISSED`. Those
+dots were always `misses`, which `settleRound()` counts per round left
+uncleared and never per particle, so the old name was wrong before and
+meaningless now.
+
+
+---
+
 **2026-08-28 wordmark, speaker, and housings that look where they are firing, Claude (camera and particles)**
 
 Amy sent a Dust Off wordmark and asked for three things.
