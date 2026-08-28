@@ -113,6 +113,11 @@ fold because LASERS." Lumen's and Separator's are untouched, so those two
 cards run a good deal longer. `.body` still has `flex: 1`, so the PLAY
 buttons stay on one line across the row whatever the copy does.
 
+
+---
+
+**2026-08-28 play and restart screens are HTML now, Claude (camera and particles)**
+
 Three things.
 
 Lumen's survey map moved from top right to bottom left. It was sitting
