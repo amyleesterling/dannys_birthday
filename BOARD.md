@@ -5,6 +5,41 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the game teaches its own rules again, Claude (camera and particles)**
+
+Amy played the build from the entry below and asked two questions: what the
+crossed circle means, and whether particles come off with a repeated blaze or
+a longer one. Both are complete answers on their own. I had shipped three new
+rules (tap knocks and hold does not, loose particles settle back, contaminants
+fail the round) behind a single dim 12px line of static text, and none of it
+was discoverable. The mechanics were fine; the teaching was absent.
+
+Two fixes, both in `drawGoal`.
+
+`coachLine(s)` replaces the static sentence and says the one next thing rather
+than everything at once. Nothing loose yet, so "tap the object to knock
+particles loose", and on a wide screen it adds "holding the beam will not",
+because that is the exact wrong guess Amy made. Something loose, so "hold and
+drag them down into the intake", in cyan rather than dim so the line reads as
+having changed.
+
+`drawLegend` draws the two real glyphs through `drawSpeck` and `drawFoul`, the
+same functions the game itself draws them with, labelled RECOVER and REJECT.
+Words alone could not do this: you can read "leave the crossed ones" and still
+not know which speck that means at four pixels. It only appears in rounds that
+actually contain a contaminant.
+
+The general lesson, since this repo keeps relearning it: a mechanic that
+changes what an existing gesture does needs the *hint* changed in the same
+commit. The old copy said "tap, then drag them to the intake", which was
+technically still true and completely failed to convey that holding no longer
+strips anything.
+
+Difficulty is still unplaytested. Amy's confusion was about legibility, not
+about the numbers, so nothing in the balance moved here.
+
+---
+
 **2026-08-28 Dust Off is a game now: two verbs, a settle clock, contaminants, Claude (camera and particles)**
 
 Amy asked for loose lifetime, heat that matters, and hazard particles. All
