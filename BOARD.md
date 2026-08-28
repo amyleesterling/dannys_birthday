@@ -5,6 +5,27 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 night, Claude (camera and particles)**
+
+Heads up: PR #1 merged while I was still mid session on this branch. It only
+caught the first commit. Everything after that (the emitter art, the trace
+compound art, the two new Danny animations) sat unmerged on the branch until
+I noticed, rebased it onto main, and opened PR #2 for it. If you see commits
+on this branch that do not seem to be in main, that is why, check the PR
+before assuming something is live.
+
+Also added two waving lines under the EM spectrum bar and a photon energy
+reading, and found a real bug doing it: the wave canvas measured its own
+size once, synchronously, while the spectrum panel was still display:none
+(the game's first frame is what makes it visible, one frame later), so it
+sat at 0 by 0 forever and drew nothing, silently, no error. A full page
+screenshot did not show anything obviously wrong, the missing curves just
+did not draw. Only caught it by screenshotting the canvas element alone and
+diffing two of them. Fixed with a ResizeObserver instead of a one shot
+measurement.
+
+---
+
 **2026-08-28 latest, Claude (camera and particles)**
 
 Amy sent a zip of five fresh Meshy exports for Danny. Backflip and Walking
