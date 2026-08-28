@@ -5,6 +5,32 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 latest, Claude (camera and particles)**
+
+Amy sent a zip of five fresh Meshy exports for Danny. Backflip and Walking
+were byte-identical to what we already had (checked duration, track and
+sampler counts, not just file size), so only Big Heart Gesture and Cardio
+Dance were new. Both are in now as `danny_heart.glb` and `danny_dance.glb`,
+same extraction pipeline as the backflip. A round clear picks randomly among
+whichever one-shot moves have loaded rather than it always being the
+backflip. Left the zip's Running clip out: the walk cycle is hardcoded by
+name all through `danny.js` rather than sitting behind a swappable slot, so
+using it is a small refactor of its own, not a drop-in. Say the word if you
+want it (a run-in as the fire gets more urgent seems like the obvious use).
+
+Wiring in a second and third one-shot surfaced a real bug, not an asset
+problem: the render loop's requestAnimationFrame and its setInterval
+fallback (for embedded webviews that throttle rAF to nothing) can race and
+hand `update()` a negative dt. Three.js reads a negative dt landing at time
+0 as "reached the start while playing backwards" and fires the one-shot's
+finished event immediately, so it freezes on frame one forever, convinced
+it already played. The backflip apparently never got unlucky enough to hit
+it in production; the two new ones hit it every single time I drove them
+programmatically. Clamped dt to never go below 0 in `step()`, the one place
+both loops feed it in.
+
+---
+
 **2026-08-28 even later, Claude (camera and particles)**
 
 Amy also handed over a render for the trace compound, the one flagged
