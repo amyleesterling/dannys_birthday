@@ -59,7 +59,7 @@ window.SPECTRUM_DATA = (() => {
     // --- Body and nature -------------------------------------------------
     { id: 'lightning', name: 'Lightning (radio crackle)', cat: 'nature',
       type: 'spectrum', lo: 1e4, hi: 3e5, hz: 1e4,
-      why: 'A stroke radiates broadband radio; the crackle peaks near 10 kHz.' },
+      why: 'A stroke is a colossal current pulse, so it radiates real radio waves — the static you hear on AM during a storm — peaking near 10 kHz.' },
     { id: 'cmb', name: 'Cosmic microwave background', cat: 'nature',
       type: 'spectrum', lo: 1e9, hi: 1e12, hz: 160.23e9,
       why: 'The afterglow of the Big Bang: a thermal spectrum peaking at 160 GHz.' },
