@@ -474,7 +474,7 @@ function update(dt) {
     const dl = Math.hypot(l.x - dev.x, l.y - dev.y);
     l.inRange = dl < ABLATE_R;
     l.close = dl < ABLATE_R * 2.2;
-    if (anchored && l.inRange) {
+    if (l.inRange) {
       dev.emit = 1;
       l.hp -= 52 * dt;
       if (Math.random() < dt * 20) {
@@ -685,11 +685,11 @@ function drawLesions(time) {
     }
     if (l.inRange && state === 'play') {
       const blink = 0.6 + 0.4 * Math.sin(time * 7);
-      ctx.globalAlpha = pointer.down ? 1 : blink;
+      ctx.globalAlpha = blink;
       ctx.fillStyle = COL.cyan;
       ctx.font = '700 15px ui-monospace, Menlo, monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(pointer.down ? 'BURNING' : 'HOLD TO BURN', p.x, p.y - l.r * 1.9 - 22);
+      ctx.fillText('BURNING', p.x, p.y - l.r * 1.9 - 22);
       ctx.textAlign = 'left';
       ctx.globalAlpha = 1;
     }
@@ -763,10 +763,12 @@ function drawDevice(time, p) {
     ctx.setLineDash([4, 4]);
     ctx.beginPath(); ctx.arc(p.x, p.y, 15 + Math.sin(time * 9) * 1.5, 0, TAU); ctx.stroke();
     ctx.setLineDash([]);
-    if (dev.emit) {
-      ctx.strokeStyle = 'rgba(126,224,255,0.55)';
-      ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
-    }
+  }
+  // the burn radius is its own signal now: it lights up on proximity alone,
+  // anchoring is just for holding still against the current while it does
+  if (dev.emit && state === 'play') {
+    ctx.strokeStyle = 'rgba(126,224,255,0.55)';
+    ctx.beginPath(); ctx.arc(p.x, p.y, ABLATE_R, 0, TAU); ctx.stroke();
   }
 }
 
@@ -1106,9 +1108,9 @@ function drawTitle() {
   card('LUMEN', COL.teal, 'A SELF PROPELLING DEVICE IN A VESSEL BED', [
     touch ? 'Drag to drive. How far you drag is the throttle.'
           : 'The device follows the cursor. Distance is the throttle.',
-    'Follow the sensor bearing to the gold plaque. It fibs at range.',
-    touch ? 'Hold the big button to anchor and burn.'
-          : 'Hold the mouse button to anchor and burn.',
+    'Follow the sensor bearing to the gold plaque. It burns on its own once you arrive.',
+    touch ? 'Hold the big button to anchor against the current while it burns.'
+          : 'Hold the mouse button to anchor against the current while it burns.',
   ], 'PLAY NOW', COL.teal);
 }
 
