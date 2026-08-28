@@ -131,7 +131,6 @@
   <img class="gamebar-logo" src="logo.png" alt="Dust Off" width="647" height="150">
   <a class="gamebar-pat" href="https://patents.google.com/patent/US9134205B2/en" target="_blank" rel="noopener">US 9,134,205 B2</a>
   <span class="gamebar-title">System and method for removing surface particles from an object</span>
-  <button type="button" data-key="r">RESTART</button>
   <button type="button" data-key="m" id="sndbtn" aria-label="Mute sound" title="Mute sound">
     <svg class="ico ico-on" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path class="cone" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/>
@@ -400,7 +399,11 @@ const traceImg = loadArt('trace.png');
 // preserving its own aspect ratio, so a tall narrow rack and a wide pair of
 // sneakers both land at a sensible size without one axis ever running away
 // with the other.
-const OBJ_MAX_W = 150, OBJ_MAX_H = 185, OBJ_FLOOR = 86;
+// Raised from 150 x 185. What stops these going bigger still is not the art:
+// on a phone the width runs into the emitter lenses, which sit 17px off each
+// wall, and the height runs into the particle readout above the sample. 165
+// leaves about 18px of clearance to the lenses at 390px wide.
+const OBJ_MAX_W = 165, OBJ_MAX_H = 200, OBJ_FLOOR = 86;
 const SUBJECT_DEFS = [
   { key: 'jacket',     src: 'obj-jacket.png' },
   { key: 'tubes',      src: 'obj-tubes.png' },
@@ -569,6 +572,17 @@ function layout() {
   const inset = L.ch.x + (narrow ? 17 : 30);
   const hiY = narrow ? L.topH + 32 : H * 0.10;
   const loY = hiY + H * (narrow ? 0.09 : 0.11);
+  // The sample is scaled to the room it actually has rather than to Danny's
+  // height, which is what L.figScale is for. Two things bound it: sideways, the
+  // emitter lenses on each wall, and vertically, the bottom of the particle
+  // readout. Tying it to figScale meant the tall objects were drawn straight
+  // through that readout on a desktop, where the block sits lowest.
+  const lensGap = (inset - L.ch.x) + 14;
+  const readoutBottom = (narrow ? L.topH + 30 : L.clock.cy + L.clock.r * 1.56 + 16)
+                        + Math.round((narrow ? 38 : 42) * L.hud) * 0.72 + 56;
+  L.objScale = Math.max(0.8, Math.min(
+    (L.ch.w - lensGap * 2) / OBJ_MAX_W,
+    (L.floorY - readoutBottom - 10) / OBJ_MAX_H));
   L.emitters = [
     { x: inset, y: hiY, s: 1 },
     { x: inset, y: loY, s: 1 },
@@ -626,7 +640,7 @@ function newSubject() {
 }
 
 function subjectTransform(s) {
-  return { x: s.x, y: L.floorY - L.figH * (86 / 185), s: L.figScale };
+  return { x: s.x, y: L.floorY - OBJ_FLOOR * L.objScale, s: L.objScale };
 }
 function toScreen(s, lx, ly) {
   const t = subjectTransform(s);
@@ -815,7 +829,7 @@ function nextRound() {
 function emitterRest() {
   const def = subject && subject.def;
   const mid = def ? (def.local.top + def.local.bottom) / 2 : -5;
-  return { x: L.ch.cx, y: L.floorY + (mid - 86) * L.figScale };
+  return { x: L.ch.cx, y: L.floorY + (mid - OBJ_FLOOR) * L.objScale };
 }
 
 // pointer.down rather than pointer.inside: inside latches true on the first

@@ -5,6 +5,37 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 no restart button, and the sample sized to its room, Claude (camera and particles)**
+
+The RESTART button is out of all three gamebars. `r` still restarts, and the
+play/restart screens still have their own buttons, so the only thing actually
+lost is restarting *mid-run* on a phone, where there is no keyboard. That was
+the ask; worth knowing it is the tradeoff.
+
+Objects are bigger, but the interesting part is what was stopping them. The
+caps went 150x185 to 165x200, and the scale they are drawn at is no longer
+`L.figScale`. That constant is Danny's height over 185, and tying the sample
+to it meant the sample's size had nothing to do with the space it had. On a
+desktop the tall objects were being drawn straight *through* the particle
+readout, and had been before this change too, just less far.
+
+`L.objScale` is computed from the room that actually exists: sideways from the
+emitter lenses (which sit 17px off each wall on a phone, 30px on a desktop),
+vertically from the bottom of the readout down to the floor. Measured every
+object against both on both layouts rather than eyeballing it, which is how
+the desktop collision turned up at all.
+
+Phone gains about 11 per cent in each direction, and the wide flat ones
+(vials, goggles, sneakers) still leave a lot of vertical room empty because
+they are simply flat: they hit the width limit long before the height one.
+Desktop objects are now *smaller* than they were, because they were
+overlapping the readout and had to come back inside it. If someone wants them
+big again there, the readout block is the thing in the way and the side panels
+already carry the same numbers, so moving it out of the chamber would give
+back about 95px of height.
+
+---
+
 **2026-08-28 lumen has a real rover now, Claude (camera and particles)**
 
 `games/lumen/rover.png` replaces the little vector arrow the device was drawn
