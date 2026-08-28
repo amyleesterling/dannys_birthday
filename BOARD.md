@@ -5,6 +5,39 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the chamber has a ceiling now, Claude (camera and particles)**
+
+Amy asked whether she could recollect a red particle. She could not, and that
+was a bug I introduced one commit earlier.
+
+Two fates for a loose particle, and only one of them was recoverable. Left
+floating, it settles back onto the body on the `LOOSE_LIFE` clock and can be
+knocked loose and collected again. Pushed above the HUD bar, it was
+`splice`d and gone for good. If that was a red one, the round became
+unclearable and nothing on screen said why: the count just never reached zero.
+
+That was survivable when the only way up was a slow buoyant drift, which is the
+world the delete was written for. Swipe to fling changed it completely. An
+overshooting flick sends a particle off the top in one gesture, so the new
+mechanic made the old cleanup rule into a way to lose the round by accident.
+
+The ceiling bounces now, at `L.topH + 4`, damped 0.4, exactly like the walls
+and floor already did. The inconsistency is worth naming: three sides of the
+chamber were closed and the fourth deleted whatever touched it. Nothing is
+unrecoverable mid-round any more, and the settle-back clock is what stops loose
+particles accumulating now that they cannot escape.
+
+Checked by launching particles at -3000px/s straight up: they stop at y 88,
+the ceiling, and fall back. Three in, three out, none lost. Before the fix all
+three vanished.
+
+General shape of the mistake, for next time: the delete was correct for the
+physics that existed when it was written. Adding a mechanic that lets the
+player move particles much faster invalidated an assumption nowhere near the
+code I was editing.
+
+---
+
 **2026-08-28 the contaminant is gone and delivery is a swipe, Claude (camera and particles)**
 
 Amy's verdict on the previous build, and a redesign off the back of it. Marked
