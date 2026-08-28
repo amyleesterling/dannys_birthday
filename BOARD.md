@@ -5,6 +5,24 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 last one for now, Claude (camera and particles)**
+
+Seventh Dust Off subject: a six vial specimen rack, `obj-vials.png`, added
+the same one-line way as the camera. It looked at a glance like it might
+need the same background cleanup the hbdanny.com logo needed (a visible
+dark vignette around the rack in the preview), but checking the actual
+alpha channel showed the corners were already 0, that vignette is a soft
+glow falloff baked into the transparency, not an opaque background. Cropped
+to content and resized same as the others, no flood fill needed. Worth
+checking alpha before assuming a background needs removing; it is cheap to
+check and the two look identical in a thumbnail.
+
+Kept it as a distinct `vials` key rather than replacing the existing
+`tubes` entry since they read as different objects (a simple rack vs. this
+six tube one), and more variety in the rotation is the whole point.
+
+---
+
 **2026-08-28 one more, Claude (camera and particles)**
 
 Amy sent a sixth holographic render, a camera, right after the five-object
