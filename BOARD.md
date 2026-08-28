@@ -5,6 +5,47 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 losing round one to a coin flip, Claude (camera and particles)**
+
+Amy: "Uh oh lost the lab coat on level 1!" Reproduced it, and the cause was not
+what I assumed. Three changes, one of which is the actual bug.
+
+**The real one: the red count was rolled, not dealt.** Clearing is measured on
+the red particles, and each particle independently rolled 42% red. On round
+one, with only seven particles, that gives **exactly one red 11% of the time
+and zero reds 2.5% of the time**. A round with one red is decided by whether
+you happen to sweep over a single dot, and the lab coat is the largest object
+in the set. Amy drew one of those rounds. `REDS_PER_ROUND` now deals a fixed
+share, floor of three, and shuffles which points get them. No round is a coin
+flip any more.
+
+**The buzzer now waits for the chamber to drain.** Particles take a couple of
+seconds to reach the intake on their own, which is new; with the swipe they
+arrived the instant you threw them. Scoring the moment the clock hit zero
+marked everything in transit as missed. The clock stops, then up to
+`LOOSE_GRACE` 2.5s for what is already travelling to land. Only what is still
+stuck on the object counts against you. Confirmed working in the repro: `got`
+went 0 to 2 after the buzzer.
+
+**Early rounds got longer**, 6.8s to 8.5s on round one. The 6.8 was set when a
+held sweep both dislodged and delivered; the beam only dislodges now and the
+trip has its own cost.
+
+Read this part before trusting a difficulty number from the scratchpad. My
+first repro "failed" three times in a row with three to five particles still on
+the coat, and I nearly tuned the game against it. The bot was sweeping a fixed
+154x175 box while the coat is 374x449, so it was covering roughly a third of
+the object. Given a bot that aims at where the particles actually are, level
+one clears 4 out of 4. **A bot that plays badly is indistinguishable from a
+game that is too hard, and only one of those is worth fixing.** Check the
+bot's coverage against the object's real bounds before believing it.
+
+Worth knowing: particles cluster in the object's dense middle, x 89..312 on a
+390 wide phone, not spread over the full silhouette. Coverage is more
+forgiving than the object's size suggests.
+
+---
+
 **2026-08-28 the swipe is gone, particles migrate to the intake, Claude (camera and particles)**
 
 Amy: "I can't swipe, it just shoots more lasers." She is right and the swipe
