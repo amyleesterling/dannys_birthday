@@ -298,22 +298,22 @@ const COL = {
   red:      '#ff4d5e',
 };
 
+// One kind of particle, the red trace compound, drawn as Amy's glowing
+// specimen render. There used to be five duller types alongside it, weighted
+// so skin cells and dust were common and the red one was the rare prize, but
+// a two pixel grey mote is invisible against the holographic subjects and
+// nobody could find them. The red one always read, so now they all are it.
+//
+// If the variety is ever wanted back, this is where it lived: a TYPES array
+// with per-type name, colour, pts, weight and size, a weighted pickType(),
+// and a flagCount in newSubject() deciding how many of a round's particles
+// were the red one. Points are per particle, so this number alone sets the
+// scoring scale.
 const TYPES = [
-  { id: 'skin',   name: 'SKIN CELL',      color: '#d9c8a4', pts: 30, weight: 30, size: 2.2 },
-  { id: 'dust',   name: 'DUST',           color: '#8d99a6', pts: 30, weight: 26, size: 2.0 },
-  { id: 'lint',   name: 'LINT',           color: '#9fd4ff', pts: 45, weight: 18, size: 2.7 },
-  { id: 'pollen', name: 'POLLEN',         color: '#ffd166', pts: 60, weight: 14, size: 2.5 },
-  { id: 'bact',   name: 'BACTERIA',       color: '#93dd86', pts: 75, weight: 8,  size: 1.8 },
-  { id: 'trace',  name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 400, weight: 0, size: 3.6, flagged: true },
+  { id: 'trace', name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 100, size: 3.6, flagged: true },
 ];
 const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
-const WEIGHT_TOTAL = TYPES.reduce((s, t) => s + t.weight, 0);
-
-function pickType() {
-  let r = Math.random() * WEIGHT_TOTAL;
-  for (const t of TYPES) { r -= t.weight; if (r <= 0) return t; }
-  return TYPES[0];
-}
+const PART_TYPE = TYPE_BY_ID.trace;
 
 // laser + heat
 const PULSE_HEAT   = 16;
@@ -572,9 +572,6 @@ const roundTime  = n => Math.min(8, 6 + (n - 1) * 0.2);
 function newSubject() {
   const def = pickSubjectDef();
   const count = roundCount(round);
-  // a trace compound turns up from round three, worth a lot, but the round is
-  // cleared on recovering everything rather than on the red ones alone
-  const flagCount = round >= 3 ? Math.min(3, Math.floor(round / 3)) : 0;
 
   // rejection sample points inside the silhouette, in local units
   const halfW = def ? def.local.w / 2 : 40;
@@ -587,15 +584,11 @@ function newSubject() {
     if (!hitsSubjectArt(def, x, y)) continue;
     pts.push({ x, y });
   }
-  const parts = pts.map((pt, i) => ({
+  const parts = pts.map(pt => ({
     lx: pt.x, ly: pt.y,
-    type: i < flagCount ? TYPE_BY_ID.trace : pickType(),
+    type: PART_TYPE,
     ph: rand(0, TAU),
   }));
-  for (let i = parts.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [parts[i], parts[j]] = [parts[j], parts[i]];
-  }
 
   const t = roundTime(round);
   return {
@@ -661,15 +654,19 @@ function shatter(x, y, color, n, speed) {
 }
 
 function capture(p) {
-  shatter(p.x, p.y, p.type.color, p.type.flagged ? 26 : 15,
-          p.type.flagged ? 300 : 210);
+  // The burst used to be 26 fragments, which was affordable when the red one
+  // turned up three times a round. Every particle is the red one now and a
+  // late round has fifty of them, so it comes down to something a phone can
+  // still draw when a whole sweep lands at once.
+  shatter(p.x, p.y, p.type.color, 16, 260);
   score += p.type.pts;
   captured++;
   addFeed(p.type);
   fx.push({ k: 'cap', x: p.x, y: p.y, t: 0, dur: 0.35, c: p.type.color });
   if (subject) subject.got++;
-  if (p.type.flagged) audio.flagged();
-  else audio.capture();
+  // audio.flagged() is a square wave, which was a treat three times a round
+  // and a headache fifty. It marks clearing the whole subject now instead.
+  audio.capture();
 }
 
 function addFeed(type) {
@@ -1507,11 +1504,8 @@ function drawBeat(time) {
     ctx.font = Math.round(16 * k) + 'px ui-monospace, Menlo, monospace';
     ctx.fillText(banner ? banner.sub : '', c.cx, cy + 30 * k);
     ctx.globalAlpha = 1;
-
-    const remain = Math.max(0, subject.resultDur - subject.t);
-    ctx.fillStyle = COL.dim;
-    ctx.font = Math.round(13 * k) + 'px ui-monospace, Menlo, monospace';
-    ctx.fillText('NEXT ROUND IN ' + remain.toFixed(1) + 's', c.cx, cy + 56 * k);
+    // the countdown to the next item is drawn by drawGoal, up where the
+    // particle count was, rather than here on top of Danny
   }
   ctx.textAlign = 'left';
 }
@@ -1568,30 +1562,66 @@ function scanFrac() {
   return { tLeft, frac: subject ? clamp(tLeft / subject.scanTime, 0, 1) : 0 };
 }
 
-// "Am I supposed to click all the dots, or just the red ones?" is a fair
-// question that the title card was answering two minutes too early.
+// "Am I supposed to click all the dots, or just the red ones?" used to be the
+// fair question this readout answered. There is only the one kind now, so the
+// answer is always all of them, and the count is free to be the whole story.
+//
+// A big numeral with a caption under it, the one readout the round hangs on.
+// Takes the y of the numeral's cap top, not its baseline, so the block can be
+// parked directly under whatever sits above it. Returns the caption's y so
+// the line after can stack on.
+function bigCount(n, label, color, cx, top, maxW) {
+  const size = Math.round((L.narrow ? 38 : 42) * L.hud);
+  ctx.font = '700 ' + size + 'px ui-monospace, Menlo, monospace';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(String(n), cx, top + size * 0.72);   // cap height of these digits
+  const capY = top + size * 0.72 + 19;
+  fitCentered(label, cx, capY, maxW, 12, COL.dim);
+  return capY;
+}
+
 function drawGoal(time) {
   const c = L.ch;
   const sc = scanFrac();
   const k = L.clock;
   if (!L.narrow) drawClock(k.cx, k.cy, k.r, sc.frac, sc.tLeft, time);
 
-  if (state !== 'play' || !subject || subject.phase === 'result') return;
-  const y = (L.narrow ? L.topH : k.cy + k.r) + 46;
+  if (state !== 'play' || !subject) return;
+  // On a phone the readout hangs off the HUD bar. On a desktop it has to clear
+  // the clock's own 'LONG NOW YEAR' caption, which drawClock puts a full
+  // r * 0.56 below the dial, so anchor to that rather than to the dial edge.
+  const y = L.narrow ? L.topH + 30 : k.cy + k.r * 1.56 + 16;
   ctx.textAlign = 'center';
   const maxW = c.w - 28;
   const left = subject.total - subject.got;
+
+  // The count of particles still on the subject and the count of seconds to
+  // the next one share this slot deliberately: the first runs down to zero,
+  // Danny comes out, and the second picks up in the same place, so the eye
+  // never goes looking for what happens next.
+  if (subject.phase === 'result') {
+    const remain = Math.max(0, subject.resultDur - subject.t);
+    bigCount(Math.ceil(remain), 'UNTIL THE NEXT ITEM', COL.cyan, c.cx, y, maxW);
+    ctx.textAlign = 'left';
+    return;
+  }
+
   if (subject.phase === 'ready') {
     fitCentered('RECOVER ALL ' + subject.total + ' IN ' +
-                subject.scanTime.toFixed(1) + ' SECONDS', c.cx, y, maxW, 15, COL.cyan);
-  } else if (left > 0) {
-    fitCentered(left + ' LEFT', c.cx, y, maxW, 16, left <= 3 ? COL.cyan : COL.text);
+                subject.scanTime.toFixed(1) + ' SECONDS', c.cx, y + 26, maxW, 15, COL.cyan);
+    fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
+                         : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE',
+                c.cx, y + 50, maxW, 12, COL.dim);
   } else {
-    fitCentered('ALL RECOVERED', c.cx, y, maxW, 16, COL.teal);
+    const capY = left > 0
+      ? bigCount(left, left === 1 ? 'PARTICLE LEFT' : 'PARTICLES LEFT',
+                 left <= 3 ? COL.cyan : COL.text, c.cx, y, maxW)
+      : bigCount(0, 'ALL RECOVERED', COL.teal, c.cx, y, maxW);
+    fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
+                         : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE',
+                c.cx, capY + 26, maxW, 12, COL.dim);
   }
-  fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
-                       : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE',
-              c.cx, y + 22, maxW, 12, COL.dim);
   ctx.textAlign = 'left';
 }
 
@@ -1631,7 +1661,10 @@ function drawPanels(time) {
   value(sc.tLeft.toFixed(1) + ' s', x, y, 20, sc.frac < 0.25 ? COL.red : COL.text);
   y += 40;
 
-  label('FLAGGED LOST', x, y); y += 24;
+  // these dots are misses, which settleRound() counts per round left uncleared,
+  // never per particle. 'FLAGGED LOST' was already the wrong name for that and
+  // is meaningless now there is only the one kind of particle.
+  label('ROUNDS MISSED', x, y); y += 24;
   strikeDots(x, y, 9);
   y += 42;
 
