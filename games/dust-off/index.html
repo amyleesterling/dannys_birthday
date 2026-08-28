@@ -319,6 +319,7 @@ const roundTime  = n => Math.min(12, 5 + n * 0.45);
 
 function newSubject() {
   const pose = { armOut: rand(0, 5), stance: rand(0, 4) };
+  const headless = dannyOn();
   const path = buildBody(pose);
   const count = roundCount(round);
   // a trace compound turns up from round three, worth a lot, but the round is
@@ -332,6 +333,9 @@ function newSubject() {
     guard++;
     const x = rand(-34, 34), y = rand(-99, 86);
     if (Math.abs(x) < 14 && y > -6 && y < 22) continue;   // not there
+    // the model's crown sits at about -93, six units below where the 2D
+    // proxy's head reaches, so keep particles off the empty space above it
+    if (headless && y < -90) continue;
     if (!hitCtx.isPointInPath(path, x, y)) continue;
     pts.push({ x, y });
   }
@@ -499,6 +503,11 @@ function settleRound() {
     const bonus = 200 * round + Math.round(s.scanLeft * 40);
     score += bonus;
     banner = { text: 'ALL RECOVERED', sub: '+' + bonus, ok: true, t: 0 };
+    if (dannyOn() && window.Danny.flip) {
+      window.Danny.celebrate();
+      s.resultDur = window.Danny.flipDur + 0.5;   // let him land it
+      s.holdFor = window.Danny.flipDur + 0.1;
+    }
     feed.unshift({ ok: true, text: 'ROUND ' + round + ' CLEARED', age: 0 });
     audio.flagged();
   } else {
@@ -590,7 +599,8 @@ function update(dt) {
       s.phase = 'result'; s.t = 0;
     }
   } else {
-    const k = easeIn(clamp(s.t / s.resultDur, 0, 1));
+    const hold = s.holdFor || 0;
+    const k = easeIn(clamp((s.t - hold) / Math.max(0.35, s.resultDur - hold), 0, 1));
     s.x = lerp(L.ch.cx, L.ch.x + L.ch.w + 70, k);
     if (s.t >= s.resultDur) { nextRound(); return; }
   }
@@ -766,7 +776,9 @@ function drawChamber(time) {
 
 function drawSubject(s, time) {
   const t = subjectTransform(s);
-  const alpha = s.phase === 'result' ? 1 - clamp(s.t / s.resultDur, 0, 1) * 0.7 : 1;
+  const hold = s.holdFor || 0;
+  const alpha = s.phase === 'result'
+    ? 1 - clamp((s.t - hold) / Math.max(0.35, s.resultDur - hold), 0, 1) * 0.7 : 1;
 
   if (dannyOn()) {
     // the model stands in for the whole subject. The 2D path is still there,

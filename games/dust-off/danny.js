@@ -112,10 +112,40 @@ class Danny {
       if (gltf.animations && gltf.animations.length) {
         this.mixer = new THREE.AnimationMixer(this.model);
         this.walk = this.mixer.clipAction(gltf.animations[0]);
+        this.walk.timeScale = this.walkRate;
         this.walk.play();
+        this.mixer.addEventListener('finished', () => this.backToWalk());
       }
       this.loaded = true;
+      this.loadExtra('danny_backflip.glb', 'flip');
     }, undefined, () => { this.ok = false; });   // no model, the game falls back
+  }
+
+  // Extra motions ship as animation only: the rig is identical across exports,
+  // so the clip drops onto the skeleton we already have by bone name. Forty
+  // seven kilobytes instead of six megabytes.
+  loadExtra(url, key) {
+    new GLTFLoader().load(url, (g) => {
+      if (!this.mixer || !g.animations || !g.animations.length) return;
+      const act = this.mixer.clipAction(g.animations[0]);
+      act.setLoop(THREE.LoopOnce, 1);
+      act.clampWhenFinished = true;
+      this[key] = act;
+      this[key + 'Dur'] = g.animations[0].duration;
+    }, undefined, () => {});                     // optional, silence is fine
+  }
+
+  celebrate() {
+    if (!this.flip || this.playingOnce) return;
+    this.playingOnce = true;
+    this.flip.reset().setLoop(THREE.LoopOnce, 1).fadeIn(0.12).play();
+    if (this.walk) this.walk.fadeOut(0.12);
+  }
+
+  backToWalk() {
+    this.playingOnce = false;
+    if (this.flip) this.flip.fadeOut(0.25);
+    if (this.walk) this.walk.reset().fadeIn(0.25).play();
   }
 
   buildFire() {
@@ -151,14 +181,17 @@ class Danny {
 
   // The game says what the subject is doing, so he walks in and then stands
   // rather than marching on the spot through the whole round.
-  setGait(rate) { this.walkRate = rate; }
+  setGait(rate) {
+    this.walkRate = rate;
+    if (this.walk && !this.playingOnce) this.walk.timeScale = rate;
+  }
 
   update(dt, turn) {
     if (!this.ok) return;
     this.t += dt;
     const S = STAGES[this.stage];
 
-    if (this.mixer) this.mixer.update(dt * this.walkRate);
+    if (this.mixer) this.mixer.update(dt);
     if (this.model) {
       this.model.rotation.y = Math.PI + Math.sin(this.t * 0.4) * 0.12 + (turn || 0) * 0.5;
     }
