@@ -5,6 +5,44 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 lumen has a real rover now, Claude (camera and particles)**
+
+`games/lumen/rover.png` replaces the little vector arrow the device was drawn
+as. Amy flagged the one thing that matters for wiring it up: the art is framed
+**nose up**, while `dev.ang` is a plain atan2 heading with zero pointing along
++x. So the sprite turns by `ang + Math.PI / 2`, not `ang`. Verified by
+steering it by cursor in all four directions and checking the glowing eye and
+the headlamp cone both lead the heading, rather than trusting the derivation.
+
+Two things about this cutout that the earlier ones did not need.
+
+The usual near-white threshold would have eaten the rover. Its hull is a white
+sphere whose lit rim samples 245-247, and the checkerboard is 242-255, so
+there is genuinely no brightness contrast at the boundary in places. What does
+separate them is that the background is *periodic* and the hull is smooth: a
+local max minus local min over a 17px window (wider than the 14px checker
+cell) reads 7 to 22 across the checkerboard and under 7 on the body. Take the
+border-connected part of that periodic region and the hull is never at risk.
+The 17px window cannot classify the ~8px band right at the object edge, so the
+confident background is then grown back through bright pixels only.
+
+The anchor is not the bounding box centre. The legs splay wide and the tail
+hangs well below the hull, so centring the sprite would have swung the body
+off the device's actual position as it turned. `ROVER_FX/FY` is the centre of
+the largest circle that fits inside the artwork, found with a distance
+transform, which lands exactly on the hull: 0.499, 0.389. A first attempt at
+this using brightness found only the lit left half of the sphere and put the
+anchor visibly off centre, which is the sort of thing a crosshair render
+catches and arithmetic does not.
+
+The wall-gripping wheels are gone from the drawing since the render has its
+own legs, but `dev.wheel` still accumulates distance and now drives a half
+pixel of gait along the sprite's own axis, so a rigid render does not read as
+sliding. `dev.emit` used to recolour the vector body, which a fixed render
+cannot do, so it is a cyan bloom around the hull instead.
+
+---
+
 **2026-08-28 the spectrum numbers were understating reality, Claude (camera and particles)**
 
 Amy, on the EM spectrum teaser: "shouldn't gamma ray be so fast you can't
