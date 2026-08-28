@@ -116,11 +116,15 @@
   .cite p { font-size: 14px; color: var(--dim); margin: 0 0 14px; }
   .cite a:hover { color: var(--cyan); }
   .note { font-size: 15px; color: var(--dim); margin-top: 26px; max-width: 70ch; }
+  /* The closing card. It carries the words itself, so the line that used to
+     say them here is gone rather than sitting above a picture of itself.
+     Wider than the header banner on purpose: this one is the last thing on
+     the page and has nothing to share the room with. */
   .signoff {
-    margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--line);
-    font-size: 19px; color: var(--cyan);
+    margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line);
   }
-  .built { margin-top: 14px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
+  .signoff .hbd { display: block; width: 100%; max-width: 720px; height: auto; }
+  .built { margin-top: 20px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
 </style>
 </head>
 <body>
@@ -251,7 +255,9 @@
       They run on a phone, and they are happier still on a laptop with a trackpad.
     </p>
 
-    <p class="signoff">Happy birthday, Danny.</p>
+    <div class="signoff">
+      <img class="hbd" src="hbd.jpg" alt="Happy birthday, Danny!" width="1440" height="810">
+    </div>
     <p class="built">
       Chrome and panels from
       <a href="https://amyleesterling.github.io/scifi-ui">scifi-ui</a>.
