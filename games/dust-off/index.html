@@ -401,11 +401,25 @@ const COL = {
 // and a flagCount in newSubject() deciding how many of a round's particles
 // were the red one. Points are per particle, so this number alone sets the
 // scoring scale.
+// Two kinds now. The trace compound is what you are paid to recover. The
+// contaminant is what you are paid to leave alone: herd one into the intake
+// and it fouls the batch, which costs more than the trace next to it is worth.
+// That is the whole decision the game was missing. Before this, every particle
+// wanted the same thing done to it, so a round had no choices in it, only a
+// speed. Now the beam has to be aimed rather than swept, because what you
+// sweep, you swallow.
 const TYPES = [
-  { id: 'trace', name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 100, size: 3.6, flagged: true },
+  { id: 'trace',  name: 'TRACE COMPOUND', color: '#ff4d5e', pts: 100, size: 3.6, flagged: true },
+  { id: 'foul',   name: 'CONTAMINANT',    color: '#c48bff', pts: -180, size: 5.2, hazard: true },
 ];
 const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const PART_TYPE = TYPE_BY_ID.trace;
+const FOUL_TYPE = TYPE_BY_ID.foul;
+
+// Starts at one in sixteen and climbs to just under a third. A contaminant is
+// worth more in penalty than a trace is in points, so this is the number that
+// actually drives late round difficulty, more than the particle count does.
+const foulFrac = n => Math.min(0.30, 0.06 + (n - 1) * 0.028);
 
 // laser + heat
 // A cleared round used to take under a second: 28 particles gone off a single
@@ -415,16 +429,42 @@ const PART_TYPE = TYPE_BY_ID.trace;
 // was never a reason to stop holding it. These numbers split those jobs back
 // apart: the tap is the tool that knocks particles off, the beam is the tool
 // that carries them, and the heat means you cannot simply hold it down.
-const PULSE_HEAT   = 16;
+// Was 16, then 12, now 6. Heat should be the price of *herding*, the sustained
+// action, not of knocking. Taps are the only way to dislodge anything now, and
+// at 12 apiece the emitter locked out after four of them, which measured at
+// 0.44 particles delivered per second against the 9.6 a late round asks for.
+// Cheap taps, expensive holds: the choice you are making under heat is how
+// long to keep pushing a cloud, not whether you can afford to aim.
+const PULSE_HEAT   = 6;
 const BEAM_HEAT    = 29;   // per second, so ~3.4s of held beam before a lockout
 const COOL_RATE    = 30;   // per second
-const OVERHEAT_LOCK = 1.6; // seconds
-const PULSE_RADIUS = 62;   // screen px
+const OVERHEAT_LOCK = 1.3; // seconds
+// Widened from 62 with the same reasoning: a tap is now the only way to get
+// anything off the body, so it has to be worth taking.
+const PULSE_RADIUS = 74;   // screen px
+
+// How long a knocked-loose particle stays in the air before it drifts back
+// down and re-attaches. Without this, the buoyant drift is so heavily damped
+// that loose particles effectively hover forever, so the optimal play was to
+// knock the entire body clean and then herd one large cloud into the intake at
+// leisure. A lifetime means you have to work in batches: knock a few, collect
+// them, knock a few more.
+// It settles back onto the body rather than vanishing, because vanishing reads
+// as the game stealing a particle you had earned, while re-settling reads as
+// what it is, that you left it too long.
+const LOOSE_LIFE  = 3.6;   // seconds in the air
+const LOOSE_WARN  = 1.2;   // it starts flickering this long before settling
 const BEAM_RADIUS  = 132;  // how far the held beam can reach for loose grit
 const BEAM_FORCE   = 2000;
-// the held beam still strips what it passes over, but over a much smaller
-// circle than a tap, so sweeping is no longer strictly better than aiming
-const BEAM_STRIP   = 0.7;
+// The held beam no longer strips anything. This is the change that makes the
+// round a game rather than a sweep. The HUD has always said "tap to knock them
+// off, then hold and drag to the intake", two verbs, but BEAM_STRIP let the
+// held beam do both jobs at once, so one pass down the body knocked everything
+// loose and carried it to the intake in the same gesture. Tuning particle
+// counts and clock never touched that; it just made you sweep faster.
+// Tapping knocks loose, holding herds, and both spend heat, so the emitter is
+// now a resource you have to pace instead of a button you hold.
+const BEAM_STRIP   = 0;
 
 const MAX_MISSES = 3;
 // Clearing this round wins the whole run rather than just starting round 11.
@@ -692,7 +732,13 @@ function layout() {
 // roundTime caps out by round 11, so from there on the count is the only
 // thing still climbing. Cap it high enough that skill runs out before the
 // formula does.
-const roundCount = n => Math.min(120, 8 + n * 4);
+// Was 8 + n*4, capping at 120, which put 48 particles in a 5 second round ten.
+// Measured throughput under the new rules is nowhere near that: knocking and
+// herding are separate actions now and a cloud has to be walked to the mouth,
+// so the count had to come down or the late rounds would simply be impossible.
+// Difficulty lives in the contaminants and the settle-back clock now, not in
+// how many dots are on the object.
+const roundCount = n => Math.min(60, Math.round(5 + (n - 1) * 3.2));
 // The scan window used to grow with the round, from 6s to 8s, which meant the
 // only thing getting harder was the count and the clock was quietly getting
 // kinder. It shrinks now: more to recover, less time to do it in.
@@ -713,11 +759,16 @@ function newSubject() {
     if (!hitsSubjectArt(def, x, y)) continue;
     pts.push({ x, y });
   }
+  const foulRate = foulFrac(round);
   const parts = pts.map(pt => ({
     lx: pt.x, ly: pt.y,
-    type: PART_TYPE,
+    type: Math.random() < foulRate ? FOUL_TYPE : PART_TYPE,
     ph: rand(0, TAU),
   }));
+  // Only the trace compound counts toward clearing the round. Contaminants are
+  // not a shortfall if they are still sitting on the body at the buzzer, they
+  // are a shortfall only if you fed them to the intake.
+  const wanted = parts.filter(p => p.type !== FOUL_TYPE).length;
 
   const t = roundTime(round);
   return {
@@ -726,7 +777,7 @@ function newSubject() {
     phase: 'ready', t: 0,
     readyDur: 2.6, walkDur: 1.0, resultDur: 1.3,
     scanTime: t, scanLeft: t,
-    total: parts.length, got: 0,
+    total: wanted, got: 0, fouled: 0,
     x: L.ch.x - 70,
     turb: 0.34 + round * 0.07,
   };
@@ -762,6 +813,9 @@ function dislodge(sx, sy, radius) {
       x: scr.x, y: scr.y,
       vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - rand(20, 70),
       type: p.type, ph: rand(0, TAU), age: 0,
+      // where to put it back: a point already known to sit on the silhouette,
+      // so re-settling can never drop one into empty space
+      lx: p.lx, ly: p.ly,
     });
     shatter(scr.x, scr.y, p.type.color, 5, 120);
     subject.parts.splice(i, 1);
@@ -783,6 +837,16 @@ function shatter(x, y, color, n, speed) {
 }
 
 function capture(p) {
+  if (p.type.hazard) {
+    shatter(p.x, p.y, p.type.color, 18, 300);
+    score = Math.max(0, score + p.type.pts);     // pts is negative for a foul
+    addFeed(p.type);
+    fx.push({ k: 'cap', x: p.x, y: p.y, t: 0, dur: 0.35, c: p.type.color });
+    if (subject) subject.fouled++;
+    audio.miss();
+    kick(9);
+    return;
+  }
   // The burst used to be 26 fragments, which was affordable when the red one
   // turned up three times a round. Every particle is the red one now and a
   // late round has fifty of them, so it comes down to something a phone can
@@ -876,7 +940,10 @@ function startRun() {
 function settleRound() {
   year++;
   const s = subject;
-  const cleared = s.got >= s.total;
+  // A clean round is every trace recovered *and* nothing fouled. Letting a
+  // contaminant through has to cost the round itself, not just some points,
+  // or the fastest play stays "sweep everything in and eat the penalty".
+  const cleared = s.got >= s.total && s.fouled === 0;
   s.cleared = cleared;
   if (cleared) {
     const bonus = 200 * round + Math.round(s.scanLeft * 40);
@@ -887,8 +954,13 @@ function settleRound() {
     kick(6);
   } else {
     misses++;
-    banner = { text: 'MISSED ' + (s.total - s.got), sub: 'RECOVER EVERY ONE', ok: false, t: 0 };
-    feed.unshift({ warn: true, text: (s.total - s.got) + ' LEFT ON SUBJECT', age: 0 });
+    if (s.fouled && s.got >= s.total) {
+      banner = { text: 'BATCH FOULED', sub: 'KEEP THE CONTAMINANT OUT', ok: false, t: 0 };
+      feed.unshift({ warn: true, text: s.fouled + ' CONTAMINANT IN THE INTAKE', age: 0 });
+    } else {
+      banner = { text: 'MISSED ' + (s.total - s.got), sub: 'RECOVER EVERY ONE', ok: false, t: 0 };
+      feed.unshift({ warn: true, text: (s.total - s.got) + ' LEFT ON SUBJECT', age: 0 });
+    }
     audio.miss();
     kick(13);
   }
@@ -1018,7 +1090,9 @@ function update(dt) {
   } else if (s.phase === 'scan') {
     s.x = L.ch.cx + Math.sin(s.t * 1.4) * 1.6;
     s.scanLeft -= dt;
-    if (s.scanLeft <= 0 || (s.parts.length === 0 && loose.length === 0)) {
+    const traceLeft = s.parts.some(q => !q.type.hazard) ||
+                      loose.some(q => !q.type.hazard);
+    if (s.scanLeft <= 0 || !traceLeft) {
       s.scanLeft = Math.max(0, s.scanLeft);
       settleRound();
       s.phase = 'result'; s.t = 0;
@@ -1037,10 +1111,10 @@ function update(dt) {
     laser.onBody = hitsSubjectArt(s.def, lp.x, lp.y);
   }
 
-  // the beam keeps ablating while held
-  if (beamOn) {
-    // held, the beams strip whatever they pass over, so one sweep down the
-    // body both knocks particles off and carries them to the intake
+  // Held, the beams only push what is already loose. BEAM_STRIP is 0, so this
+  // costs nothing when it is left at zero; it stays wired up so the two verbs
+  // can be blended again from one constant if the split turns out too strict.
+  if (beamOn && BEAM_STRIP > 0) {
     const n = dislodge(pointer.x, pointer.y, PULSE_RADIUS * BEAM_STRIP);
     released += n;
     if (n) kick(n * 1.1);
@@ -1071,10 +1145,19 @@ function updateLoose(dt, turb, beamOn) {
       }
     }
 
-    // intake suction near the vent mouth
-    const overVent = p.x > ix - 70 && p.x < ix + iw + 70 && p.y > iy - 300;
+    // Intake suction, at the vent mouth and nowhere else.
+    //
+    // This reached 300px above the intake across the full width of the screen,
+    // which on a phone is the bottom half of the display and contains most of
+    // the sample. Anything knocked off the lower body fell in by itself, so
+    // "drag them to the intake" was not really a verb: the round largely
+    // played itself, and that is the single biggest reason it was too easy.
+    // Now it is a mouth you have to deliver to.
+    const VENT_REACH = 70, VENT_MARGIN = 22;
+    const overVent = p.x > ix - VENT_MARGIN && p.x < ix + iw + VENT_MARGIN &&
+                     p.y > iy - VENT_REACH;
     if (overVent) {
-      ay += 520 * (1 - clamp((iy - p.y) / 300, 0, 1));
+      ay += 520 * (1 - clamp((iy - p.y) / VENT_REACH, 0, 1));
       ax += ((ix + iw / 2) - p.x) * 1.2;
     }
 
@@ -1097,6 +1180,17 @@ function updateLoose(dt, turb, beamOn) {
     // lost out of the top
     if (p.y < L.topH - 14) {   // on a phone they are gone once under the bar
       if (p.type.flagged) { /* counted at the end of the subject */ }
+      loose.splice(i, 1);
+      continue;
+    }
+
+    // left in the air too long: back onto the body it came off
+    if (p.age >= LOOSE_LIFE) {
+      if (subject && subject.phase === 'scan' && p.lx !== undefined) {
+        subject.parts.push({ lx: p.lx, ly: p.ly, type: p.type, ph: rand(0, TAU) });
+        const scr = toScreen(subject, p.lx, p.ly);
+        shatter(scr.x, scr.y, p.type.color, 4, 70);
+      }
       loose.splice(i, 1);
     }
   }
@@ -1331,6 +1425,29 @@ function drawTrace(x, y, r, fl) {
 // highlights. A flat coloured dot vanishes into the second one. So each speck
 // sits on a dark disc and carries a faint rim of its own colour, the same
 // halo trick a map label uses to stay legible over aerial photography.
+// The contaminant. Colour alone would not carry it: at three or four pixels on
+// a phone, over holographic art, violet against red is a coin flip. So it is a
+// different *shape* too, a hollow ring with a cross through it, which reads as
+// "not one of those" even when the hue does not survive.
+function drawFoul(x, y, r, time, ph) {
+  const a = ctx.globalAlpha;
+  const puls = 0.5 + 0.5 * Math.sin(time * 4 + ph);
+  ctx.beginPath(); ctx.arc(x, y, r + 3.6, 0, TAU);
+  ctx.fillStyle = 'rgba(0,7,11,0.86)';
+  ctx.fill();
+  ctx.strokeStyle = FOUL_TYPE.color;
+  ctx.globalAlpha = a * (0.8 + puls * 0.2);
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.stroke();
+  const k = r * 0.62;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k);
+  ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k);
+  ctx.stroke();
+  ctx.globalAlpha = a;
+}
+
 function drawSpeck(x, y, r, color) {
   const a = ctx.globalAlpha;
   ctx.beginPath(); ctx.arc(x, y, r + 2.1, 0, TAU);
@@ -1360,11 +1477,23 @@ function drawAttached(s, time, alpha) {
       ctx.fillStyle = `rgba(255,77,94,${0.35 + fl * 0.45})`;
       ctx.beginPath(); ctx.arc(scr.x, scr.y, r + 4 + fl * 2.5, 0, TAU); ctx.fill();
       drawTrace(scr.x, scr.y, r, fl);
+    } else if (p.type.hazard) {
+      drawFoul(scr.x, scr.y, r, time, p.ph);
     } else {
       drawSpeck(scr.x, scr.y, r, p.type.color);
     }
   }
   ctx.globalAlpha = 1;
+}
+
+// A particle about to settle back flickers, faster the closer it is, so the
+// warning is readable at a glance without a timer bar per speck. Returns 1
+// for anything with time still on it.
+function looseFade(p, time) {
+  const left = LOOSE_LIFE - p.age;
+  if (left > LOOSE_WARN) return 1;
+  const urgency = 1 - Math.max(0, left) / LOOSE_WARN;
+  return 0.45 + 0.55 * Math.abs(Math.sin(time * (5 + urgency * 12) + p.ph));
 }
 
 function drawLoose(time) {
@@ -1383,27 +1512,36 @@ function drawLoose(time) {
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  const baseAlpha = ctx.globalAlpha;
   for (const p of loose) {
     const r = p.type.size * L.pScale;
+    ctx.globalAlpha = baseAlpha * looseFade(p, time);
     if (p.type.flagged) {
       const fl = 0.5 + 0.5 * Math.sin(time * 7 + p.ph);
       ctx.fillStyle = `rgba(255,77,94,${0.30 + fl * 0.35})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, r + 5 + fl * 3, 0, TAU); ctx.fill();
       drawTrace(p.x, p.y, r, fl);
+    } else if (p.type.hazard) {
+      // 'lighter' cannot darken, so the ring's dark seat is drawn in normal
+      // blending for the length of this one speck and then handed back
+      ctx.globalCompositeOperation = 'source-over';
+      drawFoul(p.x, p.y, r, time, p.ph);
+      ctx.globalCompositeOperation = 'lighter';
     } else {
       ctx.fillStyle = p.type.color;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
     }
-    // motion streak
+    // motion streak. Fades with the speck rather than sitting at a flat 0.28,
+    // which would leave a solid tail on a particle that is blinking out.
     ctx.strokeStyle = p.type.color;
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = ctx.globalAlpha * 0.28;
     ctx.lineWidth = r * 0.9;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
     ctx.lineTo(p.x - p.vx * 0.03, p.y - p.vy * 0.03);
     ctx.stroke();
-    ctx.globalAlpha = 1;
   }
+  ctx.globalAlpha = baseAlpha;
   ctx.restore();
 }
 
@@ -1757,16 +1895,22 @@ function drawGoal(time) {
   if (subject.phase === 'ready') {
     fitCentered('RECOVER ALL ' + subject.total + ' IN ' +
                 subject.scanTime.toFixed(1) + ' SECONDS', c.cx, y + 26, maxW, 15, COL.cyan);
-    fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
-                         : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE',
+    fitCentered(subject && subject.parts.some(q => q.type.hazard)
+                  ? (L.narrow ? 'DRAG THE RED IN. LEAVE THE CROSSED ONES'
+                              : 'DRAG THE RED ONES TO THE INTAKE. LEAVE THE CROSSED ONES ALONE')
+                  : (L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
+                              : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE'),
                 c.cx, y + 50, maxW, 12, COL.dim);
   } else {
     const capY = left > 0
       ? bigCount(left, left === 1 ? 'PARTICLE LEFT' : 'PARTICLES LEFT',
                  left <= 3 ? COL.cyan : COL.text, c.cx, y, maxW)
       : bigCount(0, 'ALL RECOVERED', COL.teal, c.cx, y, maxW);
-    fitCentered(L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
-                         : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE',
+    fitCentered(subject && subject.parts.some(q => q.type.hazard)
+                  ? (L.narrow ? 'DRAG THE RED IN. LEAVE THE CROSSED ONES'
+                              : 'DRAG THE RED ONES TO THE INTAKE. LEAVE THE CROSSED ONES ALONE')
+                  : (L.narrow ? 'TAP, THEN DRAG THEM TO THE INTAKE'
+                              : 'TAP TO KNOCK THEM OFF, THEN HOLD AND DRAG TO THE INTAKE'),
                 c.cx, capY + 26, maxW, 12, COL.dim);
   }
   ctx.textAlign = 'left';

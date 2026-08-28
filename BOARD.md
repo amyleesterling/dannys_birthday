@@ -5,6 +5,61 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 Dust Off is a game now: two verbs, a settle clock, contaminants, Claude (camera and particles)**
+
+Amy asked for loose lifetime, heat that matters, and hazard particles. All
+three are in. But the thing that actually made the game trivial was none of
+them, and it turned up while testing the first one.
+
+**The intake was a vacuum, not a mouth.** Its suction reached 300px above the
+vent across the full width of the screen. On a phone that is the bottom half
+of the display, which contains most of the sample, so anything knocked off the
+lower body simply fell in by itself. "Drag them to the intake" was barely a
+verb. It is `VENT_REACH` 70 and `VENT_MARGIN` 22 now, and you have to deliver.
+If Dust Off ever feels like it plays itself again, look here first.
+
+The three asked-for changes:
+
+**BEAM_STRIP is 0.** The HUD has always said tap to knock, then hold and drag,
+two verbs, but the held beam stripped as well as pushed, so one sweep did both
+jobs. That is why particle counts and clock never made it harder: they only
+made you sweep faster. Taps knock, holds herd, both cost heat. The constant is
+still wired up so the verbs can be blended again from one number.
+
+**LOOSE_LIFE 3.6s**, then the particle settles back onto the body at the exact
+local point it came off, so it can never land in empty space. It settles
+rather than vanishing because vanishing reads as the game stealing something
+you earned. It flickers for the last 1.2s, faster as it runs out.
+
+**Contaminants.** `foulFrac` runs one in sixteen up to just under a third.
+Feeding one to the intake costs 180 and *fails the round*, not just some
+points, because a mere score penalty leaves "sweep it all in and eat the cost"
+as the fastest play. They are drawn as a crossed ring, not just a violet dot:
+at four pixels over Amy's holographic art, violet against red is a coin flip,
+so the shape has to carry it where the hue cannot.
+
+**Balance is the honest weak spot here.** I measured throughput at 0.36 to
+0.79 particles per second across runs, against 0.74 needed for round one and
+6.8 for round ten. But my bot herds one column at `cx` and taps a few fixed
+targets, so it is a floor, not an estimate, and the spread between runs shows
+how noisy it is. I used it only to catch the case where I had clearly gone too
+far: at `PULSE_HEAT` 12 the emitter locked out after four taps and the late
+rounds were unreachable, so taps came down to 6, `PULSE_RADIUS` up to 74, and
+`roundCount` from `8 + n*4` capped at 120 to `5 + (n-1)*3.2` capped at 60.
+Heat should price herding, the sustained action, not aiming.
+
+Turn these first if Amy says it is wrong, in this order: `roundCount`,
+`LOOSE_LIFE`, `foulFrac`, `VENT_REACH`, `PULSE_HEAT`.
+
+One testing note that has now cost two sessions: **the canvas sits 51px below
+the viewport top**, under the gamebar. `page.mouse` takes viewport coordinates
+and everything inside the game is in canvas coordinates. My first delivery
+test reported FAIL for both trace and contaminant purely because of this, and
+the difficulty bot from an earlier entry died the same way. Convert with the
+canvas `getBoundingClientRect()` before every synthetic pointer event.
+
+---
+
 **2026-08-28 gamma is unresolvable now, and my earlier reasoning was wrong, Claude (camera and particles)**
 
 Amy, twice: gamma should be so fast you cannot see it. The note further down
