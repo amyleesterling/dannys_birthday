@@ -130,6 +130,21 @@
   .qtable td.rel { color: #a07cff; white-space: nowrap; }
   .qtable .u { color: #8b98a8; }
 
+  /* ---- wavelength scale ladder ------------------------------------------ */
+  .scalecap { font-size: 12px; letter-spacing: .1em; color: #6c7c8c; text-transform: uppercase; margin: 0 0 8px; }
+  .scalerow { display: flex; gap: 12px; flex-wrap: wrap; margin: 0 0 28px; }
+  .scalecard {
+    flex: 1 1 320px; display: flex; gap: 14px; align-items: center;
+    border: 1px solid rgba(196,228,255,.14); padding: 12px 14px; background: rgba(8,14,22,.4);
+  }
+  .scalecard.a { border-left: 3px solid #7ee0ff; }
+  .scalecard.b { border-left: 3px solid #e8a93a; }
+  .scalecard img { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
+  .scalecard .who { font-size: 11.5px; letter-spacing: .08em; color: #6c7c8c; margin-bottom: 3px; }
+  .scalecard.a .who b { color: #7ee0ff; } .scalecard.b .who b { color: #e8a93a; }
+  .scalecard .what { font-size: 14px; color: #eff4fb; line-height: 1.5; }
+  .scalecard .what .num { color: #cfe6e6; }
+
   /* ---- same power ------------------------------------------------------- */
   .power { border: 1px solid rgba(196,228,255,.14); padding: 16px 18px; margin: 0 0 26px; }
   .power h2 { font-size: 13px; letter-spacing: .12em; color: #7ee0ff; margin: 0 0 10px; font-weight: 600; }
@@ -242,6 +257,14 @@
     <tbody id="qBody"></tbody>
   </table>
 
+  <p class="scalecap">Wavelength, for scale</p>
+  <div class="scalerow">
+    <div class="scalecard a"><img id="scaleImgA" alt=""><div>
+      <div class="who" id="scaleWhoA"></div><div class="what" id="scaleWhatA"></div></div></div>
+    <div class="scalecard b"><img id="scaleImgB" alt=""><div>
+      <div class="who" id="scaleWhoB"></div><div class="what" id="scaleWhatB"></div></div></div>
+  </div>
+
   <div class="power">
     <h2>✦ SAME POWER, DIFFERENT PHOTONS</h2>
     <div class="modes" role="radiogroup" aria-label="Comparison basis">
@@ -321,7 +344,7 @@ beam power      P = photons per second × energy per photon</pre>
   const FMIN = 1e4, FMAX = 1e20;
   const VIS_LO = C / 750e-9, VIS_HI = C / 380e-9;
   const TAU = Math.PI * 2;
-  const { LANDMARKS, STORIES } = window.SPECTRUM_DATA;
+  const { LANDMARKS, STORIES, SCALE_OBJECTS } = window.SPECTRUM_DATA;
   const byId = Object.fromEntries(LANDMARKS.map(l => [l.id, l]));
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -735,6 +758,26 @@ beam power      P = photons per second × energy per photon</pre>
       '</td><td class="rel num">' + rel + '</td></tr>').join('');
   }
 
+  function renderScale() {
+    for (const m of ['a', 'b']) {
+      const lam = C / hzOf(m);
+      let best = SCALE_OBJECTS[0];
+      for (const o of SCALE_OBJECTS)
+        if (Math.abs(log(lam / o.size)) < Math.abs(log(lam / best.size))) best = o;
+      const r = lam / best.size;
+      const M = m.toUpperCase();
+      let phrase;
+      if (r >= 0.5 && r <= 2) phrase = 'about the size of <b>' + best.name + '</b>';
+      else if (r > 2) phrase = 'about <b>' + ratioWord(r) + '×</b> the size of <b>' + best.name + '</b>';
+      else phrase = 'about <b>1/' + ratioWord(1 / r) + '</b> the size of <b>' + best.name + '</b>';
+      $('scaleWho' + M).innerHTML = '<b>' + M + '</b> · ' + nameOf(m).toUpperCase();
+      $('scaleWhat' + M).innerHTML = 'One wavelength — <span class="num">' + wave(hzOf(m), true) + '</span> — is ' + phrase + '.';
+      const img = $('scaleImg' + M);
+      img.src = best.img;
+      img.alt = best.name;
+    }
+  }
+
   function renderPower() {
     const r = Math.max(S.aHz, S.bHz) / Math.min(S.aHz, S.bHz);
     const hiM = S.bHz >= S.aHz ? 'b' : 'a', loM = hiM === 'b' ? 'a' : 'b';
@@ -831,7 +874,7 @@ beam power      P = photons per second × energy per photon</pre>
 
   // ---- master render -------------------------------------------------------
   function render() {
-    renderComposer(); renderSentence(); renderTable(); renderPower();
+    renderComposer(); renderSentence(); renderTable(); renderScale(); renderPower();
     renderOverview(); renderFocus(); renderMatter(); renderWaveText();
     encodeState();
     pokeWave();
