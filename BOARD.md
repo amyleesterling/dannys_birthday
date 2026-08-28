@@ -5,6 +5,55 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 the contaminant is gone and delivery is a swipe, Claude (camera and particles)**
+
+Amy's verdict on the previous build, and a redesign off the back of it. Marked
+interim by her: the feel of the fling wants her hands on a phone, not my bot.
+
+**The contaminant is out.** It read as unclear, and she is right that it was a
+lot of rule to hang on a four pixel dot: identify a thing, then deliberately
+not touch it. Two tiers of wanted particle instead, red at 100 and yellow at
+35. The triage the contaminant was reaching for now comes from the round being
+cleared on the *red alone*: when the clock is short you take the red and leave
+the yellow, and that is a real decision with no rule to memorise.
+
+**Holding the beam dislodges again.** `BEAM_STRIP` is back to 0.9. Tap to
+dislodge was my answer to "one gesture does everything" and she did not like
+it, fairly: it made the laser a trigger instead of a tool.
+
+**Delivery is a swipe.** This is her idea and it is a better one than herding.
+The finger's velocity is handed to whatever it passes through, so a flick
+throws a cloud across the chamber and a slow pass only nudges. The two verbs
+stay separate without a mode, because the *gesture* distinguishes them: the
+beam holds still over the object, a fling is fast and directional. Below
+`FLING_MIN` (340px/s) a pass shepherds, above it, it throws.
+
+Watch the velocity tracking if you touch it. Sub-4ms gaps are ignored rather
+than divided by, because coalesced pointer events on a phone arrive in bursts
+and a tiny dt makes the velocity explode. A gap over 100ms zeroes it instead of
+decaying it, because that means the finger stopped, and a stale velocity would
+fling the next thing you touched.
+
+**The item is bigger, and the reason it was not is worth knowing.** Raising
+`OBJ_MAX_W` did nothing at all: `objScale` is computed to *fit* that cap into
+the space, so 165 x 2.04 and 200 x 1.68 are both 337px on screen. The real
+constraint was `lensGap`, 27px a side reserved for the emitter lenses. Measured,
+that clearance protects against a collision that cannot happen: the emitters
+sit at y 110 and 229 and the sample's top edge is at 262. It reserved empty
+air. Now an 8px wall margin, plus a little more floor on narrow, and the phone
+sample went 337x404 to 374x449, about a quarter more area. Desktop is height
+bound and unchanged.
+
+**Deliberately not built: the green sample in its own collector.** Amy floated
+it and then said "we may not want it" in the same message. Adding a third
+particle type with its own collector and its own gesture, one message after
+removing a type for being unclear, is how the last version got confusing. It
+is a good idea to hold until the swipe itself is proven fun.
+
+The fan idea she also floated is superseded by the swipe, by her own message.
+
+---
+
 **2026-08-28 no text selection inside the games, Claude (camera and particles)**
 
 Amy caught this on a phone: a drag that started near the top bar selected the
