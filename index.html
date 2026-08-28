@@ -50,7 +50,16 @@
   @media (min-width: 1040px) { .cards { grid-template-columns: repeat(3, 1fr); } }
 
   .card { padding: 22px 24px 24px; display: flex; flex-direction: column; text-decoration: none; }
-  .card .pat { font-size: 13px; letter-spacing: .1em; color: rgb(var(--holo-dim) / .8); }
+  /* The patent number and its title, as one prefacing line. They used to be
+     two: a number eyebrow above the art and the title below it, with the
+     game's name in between. */
+  .card .pat {
+    font-size: 13px; line-height: 1.5; letter-spacing: .03em;
+    color: rgb(var(--holo-dim) / .8);
+  }
+  .card .pat b {
+    font-weight: 600; letter-spacing: .1em; color: rgb(var(--accent) / .9);
+  }
 
   /* the figure, redrawn in the patent idiom rather than copied from the office
      drawing: thin single weight strokes, no fill, numbered leaders */
@@ -80,8 +89,7 @@
   }
   .card:hover .thumb { border-color: rgb(var(--accent) / .6); }
 
-  .card .name { font-size: 26px; margin: 10px 0 6px; font-weight: 600; color: rgb(var(--accent)); }
-  .card .tag { font-size: 14px; color: var(--dim); margin: 0 0 16px; }
+  .card .name { font-size: 26px; margin: 12px 0 8px; font-weight: 600; color: rgb(var(--accent)); }
   .card .body { font-size: 15px; color: var(--dim); margin: 0 0 22px; flex: 1; }
   .card .body strong { color: var(--ink); font-weight: 600; }
   .card .go {
@@ -116,23 +124,20 @@
 
     <a class="card holocard" href="games/dust-off/" style="--accent: var(--holo-cyan);">
       <span class="holocard-trace"></span>
-      <div class="pat">US 9,134,205 B2 &middot; 2015</div>
+      <div class="pat"><b>US 9,134,205 B2</b>: System and method for removing surface particles from an object</div>
 
       <img class="thumb" src="games/dust-off/theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose.">
 
-      <div class="name">Dust Off</div>
-      <p class="tag">System and method for removing surface particles from an object</p>
       <p class="body">
-        Radiofrequency particle separator, except up the spectrum bc we are using light
-        beams. Four of them, crossing where you aim. Sweep every particle into the intake
-        before the clock runs out, and the clock is the ten thousand year one.
+        Radiofrequency particle separator, except up the frequency five million fold
+        because LASERS.
       </p>
       <span class="go">PLAY</span>
     </a>
 
     <a class="card holocard" href="games/lumen/" style="--accent: var(--rose);">
       <span class="holocard-trace"></span>
-      <div class="pat">US 7,857,767 B2 &middot; 2010</div>
+      <div class="pat"><b>US 7,857,767 B2</b>: Lumen traveling device</div>
 
       <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a wheeled device inside a body lumen, with plaque on the wall">
         <path d="M10 40 H310 M10 106 H310"/>
@@ -150,7 +155,6 @@
       </svg>
 
       <div class="name">Lumen</div>
-      <p class="tag">Lumen traveling device</p>
       <p class="body">
         A self propelling microrobot with wall gripping wheels, a sensor for a condition of
         interest, and an active portion that does something about it.
@@ -163,7 +167,7 @@
 
     <a class="card holocard" href="games/separator/" style="--accent: var(--holo-viol);">
       <span class="holocard-trace"></span>
-      <div class="pat">US 9,480,991 B2 &middot; 2016</div>
+      <div class="pat"><b>US 9,480,991 B2</b>: Radiofrequency particle separator</div>
 
       <svg class="fig" viewBox="0 0 320 136" aria-label="Line figure: a chute of carrier fluid, a radiofrequency generator, grains rising on bubbles to a skimmer">
         <path d="M10 40 H310 M10 112 H310"/>
@@ -186,7 +190,6 @@
       </svg>
 
       <div class="name">Separator</div>
-      <p class="tag">Radiofrequency particle separator</p>
       <p class="body">
         A radiofrequency field heats mineral grains until the water around them boils, and
         the bubble carries the grain up to a skimmer. Frequency sets the skin depth, which
