@@ -1,0 +1,130 @@
+/* Play and restart screens, shared by all three games.
+   ---------------------------------------------------------------------------
+   These used to be drawn on the canvas by each game's own card() function,
+   which meant hand rolling type, buttons and panel edges in 2D context calls
+   and getting a slightly different result in each game. They are HTML over the
+   stage now, which lets them use scifi-ui properly rather than imitating it:
+   the cycling rim, the eyebrow/title/desc type scale and .holobtn all come
+   straight from hologram.css, and only the layout around them lives here.
+
+   The palette is the branded cyan and violet rather than each game's in-game
+   accent (Lumen's rose, Separator's violet, Dust Off's teal). That is
+   deliberate: the wordmarks are all cyan and violet, so a screen built around
+   one wants to agree with it. The game keeps its own accent once you are
+   actually playing.
+
+   Visibility is driven entirely by body[data-state], which every game already
+   syncs in its frame loop, so nothing here needs a hook into game internals. */
+
+.gscreen {
+  position: absolute; inset: 0; z-index: 6;
+  display: none; place-items: center;
+  padding: 18px;
+  background: radial-gradient(ellipse at center,
+    rgba(0, 15, 40, .86) 0%, rgba(0, 0, 0, .94) 100%);
+  -webkit-backdrop-filter: blur(3px) saturate(1.2);
+          backdrop-filter: blur(3px) saturate(1.2);
+  overflow-y: auto; scrollbar-width: none;
+}
+.gscreen::-webkit-scrollbar { width: 0; height: 0; }
+
+body[data-state="title"]  #gs-title,
+body[data-state="over"]   #gs-over,
+body[data-state="won"]    #gs-won,
+body[data-state="report"] #gs-report { display: grid; }
+
+.gscreen-panel {
+  position: relative; box-sizing: border-box;
+  width: min(94%, 440px); margin: auto;
+  padding: 26px 30px 22px; text-align: center;
+  /* the em sizes on the scifi-ui type classes are relative to this */
+  font-size: 19px;
+  border: 1px solid rgb(var(--holo-glow, 74 150 224) / .18);
+  border-radius: 2px;
+  background: linear-gradient(165deg,
+    rgb(10 18 35 / .95) 0%, rgb(5 10 22 / .98) 100%);
+  box-shadow:
+    0 0 80px rgb(var(--holo-glow, 74 150 224) / .08),
+    inset 0 0 80px rgb(var(--holo-glow, 74 150 224) / .04),
+    0 20px 60px rgb(0 0 0 / .5);
+  /* the same materialise the library's dialog uses, so a screen arriving here
+     and a dialog opening anywhere else read as the same system */
+  animation: holodialog-materialize .8s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+/* the wordmark. Width driven rather than height driven, unlike the one in the
+   gamebar: here it is the largest thing on the panel and wants to fill it. */
+.gscreen-logo {
+  position: relative; z-index: 2;
+  display: block; width: min(272px, 82%); height: auto;
+  margin: 2px auto 16px;
+}
+
+/* Dust Off's trophy and its theme banner both come through here */
+.gscreen-art {
+  position: relative; z-index: 2;
+  display: block; width: min(300px, 88%); height: auto;
+  margin: 0 auto 16px;
+}
+.gscreen-art--tall { width: min(150px, 44%); }
+
+/* the run's numbers, in the library's readout idiom: a lit left edge, the
+   label small and spaced, the value large and tabular so digits do not jitter */
+.gscreen-stats {
+  position: relative; z-index: 2;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  margin: 0 0 20px; text-align: left;
+}
+.gscreen-stat {
+  border-left: 2px solid rgb(var(--holo-cyan, 126 224 255) / .55);
+  background: rgb(var(--holo-glow, 74 150 224) / .07);
+  padding: 8px 10px 7px;
+}
+.gscreen-stat .k {
+  display: block; font-size: .52em; font-weight: 700; letter-spacing: .2em;
+  text-transform: uppercase; color: rgb(var(--holo-cyan, 126 224 255) / .55);
+  margin-bottom: 3px;
+}
+.gscreen-stat .v {
+  display: block; font-size: .95em; font-weight: 500; line-height: 1.05;
+  font-variant-numeric: tabular-nums; color: rgb(200 230 255 / .95);
+}
+
+/* the hint under the button: what the keyboard does, for anyone on a laptop */
+.gscreen-foot {
+  position: relative; z-index: 2; margin: 12px 0 0;
+  font-size: .52em; letter-spacing: .16em; text-transform: uppercase;
+  color: rgb(var(--holo-dim, 154 162 177) / .45);
+}
+
+/* a doorway out to the patent pages, only ever on the title screen */
+.gscreen-links {
+  position: relative; z-index: 2;
+  display: grid; gap: 7px; margin: 14px 0 0;
+}
+.gscreen-links a {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; text-decoration: none;
+  border: 1px solid rgb(var(--holo-line, 196 228 255) / .16);
+  font-size: .56em; letter-spacing: .1em; text-transform: uppercase;
+  color: rgb(var(--holo-dim, 154 162 177) / .8);
+  transition: border-color .2s ease, color .2s ease;
+}
+.gscreen-links a:hover {
+  border-color: rgb(var(--holo-cyan, 126 224 255) / .5);
+  color: rgb(var(--holo-cyan, 126 224 255) / .95);
+}
+
+/* a short viewport (a phone in landscape, mostly) has no room for the full
+   panel, so the art is what gives way rather than the button */
+@media (max-height: 560px) {
+  .gscreen-panel { padding: 18px 22px 16px; font-size: 17px; }
+  .gscreen-logo { width: min(200px, 62%); margin-bottom: 10px; }
+  .gscreen-art { width: min(190px, 60%); margin-bottom: 10px; }
+  .gscreen-art--tall { width: min(96px, 30%); }
+  .gscreen-links { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gscreen-panel { animation: none; }
+}

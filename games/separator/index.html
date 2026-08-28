@@ -6,6 +6,7 @@
 <title>Separator</title>
 <link rel="stylesheet" href="../../vendor/scifi-ui/hologram.css">
 <link rel="stylesheet" href="../../vendor/scifi-ui/panel-surface.css">
+<link rel="stylesheet" href="../screen.css">
 <style>
   html, body {
     margin: 0; padding: 0; height: 100%; overflow: hidden;
@@ -86,22 +87,6 @@
     .gamebar button { padding: 7px 10px; font-size: 12px; }
   }
 
-  /* the patent explainer, on the title screen only */
-  .patwrap {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
-    display: none; padding: 0 20px 24px;
-  }
-  body[data-state="title"] .patwrap { display: block; }
-  .patwrap .in { max-width: 560px; margin: 0 auto; }
-  .patlink {
-    display: flex; align-items: center; justify-content: space-between; gap: 14px;
-    border: 1px solid rgba(196,228,255,.18); background: rgba(7,9,10,.9);
-    padding: 14px 18px; text-decoration: none; color: inherit;
-  }
-  .patlink:hover { border-color: rgba(160,124,255,.5); }
-  .patlink .t { font-size: 14px; color: #c9b6ff; font-weight: 600; }
-  .patlink .s { font-size: 12px; color: #8b98a8; margin-top: 3px; }
-  .patlink .go { font-size: 18px; color: #c9b6ff; }
 </style>
 </head>
 <body>
@@ -114,20 +99,62 @@
   <button type="button" data-key="m" id="sndbtn">SOUND ON</button>
 </header>
 <div class="stage"><canvas id="c"></canvas>
-<div class="patwrap"><div class="in">
-  <a class="patlink" href="patent.html">
-    <span>
-      <span class="t">HOW THE PATENT ACTUALLY WORKS</span>
-      <span class="s">Skin depth, frequency, and why a bigger grain always tunes lower.</span>
-    </span>
-    <span class="go">&rarr;</span>
-  </a>
-</div></div>
+<section class="gscreen" id="gs-title">
+  <div class="gscreen-panel">
+    <span class="holodialog-rim"></span>
+    <img class="gscreen-logo" src="logo.png" alt="Separator" width="760" height="150">
+    <p class="holodialog-eyebrow">US 9,480,991 B2 &middot; Radiofrequency particle separator</p>
+    <p class="holodialog-desc">
+      Tune the field to the grain. A big grain tunes low and a fine one tunes
+      high, and the line along the top tells you what is coming. Rock lifts too
+      whenever it happens to match, so watch the grade.
+    </p>
+    <button class="holobtn" type="button" data-key="r">
+      <span class="holobtn-text">Run the plant</span><span class="holobtn-glow"></span>
+    </button>
+    <p class="gscreen-foot">Or press R</p>
+    <div class="gscreen-links">
+      <a href="patent.html">How the patent actually works <span>&rarr;</span></a>
+    </div>
+  </div>
+</section>
+<section class="gscreen" id="gs-report">
+  <div class="gscreen-panel">
+    <span class="holodialog-rim"></span>
+    <p class="holodialog-eyebrow" id="gs-rep-eyebrow">Batch cleared</p>
+    <p class="holodialog-title" id="gs-rep-title">&nbsp;</p>
+    <p class="holodialog-desc" id="gs-rep-desc">&nbsp;</p>
+    <div class="gscreen-stats">
+      <div class="gscreen-stat"><span class="k">Grade</span><span class="v" id="gs-rep-grade">0%</span></div>
+      <div class="gscreen-stat"><span class="k">Recovery</span><span class="v" id="gs-rep-rec">0%</span></div>
+    </div>
+    <button class="holobtn" type="button" data-key="Enter">
+      <span class="holobtn-text">Next batch</span><span class="holobtn-glow"></span>
+    </button>
+    <p class="gscreen-foot">Or press Enter</p>
+  </div>
+</section>
+<section class="gscreen" id="gs-over">
+  <div class="gscreen-panel">
+    <span class="holodialog-rim"></span>
+    <img class="gscreen-logo" src="logo.png" alt="Separator" width="760" height="150">
+    <p class="holodialog-eyebrow">Plant shut down</p>
+    <p class="holodialog-desc">Three batches rejected by the assay office.</p>
+    <div class="gscreen-stats">
+      <div class="gscreen-stat"><span class="k">Value recovered</span><span class="v" id="gs-over-score">000000</span></div>
+      <div class="gscreen-stat"><span class="k">Batches run</span><span class="v" id="gs-over-batches">0</span></div>
+    </div>
+    <button class="holobtn" type="button" data-key="r">
+      <span class="holobtn-text">Run it again</span><span class="holobtn-glow"></span>
+    </button>
+    <p class="gscreen-foot">Or press R</p>
+  </div>
+</section>
 </div>
 <script>
 // The bar talks to the game the same way a keyboard does, so the game needs no
 // hook of its own and the two stay independent.
-document.querySelectorAll('.gamebar button').forEach(b => {
+document.querySelectorAll('.gamebar button, .gscreen button').forEach(b => {
   b.addEventListener('click', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: b.dataset.key }));
     if (b.id === 'sndbtn') {
@@ -461,6 +488,7 @@ window.addEventListener('keydown', e => {
   if (e.key === ' ') { e.preventDefault(); keys.space = true; audio.init(); }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault();
   if (k === 'r') { audio.init(); startRun(); }
+  if (k === 'enter' && state === 'report') { audio.init(); batch++; startBatch(batch); state = 'play'; }
   if (k === 'm') { audio.init(); audio.muted = !audio.muted; }
 });
 window.addEventListener('keyup', e => {
@@ -595,9 +623,7 @@ function draw(time) {
   drawGoal(time);
   drawDial(time);
   drawPanels(time);
-  if (state === 'title')  drawTitle();
-  if (state === 'report') drawReport();
-  if (state === 'over')   drawOver();
+  // title, report and game over are HTML now, see the #gs- sections
   if (state === 'play' && pointer.inside && !L.narrow) drawCursor();
 }
 
@@ -1107,7 +1133,6 @@ function drawBars(time) {
   bar(pad + (bwid + gap) * 2, by, bwid, 10, power / 100, power < 25 ? COL.red : COL.cyan);
 }
 
-const OVERLAY = 'rgba(5,7,12,0.975)';
 
 // Measure before drawing. A centred string that does not fit gets shrunk, down
 // to a floor of 12px, below which it is not worth reading.
@@ -1124,98 +1149,36 @@ function fitCentered(text, cx, y, maxW, size, color) {
   return f;
 }
 
-function wrapToWidth(text, maxW, font) {
-  ctx.font = font;
-  const words = text.split(' ');
-  const out = [];
-  let line = '';
-  for (const w of words) {
-    const t = line ? line + ' ' + w : w;
-    if (ctx.measureText(t).width > maxW && line) { out.push(line); line = w; }
-    else { line = t; }
-  }
-  if (line) out.push(line);
-  return out;
-}
-
-function card(title, titleColor, sub, lines, button, accent) {
-  const c = L.ch;
-  ctx.fillStyle = OVERLAY;
-  ctx.fillRect(c.x, 0, c.w, H);
-  ctx.textAlign = 'center';
-
-  const k = clamp(Math.min(W, H) / 720, 0.82, 1.35);
-  const mono = 'px ui-monospace, Menlo, monospace';
-  const maxW = c.w - 36;
-  const put = (t, y, size, color, weight) => {
-    ctx.fillStyle = color;
-    ctx.font = (weight ? weight + ' ' : '') + (size * k) + mono;
-    ctx.fillText(t, c.cx, y);
-  };
-
-  // wrap first, so the block height knows how tall it really is
-  const bodyFont = (14 * k) + mono;
-  const wrapped = [];
-  for (const t of lines) for (const w of wrapToWidth(t, maxW, bodyFont)) wrapped.push(w);
-
-  const bw = Math.min(c.w * 0.72, 280 * k), bh = 56 * k;
-  const block = 46 * k + 26 * k + bh + 44 * k + wrapped.length * 24 * k;
-  let y = Math.max(40 * k, (H - block) / 2) + 34 * k;
-
-  const tSize = Math.min(44, (maxW / Math.max(6, title.length)) * 1.55);
-  put(title, y, tSize, titleColor, '600'); y += 24 * k;
-  for (const sl of wrapToWidth(sub, maxW, (13 * k) + mono)) {
-    put(sl, y, 13, COL.dim); y += 19 * k;
-  }
-  y += 12 * k;
-
-  const bx = c.cx - bw / 2;
-  const pulse = 0.6 + 0.4 * Math.sin(performance.now() / 420);
-  ctx.fillStyle = 'rgba(126,224,255,' + (0.08 + pulse * 0.07) + ')';
-  ctx.fillRect(bx, y, bw, bh);
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(bx + 1, y + 1, bw - 2, bh - 2);
-  ctx.textAlign = 'center';
-  put(button, y + bh / 2 + 7 * k, 19, accent, '700');
-  y += bh + 40 * k;
-
-  for (const t of wrapped) { put(t, y, 14, COL.dim); y += 24 * k; }
-  ctx.textAlign = 'left';
-}
-
-function drawTitle() {
-  const touch = L.narrow;
-  card('SEPARATOR', COL.cyan, 'TUNE THE FIELD TO THE GRAIN', [
-    touch ? 'Drag the dial. A big grain tunes low, a fine one tunes high.'
-          : 'Scroll to tune. A big grain tunes low, a fine one tunes high.',
-    'The line at the top tells you what is coming and where to put the dial.',
-    'Rock lifts too when it happens to match. Watch the grade.',
-  ], 'PLAY NOW', COL.cyan);
-}
-
-function drawReport() {
-  const r = stat.report;
-  card(r.pass ? 'BATCH CLEARED' : 'BATCH REJECTED', r.pass ? COL.teal : COL.red,
-       r.pass ? 'THAT ONE GOES TO THE SMELTER' : 'THE ASSAY OFFICE SENT IT BACK', [
-    'Grade ' + Math.round(r.grade * 100) + ' per cent, needed 70',
-    'Recovery ' + Math.round(r.recovery * 100) + ' per cent, needed 55',
-    stat.recovered + ' ore of ' + stat.targets + ', and ' + stat.waste + ' gangue',
-  ], 'NEXT BATCH', COL.cyan);
-}
-
-function drawOver() {
-  card('PLANT SHUT DOWN', COL.red, 'THREE BATCHES REJECTED', [
-    'Value recovered ' + String(score).padStart(6, '0'),
-    batch + ' batches run',
-  ], 'RUN IT AGAIN', COL.cyan);
-}
-
 // ---------------------------------------------------------------- loop
 
 let last = performance.now();
+// The report and game over screens are HTML, so their numbers are pushed once
+// as the state opens rather than redrawn every frame.
+function syncScreens(st) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  if (st === 'report' && stat.report) {
+    const r = stat.report;
+    set('gs-rep-eyebrow', r.pass ? 'Batch cleared' : 'Batch rejected');
+    set('gs-rep-title', r.pass ? 'To the smelter' : 'Sent back');
+    set('gs-rep-desc', r.pass
+      ? 'The assay office took it: ' + stat.recovered + ' ore of ' + stat.targets +
+        ', and ' + stat.waste + ' gangue along with it.'
+      : 'The assay office sent it back: ' + stat.recovered + ' ore of ' + stat.targets +
+        ', and ' + stat.waste + ' gangue along with it.');
+    set('gs-rep-grade', Math.round(r.grade * 100) + '%  of 70');
+    set('gs-rep-rec', Math.round(r.recovery * 100) + '%  of 55');
+  }
+  if (st === 'over') {
+    set('gs-over-score', String(score).padStart(6, '0'));
+    set('gs-over-batches', String(batch));
+  }
+}
+
 function step(now) {
-  if (document.body.dataset.state !== state) document.body.dataset.state = state;
+  if (document.body.dataset.state !== state) {
+    document.body.dataset.state = state;
+    syncScreens(state);
+  }
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   update(dt);
