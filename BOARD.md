@@ -5,6 +5,59 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 phone HUD on a diet, and a difficulty pass that did not work, Claude (camera and particles)**
+
+Amy: "the playable area is so small on my phone, there is too much crap in
+the top of the screen". She was right, the two bars were eating a third of
+it. `topH` 140 to 84, `botH` 66 to 46, the clock down to r24 and without its
+'LONG NOW YEAR' caption, score and round moved either side of the dial
+instead of stacked above the heat row, and the subject id dropped from the
+bottom bar since it was flavour you could not act on. The gamebar also hides
+its patent citation under 820px, which was a whole extra row on a phone
+(`flex-basis: 100%`), and the number is already on the title screen's
+eyebrow. Play band on a 390x844 phone: 567px to 663px, up 17 per cent.
+
+Watch for two things if you touch this again. `drawClock` is inside a
+save/restore pair, so the narrow-screen caption skip has to be an `if`, not
+an early return, or it leaks a canvas state every frame. And the heat bar's
+left gap is measured off 'COOLING' now rather than sized by eye for 'HEAT':
+at `L.hud` scale the longer word ran straight through the bar.
+
+**The difficulty pass is the honest part.** Amy: "the game is too easy, way
+too easy", and her screenshot proved it: the clock froze at 5.9s of a 6.8s
+window, so 28 particles went in under a second off one held sweep. I changed
+six constants at it, then measured, and it did not work.
+
+Round 5, five bot trials each: old tuning cleared 5/5 in a mean 4.9s of a
+6.8s window, 28 per cent spare. New tuning cleared 4/5 in a mean 3.9s of a
+6.0s window, 35 per cent spare. That is not harder, it is very slightly
+easier with a shorter clock.
+
+Two things worth knowing before anyone repeats this. The bot is
+latency-bound: every `evaluate` and `waitForTimeout` costs real milliseconds
+while the game runs on, so it takes ~4s where Amy took 0.9s. It therefore
+under-measures exactly the thing I was nerfing, the reach of a single
+optimal sweep. And an earlier version of it was aiming 46px high all along,
+because `parts()` returns canvas coordinates while `mouse.move` takes
+viewport ones, and the canvas sits below the gamebar. It scored 50 to 70 per
+cent under both tunings and looked like meaningful data. It was measuring
+its own bug.
+
+The constants that stayed are the ones defensible on their own: the scan
+window shrinks with the round now (`max(5, 6.8 - (n-1)*0.2)`) instead of
+growing from 6s to 8s, which meant the clock was getting kinder while the
+count climbed. `BEAM_STRIP` is new and splits the two jobs the held beam was
+doing at once, stripping and carrying, which is the actual exploit. Whether
+it is enough against a skilled player is unproven.
+
+The real answer is structural, not numeric: one gesture currently does
+knock-loose and deliver-to-intake, so no constant makes it demanding, only
+slower. Amy's own scanner idea, identify the item before you are allowed to
+fire, is the shape of fix that would work.
+
+
+---
+
 **2026-08-28 landing cards say the name once, Claude (camera and particles)**
 
 The Dust Off card said "Dust Off" twice, once in the theme banner and again

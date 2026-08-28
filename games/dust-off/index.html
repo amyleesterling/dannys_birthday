@@ -101,6 +101,10 @@
        instead of getting clipped or pushed off screen. */
     .gamebar { flex-wrap: wrap; row-gap: 8px; gap: 7px; padding: 9px 11px; }
     .gamebar-title { display: none; }
+    /* The patent citation is a whole extra row on a phone (flex-basis:100%),
+       and the number is already on the title screen's own eyebrow and on the
+       landing page. In game, the play area needs the height more. */
+    .gamebar-pat { display: none; }
     .gamebar-logo { height: 21px; }
     .gamebar-pat { font-size: 12px; order: 10; flex-basis: 100%; }
     .gamebar-back { padding: 7px 9px; font-size: 12px; }
@@ -317,13 +321,23 @@ const TYPE_BY_ID = Object.fromEntries(TYPES.map(t => [t.id, t]));
 const PART_TYPE = TYPE_BY_ID.trace;
 
 // laser + heat
+// A cleared round used to take under a second: 28 particles gone off a single
+// held sweep, with most of the scan window still on the clock. The held beam
+// was doing both jobs at once, knocking particles loose over nearly the tap's
+// own radius and then vacuuming them to the intake from 155px away, so there
+// was never a reason to stop holding it. These numbers split those jobs back
+// apart: the tap is the tool that knocks particles off, the beam is the tool
+// that carries them, and the heat means you cannot simply hold it down.
 const PULSE_HEAT   = 16;
-const BEAM_HEAT    = 24;   // per second
+const BEAM_HEAT    = 29;   // per second, so ~3.4s of held beam before a lockout
 const COOL_RATE    = 30;   // per second
 const OVERHEAT_LOCK = 1.6; // seconds
 const PULSE_RADIUS = 62;   // screen px
-const BEAM_RADIUS  = 155;
-const BEAM_FORCE   = 2800;
+const BEAM_RADIUS  = 132;  // how far the held beam can reach for loose grit
+const BEAM_FORCE   = 2000;
+// the held beam still strips what it passes over, but over a much smaller
+// circle than a tap, so sweeping is no longer strictly better than aiming
+const BEAM_STRIP   = 0.7;
 
 const MAX_MISSES = 3;
 // Clearing this round wins the whole run rather than just starting round 11.
@@ -519,12 +533,16 @@ function layout() {
     L.left  = { x: 0, w: 0 };
     L.right = { x: W, w: 0 };
     L.ch    = { x: 0, y: 0, w: W, h: H };
-    L.topH  = 140;
-    L.botH  = 66;
+    // These two bars were eating a third of a phone screen between them. The
+    // clock is smaller and loses its caption, score and round share one row
+    // with the dial rather than sitting below it, and the bottom bar drops the
+    // subject id, which was flavour. Worth about 100px of play area.
+    L.topH  = 84;
+    L.botH  = 46;
     L.hud   = clamp(W / 300, 1.2, 1.8);
-    L.floorY = H * 0.82;
-    L.figH   = clamp(H * 0.44, 180, 420);
-    L.clock  = { cx: W / 2, cy: 62, r: 34 };
+    L.floorY = H * 0.84;
+    L.figH   = clamp(H * 0.46, 180, 420);
+    L.clock  = { cx: W / 2, cy: 34, r: 24 };
   } else {
     const padL = W >= 1180 ? 272 : 236;
     const padR = W >= 1180 ? 304 : 252;
@@ -568,7 +586,10 @@ function layout() {
 // thing still climbing. Cap it high enough that skill runs out before the
 // formula does.
 const roundCount = n => Math.min(120, 8 + n * 4);
-const roundTime  = n => Math.min(8, 6 + (n - 1) * 0.2);
+// The scan window used to grow with the round, from 6s to 8s, which meant the
+// only thing getting harder was the count and the clock was quietly getting
+// kinder. It shrinks now: more to recover, less time to do it in.
+const roundTime  = n => Math.max(5, 6.8 - (n - 1) * 0.2);
 
 function newSubject() {
   const def = pickSubjectDef();
@@ -600,7 +621,7 @@ function newSubject() {
     scanTime: t, scanLeft: t,
     total: parts.length, got: 0,
     x: L.ch.x - 70,
-    turb: 0.30 + round * 0.05,
+    turb: 0.34 + round * 0.07,
   };
 }
 
@@ -898,7 +919,7 @@ function update(dt) {
   if (beamOn) {
     // held, the beams strip whatever they pass over, so one sweep down the
     // body both knocks particles off and carries them to the intake
-    const n = dislodge(pointer.x, pointer.y, PULSE_RADIUS * 0.85);
+    const n = dislodge(pointer.x, pointer.y, PULSE_RADIUS * BEAM_STRIP);
     released += n;
     if (n) kick(n * 1.1);
   }
@@ -1466,9 +1487,13 @@ function drawClock(cx, cy, r, frac, secs, time) {
   ctx.fillStyle = COL.teal;
   ctx.font = Math.round(r * 0.26) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText('0' + year, cx, cy + r + Math.round(r * 0.32));
-  ctx.fillStyle = COL.dim;
-  ctx.font = Math.round(r * 0.19) + 'px ui-monospace, Menlo, monospace';
-  ctx.fillText('LONG NOW YEAR', cx, cy + r + Math.round(r * 0.56));
+  // no room for the caption under the small phone dial (and no early return
+  // here: this function is inside a save/restore pair)
+  if (!L.narrow) {
+    ctx.fillStyle = COL.dim;
+    ctx.font = Math.round(r * 0.19) + 'px ui-monospace, Menlo, monospace';
+    ctx.fillText('LONG NOW YEAR', cx, cy + r + Math.round(r * 0.56));
+  }
   ctx.textAlign = 'left';
   ctx.restore();
 }
@@ -1727,23 +1752,28 @@ function drawBars(time) {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, L.topH + .5); ctx.lineTo(W, L.topH + .5); ctx.stroke();
 
+  // score and round sit either side of the dial rather than above the heat
+  // row, which is what let the bar come down from 140px to 84
   ctx.textAlign = 'left';
-  label('SCORE', pad, 20, 12);
-  value(String(score).padStart(6, '0'), pad, 42, 20, COL.text);
+  label('SCORE', pad, 17, 11);
+  value(String(score).padStart(6, '0'), pad, 38, 18, COL.text);
 
   const sc = scanFrac();
   const k = L.clock;
   drawClock(k.cx, k.cy, k.r, sc.frac, sc.tLeft, time);
 
   ctx.textAlign = 'right';
-  label('ROUND ' + String(round).padStart(2, '0'), W - pad, 20, 12);
+  label('ROUND ' + String(round).padStart(2, '0'), W - pad, 17, 11);
   ctx.textAlign = 'left';
-  strikeDots(W - pad - 50, 36, 7);
+  strikeDots(W - pad - 46, 30, 6);
 
-  // the heat bar sits on its own row with the label beside it, not over it
-  const hy = L.topH - 20;
-  label(laser.lock > 0 ? 'COOLING' : 'HEAT', pad, hy + 9, 12);
-  bar(pad + 60, hy, W - pad - 60 - pad, 10, laser.heat / 100, heatColor());
+  // the bar starts clear of the widest label this can show, measured rather
+  // than guessed: 'COOLING' at L.hud scale overran a gap sized for 'HEAT'
+  const hy = L.topH - 16;
+  const heatLabel = laser.lock > 0 ? 'COOLING' : 'HEAT';
+  label(heatLabel, pad, hy + 8, 11);
+  const gap = ctx.measureText('COOLING').width + 10;
+  bar(pad + gap, hy, W - pad - gap - pad, 8, laser.heat / 100, heatColor());
 
   // bottom bar: what the analyser last saw, and how much you are keeping
   const by = H - L.botH;
@@ -1752,28 +1782,23 @@ function drawBars(time) {
   ctx.strokeStyle = COL.rule;
   ctx.beginPath(); ctx.moveTo(0, by + .5); ctx.lineTo(W, by + .5); ctx.stroke();
 
-  if (subject && state === 'play') {
-    ctx.textAlign = 'center';
-    value('SUBJECT ' + subject.id, W / 2, by + 24, 12, COL.dim);
-    ctx.textAlign = 'left';
-  }
-
+  // the subject id went with the taller bar: it never told you anything you
+  // could act on, and the analysis line is the one that does
   const top = feed[0];
-  label('ANALYSIS', pad, by + 40, 12);
+  const ry = by + 30;
   if (!top) {
-    value('AWAITING SAMPLE', pad, by + 58, 14, COL.dim);
+    value('AWAITING SAMPLE', pad, ry, 13, COL.dim);
   } else if (top.warn || top.ok) {
-    value(top.text, pad, by + 58, 14, top.warn ? COL.red : COL.teal);
+    value(top.text, pad, ry, 13, top.warn ? COL.red : COL.teal);
   } else {
     ctx.fillStyle = top.type.color;
-    ctx.beginPath(); ctx.arc(pad + 5, by + 53, 5, 0, TAU); ctx.fill();
-    value(top.type.name + (top.n > 1 ? ' x' + top.n : ''), pad + 19, by + 58, 14,
+    ctx.beginPath(); ctx.arc(pad + 5, ry - 5, 5, 0, TAU); ctx.fill();
+    value(top.type.name + (top.n > 1 ? ' x' + top.n : ''), pad + 19, ry, 13,
           top.type.flagged ? COL.red : COL.text);
   }
   const rate = released > 0 ? Math.round(captured / released * 100) : 0;
   ctx.textAlign = 'right';
-  label('RECOVERY', W - pad, by + 40, 12);
-  value(rate + ' %', W - pad, by + 58, 18, rate >= 60 ? COL.teal : COL.cyan);
+  value(rate + ' % KEPT', W - pad, ry, 15, rate >= 60 ? COL.teal : COL.cyan);
   ctx.textAlign = 'left';
 }
 
