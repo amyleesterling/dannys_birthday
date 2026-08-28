@@ -329,16 +329,21 @@ const dannyOn = () => !!(window.Danny && window.Danny.ok && window.Danny.loaded)
 // around the same lens point, so the beam still leaves from the right place.
 // emitter-hot.png is the same render with the lens glow rechannelled from
 // blue to red, swapped in while the emitter is locked out cooling down.
-function loadEmitterArt(src) {
+function loadArt(src) {
   const img = new Image();
   img.ready = false;
   img.onload = () => { img.ready = true; };
   img.src = src;
   return img;
 }
-const emitterImg = loadEmitterArt('emitter.png');
-const emitterHotImg = loadEmitterArt('emitter-hot.png');
+const emitterImg = loadArt('emitter.png');
+const emitterHotImg = loadArt('emitter-hot.png');
 const EMITTER_FX = 0.744, EMITTER_FY = 0.276;
+
+// The trace compound, the one flagged particle worth going after: Amy's
+// glowing red specimen render in place of a plain dot. Rare enough (three a
+// round, at most) that drawing the real image instead of a circle is cheap.
+const traceImg = loadArt('trace.png');
 
 // dedicated context for hit tests so the main transform is never disturbed
 const hitCtx = document.createElement('canvas').getContext('2d');
@@ -997,6 +1002,18 @@ function drawSubject(s, time) {
   drawAttached(s, time, alpha);
 }
 
+// The flagged particle draws as the trace compound render instead of a
+// dot, sized off the same radius its halo already breathes with.
+function drawTrace(x, y, r, fl) {
+  if (!traceImg.ready) {
+    ctx.fillStyle = TYPE_BY_ID.trace.color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    return;
+  }
+  const d = (r + 4 + fl * 2.5) * 2.2;
+  ctx.drawImage(traceImg, x - d / 2, y - d / 2, d, d);
+}
+
 function drawAttached(s, time, alpha) {
   for (const p of s.parts) {
     const scr = toScreen(s, p.lx, p.ly);
@@ -1006,9 +1023,11 @@ function drawAttached(s, time, alpha) {
       const fl = 0.5 + 0.5 * Math.sin(time * 6 + p.ph);
       ctx.fillStyle = `rgba(255,77,94,${0.35 + fl * 0.45})`;
       ctx.beginPath(); ctx.arc(scr.x, scr.y, r + 4 + fl * 2.5, 0, TAU); ctx.fill();
+      drawTrace(scr.x, scr.y, r, fl);
+    } else {
+      ctx.fillStyle = p.type.color;
+      ctx.beginPath(); ctx.arc(scr.x, scr.y, r, 0, TAU); ctx.fill();
     }
-    ctx.fillStyle = p.type.color;
-    ctx.beginPath(); ctx.arc(scr.x, scr.y, r, 0, TAU); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -1022,9 +1041,11 @@ function drawLoose(time) {
       const fl = 0.5 + 0.5 * Math.sin(time * 7 + p.ph);
       ctx.fillStyle = `rgba(255,77,94,${0.30 + fl * 0.35})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, r + 5 + fl * 3, 0, TAU); ctx.fill();
+      drawTrace(p.x, p.y, r, fl);
+    } else {
+      ctx.fillStyle = p.type.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
     }
-    ctx.fillStyle = p.type.color;
-    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
     // motion streak
     ctx.strokeStyle = p.type.color;
     ctx.globalAlpha = 0.28;
