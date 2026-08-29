@@ -5,6 +5,48 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-28 countdown up top, the Long Now clock enlarged on the right, and the 2x clock bug, Claude (camera and particles)**
+
+Amy asked for a countdown where the particle count was, the 10,000 year clock
+enlarged and moved right, and an agent deployed to refine the HUD. A design
+subagent did the composition; this entry records what shipped and the bug the
+work surfaced.
+
+**The HUD.** The big centred numeral during a scan is now the time left, in
+tenths, turning red with a soft pulse over the last quarter of the window, the
+same threshold the clock ring uses so the two agree. The red-particles-left
+count stepped down to a quiet teal line under it rather than vanishing. Phone:
+clock r 24 to 38, moved from top centre to the right end of a slightly taller
+top bar, with score, round, misses and heat stacked as a left column. Desktop:
+clock r 58 to 88, moved out of the chamber to head the right analysis panel
+(drawn in `drawPanels`, because the panel fill would otherwise paint over it).
+The clock face lost its numeric seconds, since the big countdown owns the
+number now and the ring keeps the progress; the star field gets the centre
+back, which is where the real Long Now clock keeps it.
+
+**Freed space is real space.** Moving the desktop clock out of the chamber
+raised the readout ceiling and the desktop object grew from objScale 1.95 to
+2.53, a 391px lab coat becoming 506px. Phone objScale held within 2px of
+before, which was a hard requirement.
+
+**The bug: the round clock ran at double speed.** Found by the subagent while
+verifying the countdown. The buzzer-grace change (PR #51) added a guarded
+`scanLeft -= dt` and left the original unconditional decrement in place four
+lines above, so both ran every frame and an "8.5 second" window lasted about
+4.3 wall seconds. Nothing caught it for six PRs because every measurement was
+made *in scanLeft units*, so bot, scoring, ring and readout were all
+consistently wrong together. It took putting the number next to a human's own
+sense of time to make it visible. Fixed by deleting the stray decrement;
+measured 3.00s of game clock in 3.00s wall.
+
+Consequence to know before judging difficulty: rounds now genuinely last their
+stated windows, roughly twice as long in wall time as what Amy has been
+playing. The heat curve from earlier today is per wall-second and unchanged.
+If the game now feels roomy, tune `roundTime` down, which finally means what
+it says; do not reintroduce the second decrement.
+
+---
+
 **2026-08-28 heat scales with the round, Claude (camera and particles)**
 
 Amy asked to make the laser overheat faster, and whether more particles should
