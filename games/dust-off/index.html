@@ -711,16 +711,22 @@ function layout() {
     L.left  = { x: 0, w: 0 };
     L.right = { x: W, w: 0 };
     L.ch    = { x: 0, y: 0, w: W, h: H };
-    // These two bars were eating a third of a phone screen between them. The
-    // clock is smaller and loses its caption, score and round share one row
-    // with the dial rather than sitting below it, and the bottom bar drops the
-    // subject id, which was flavour. Worth about 100px of play area.
-    L.topH  = 84;
+    // These two bars were eating a third of a phone screen between them, and
+    // the bottom bar drops the subject id, which was flavour. The clock owns
+    // the right end of the bar now, at a size you can actually read the dials
+    // on (Amy: "give the 10000 year clock more space, put it on the right"),
+    // and score, round and misses stack as a left column beside it. 94 rather
+    // than the old 84 buys the bigger dial; any taller starts squeezing the
+    // object through readoutBottom below, which Amy wants big. Measured:
+    // objScale 1.861 against 1.870 before, under 2px of object width.
+    L.topH  = 94;
     L.botH  = 46;
     L.hud   = clamp(W / 300, 1.2, 1.8);
     L.floorY = H * (narrow ? 0.86 : 0.84);
     L.figH   = clamp(H * 0.46, 180, 420);
-    L.clock  = { cx: W / 2, cy: 34, r: 24 };
+    // r 38, up from 24: the star field, sun and moon were sub-pixel soup at 24.
+    // cy 43 leaves the five digit year its line inside the bar below the dial.
+    L.clock  = { cx: W - 15 - 38, cy: 43, r: 38 };
   } else {
     const padL = W >= 1180 ? 272 : 236;
     const padR = W >= 1180 ? 304 : 252;
@@ -731,7 +737,12 @@ function layout() {
     L.hud   = clamp(H / 660, 1.1, 1.45);
     L.floorY = H * 0.895;
     L.figH   = clamp(H * 0.62, 280, 560);
-    L.clock  = { cx: L.ch.x + L.ch.w / 2, cy: 18 + 58, r: 58 };
+    // The clock heads the analysis panel on the right rather than floating
+    // over the chamber centre, half again the dial it had there. Moving it out
+    // of the chamber is also what frees the top-centre slot for the countdown
+    // readout, and lets the object grow: the readout no longer has to clear
+    // the dial plus its caption before the object can start.
+    L.clock  = { cx: W - padR / 2, cy: 24 + 88, r: 88 };
   }
 
   L.ch.cx = L.ch.x + L.ch.w / 2;
@@ -763,8 +774,13 @@ function layout() {
   // below both, so the gap was reserving empty air. A plain wall margin instead,
   // which is what Amy's "make the item bigger" actually needed.
   const lensGap = 8;
-  const readoutBottom = (narrow ? L.topH + 30 : L.clock.cy + L.clock.r * 1.56 + 16)
-                        + Math.round((narrow ? 38 : 42) * L.hud) * 0.72 + 56;
+  // The countdown readout hangs off the HUD bar on a phone and sits at a flat
+  // 30 on desktop, now that the clock lives in the right panel and no longer
+  // has to be cleared. The trailing 70 is the stack under the big numeral:
+  // caption, the red-count line, the coach line, the legend. Keep in sync
+  // with the offsets in drawGoal.
+  const readoutBottom = (narrow ? L.topH + 26 : 30)
+                        + Math.round((narrow ? 38 : 42) * L.hud) * 0.72 + 70;
   L.objScale = Math.max(0.8, Math.min(
     (L.ch.w - lensGap * 2) / OBJ_MAX_W,
     (L.floorY - readoutBottom - 10) / OBJ_MAX_H));
@@ -1135,7 +1151,13 @@ function update(dt) {
     if (s.t >= s.readyDur) { s.phase = 'scan'; s.t = 0; s.x = L.ch.cx; }
   } else if (s.phase === 'scan') {
     s.x = L.ch.cx + Math.sin(s.t * 1.4) * 1.6;
-    s.scanLeft -= dt;
+    // The clock ticks in exactly one place, the guarded line below. There used
+    // to be an unconditional decrement here as well, left behind when the
+    // buzzer-grace logic was added, and the two together ran the round at
+    // double speed: an "8.5 second" window lasted about 4.3 on a wall clock.
+    // Every measurement made against scanLeft was internally consistent, which
+    // is why nothing caught it until the countdown became the biggest number
+    // on screen.
     // Particles take a couple of seconds to reach the intake under their own
     // steam, which is new: with a swipe they arrived the moment you threw them.
     // Scoring the instant the clock hits zero would mark everything still in
@@ -1695,9 +1717,13 @@ function drawLaser(time) {
 // an opening. The year reads in five digits, 02026, so there is no Y10K
 // problem. It is five hundred feet down a shaft in a West Texas mountain.
 //
-// The scan window is laid on the outermost ring as the countdown, which is the
-// one thing here the real clock would find hilariously short.
-function drawClock(cx, cy, r, frac, secs, time) {
+// The scan window is laid on the outermost ring as a draining arc, which is
+// the one thing here the real clock would find hilariously short. The arc is
+// all it carries: the numeric seconds moved to the big countdown in the
+// chamber (Amy asked for the time up top), and printing them here as well
+// would be the same timer twice. Losing the digits also gives the star field
+// back its centre, which is where the real clock keeps it.
+function drawClock(cx, cy, r, frac, time) {
   ctx.save();
   ctx.fillStyle = 'rgba(6,11,15,0.94)';
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
@@ -1775,13 +1801,8 @@ function drawClock(cx, cy, r, frac, secs, time) {
   ctx.stroke();
   ctx.lineCap = 'butt';
 
-  // the countdown itself, over the stars
+  // the year, in five digits, outside everything
   ctx.textAlign = 'center';
-  ctx.fillStyle = frac < 0.25 ? COL.red : COL.text;
-  ctx.font = '600 ' + Math.round(r * 0.52) + 'px ui-monospace, Menlo, monospace';
-  ctx.fillText(secs.toFixed(1), cx, cy + r * 0.19);
-
-  // and the year, in five digits, outside everything
   ctx.fillStyle = COL.teal;
   ctx.font = Math.round(r * 0.26) + 'px ui-monospace, Menlo, monospace';
   ctx.fillText('0' + year, cx, cy + r + Math.round(r * 0.32));
@@ -1905,23 +1926,21 @@ function bigCount(n, label, color, cx, top, maxW) {
 
 function drawGoal(time) {
   const c = L.ch;
-  const sc = scanFrac();
-  const k = L.clock;
-  if (!L.narrow) drawClock(k.cx, k.cy, k.r, sc.frac, sc.tLeft, time);
-
   if (state !== 'play' || !subject) return;
-  // On a phone the readout hangs off the HUD bar. On a desktop it has to clear
-  // the clock's own 'LONG NOW YEAR' caption, which drawClock puts a full
-  // r * 0.56 below the dial, so anchor to that rather than to the dial edge.
-  const y = L.narrow ? L.topH + 30 : k.cy + k.r * 1.56 + 16;
+  const sc = scanFrac();
+  // On a phone the readout hangs off the HUD bar; on a desktop it sits at the
+  // chamber's top, in the slot the clock vacated when it moved to the right
+  // panel. Keep in sync with readoutBottom in layout(), which is what stops
+  // the object growing up into this block.
+  const y = L.narrow ? L.topH + 26 : 30;
   ctx.textAlign = 'center';
   const maxW = c.w - 28;
   const left = subject.total - subject.got;
 
-  // The count of particles still on the subject and the count of seconds to
-  // the next one share this slot deliberately: the first runs down to zero,
-  // Danny comes out, and the second picks up in the same place, so the eye
-  // never goes looking for what happens next.
+  // The seconds left on the scan and the seconds to the next item share this
+  // slot deliberately: the first runs down to zero, Danny comes out, and the
+  // second picks up in the same place, so the eye never goes looking for what
+  // happens next.
   if (subject.phase === 'result') {
     const remain = Math.max(0, subject.resultDur - subject.t);
     bigCount(Math.ceil(remain), 'UNTIL THE NEXT ITEM', COL.cyan, c.cx, y, maxW);
@@ -1935,13 +1954,23 @@ function drawGoal(time) {
     fitCentered(coachLine(), c.cx, y + 50, maxW, 12, COL.dim);
     drawLegend(c.cx, y + 72);
   } else {
-    const capY = left > 0
-      ? bigCount(left, left === 1 ? 'PARTICLE LEFT' : 'PARTICLES LEFT',
-                 left <= 3 ? COL.cyan : COL.text, c.cx, y, maxW)
-      : bigCount(0, 'ALL RECOVERED', COL.teal, c.cx, y, maxW);
-    fitCentered(coachLine(), c.cx, capY + 26, maxW, 12,
+    // Amy: "this should have a countdown at the top, not a particle remaining
+    // count". So the big numeral is the clock now, in tenths, and it turns red
+    // and pulses over the last quarter of the window, matching the ring on the
+    // dial. The particle count did not vanish, it stepped down a rank: one
+    // quiet line under the countdown, counting the reds because those are the
+    // ones the round is actually scored on.
+    const urgent = sc.frac < 0.25;
+    if (urgent) ctx.globalAlpha = 0.72 + 0.28 * Math.abs(Math.sin(time * 7));
+    const capY = bigCount(Math.max(0, sc.tLeft).toFixed(1), 'SECONDS LEFT',
+                          urgent ? COL.red : COL.text, c.cx, y, maxW);
+    ctx.globalAlpha = 1;
+    fitCentered(left > 0 ? left + ' RED LEFT ON SUBJECT' : 'ALL RECOVERED',
+                c.cx, capY + 20, maxW, 13,
+                left > 0 ? (left <= 3 ? COL.cyan : COL.text) : COL.teal);
+    fitCentered(coachLine(), c.cx, capY + 42, maxW, 12,
                 loose.length ? COL.cyan : COL.dim);
-    drawLegend(c.cx, capY + 48);
+    drawLegend(c.cx, capY + 62);
   }
   ctx.textAlign = 'left';
 }
@@ -1977,10 +2006,10 @@ function drawPanels(time) {
   if (laser.lock > 0) value('OVERHEAT. COOLING.', x, y, 13, COL.red);
   y += 24;
 
-  label('SCAN WINDOW', x, y); y += 26;
-  const sc = scanFrac();
-  value(sc.tLeft.toFixed(1) + ' s', x, y, 20, sc.frac < 0.25 ? COL.red : COL.text);
-  y += 40;
+  // The 'SCAN WINDOW' seconds readout that lived here is gone: the countdown
+  // is the big numeral at the top of the chamber now, and the clock's outer
+  // ring still drains alongside it. A third copy in the corner was the same
+  // number told three ways.
 
   // these dots are misses, which settleRound() counts per round left uncleared,
   // never per particle. 'FLAGGED LOST' was already the wrong name for that and
@@ -1992,9 +2021,14 @@ function drawPanels(time) {
   label('SUBJECT', x, y); y += 24;
   value(subject && state === 'play' ? subject.id : 'STANDBY', x, y, 17, COL.text);
 
-  // ---- right panel, the analysis feed
+  // ---- right panel: the Long Now clock on top, the analysis feed below it.
+  // The clock draws here rather than in drawGoal because the panel fill above
+  // would paint straight over it otherwise: drawPanels runs last.
+  const kc = L.clock;
+  drawClock(kc.cx, kc.cy, kc.r, scanFrac().frac, time);
+
   const rx = rp.x + 20;
-  let ry = 40;
+  let ry = Math.round(kc.cy + kc.r * 1.56 + 40);
   value('ANALYSIS FEED', rx, ry, 16, COL.teal); ry += 19;
   label('CAPTURE MECHANISM 1', rx, ry, 11); ry += 28;
   ctx.strokeStyle = COL.rule;
@@ -2049,28 +2083,29 @@ function drawBars(time) {
   ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, L.topH + .5); ctx.lineTo(W, L.topH + .5); ctx.stroke();
 
-  // score and round sit either side of the dial rather than above the heat
-  // row, which is what let the bar come down from 140px to 84
+  // The clock owns the right end of the bar (Amy: more space, right side), so
+  // everything textual stacks as a left column beside it: score on top, round
+  // and its miss dots on one line under it, heat along the bottom. One left
+  // edge for the column, one right edge for the dial, nothing centred between
+  // them fighting both.
   ctx.textAlign = 'left';
   label('SCORE', pad, 17, 11);
-  value(String(score).padStart(6, '0'), pad, 38, 18, COL.text);
+  value(String(score).padStart(6, '0'), pad, 40, 18, COL.text);
 
-  const sc = scanFrac();
+  label('ROUND ' + String(round).padStart(2, '0'), pad, 64, 11);
+  strikeDots(pad + ctx.measureText('ROUND 00').width + 14, 60, 5);
+
   const k = L.clock;
-  drawClock(k.cx, k.cy, k.r, sc.frac, sc.tLeft, time);
+  drawClock(k.cx, k.cy, k.r, scanFrac().frac, time);
 
-  ctx.textAlign = 'right';
-  label('ROUND ' + String(round).padStart(2, '0'), W - pad, 17, 11);
-  ctx.textAlign = 'left';
-  strikeDots(W - pad - 46, 30, 6);
-
-  // the bar starts clear of the widest label this can show, measured rather
-  // than guessed: 'COOLING' at L.hud scale overran a gap sized for 'HEAT'
+  // The bar starts clear of the widest label this can show, measured rather
+  // than guessed: 'COOLING' at L.hud scale overran a gap sized for 'HEAT'.
+  // It ends clear of the dial, which the bottom of the column runs under.
   const hy = L.topH - 16;
   const heatLabel = laser.lock > 0 ? 'COOLING' : 'HEAT';
   label(heatLabel, pad, hy + 8, 11);
   const gap = ctx.measureText('COOLING').width + 10;
-  bar(pad + gap, hy, W - pad - gap - pad, 8, laser.heat / 100, heatColor());
+  bar(pad + gap, hy, k.cx - k.r - 12 - (pad + gap), 8, laser.heat / 100, heatColor());
 
   // bottom bar: what the analyser last saw, and how much you are keeping
   const by = H - L.botH;
