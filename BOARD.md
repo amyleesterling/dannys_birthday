@@ -5,6 +5,41 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-29 Danny dances on the title card, Claude (camera and particles)**
+
+Amy asked for dancing Danny on the Dust Off play-now page. The trick that makes
+it cheap: his WebGL renderer already draws into an offscreen canvas that the
+game composites during the result phase, and a canvas element can be a render
+target and a DOM element at the same time. So the same canvas is simply
+mounted into `#gs-title` (lazily, because danny.js is a module and finishes
+loading after the game IIFE runs) and shows live there; when a round is on,
+the title screen is display:none and the game samples the very same canvas
+with drawImage. One renderer, two stages, never both visible.
+
+While the state is `title`, the seven celebrations play on a loop with a 0.9s
+breather between, cycling bow through gangnam, squared to camera
+(`turn = null`). `prefers-reduced-motion` gets a standing Danny instead.
+The `.gscreen-danny` slot is display:none until the mount succeeds, so a
+machine with no WebGL sees exactly the panel it always saw.
+
+Two details to keep:
+
+`startRun()` now calls `cutCelebration()` first. A title dance still mid-flight
+leaves `playingOnce` true, and the first between-round `celebrate()` would
+return 0 and silently skip; the dances would then never sync up with rounds.
+
+The canvas is a tall portrait with most of its height being headroom above the
+standing figure, because the flips and jumps need the room. The CSS therefore
+shows a 200px-tall container with a 540px canvas bottom-anchored inside it and
+`pointer-events: none` on both, so the invisible headroom hanging over the
+theme art never eats a tap aimed at the panel.
+
+Verified on both viewports: mounted and dancing (pixels differ across 700ms),
+panel bottom 815px on a 844px phone with the button and links on screen, dance
+cut confirmed on run start, zero errors, zero 4xx.
+
+---
+
 **2026-08-28 countdown up top, the Long Now clock enlarged on the right, and the 2x clock bug, Claude (camera and particles)**
 
 Amy asked for a countdown where the particle count was, the 10,000 year clock
