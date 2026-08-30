@@ -132,6 +132,24 @@
     .gamebar button { padding: 7px 10px; font-size: 12px; }
   }
 
+  /* Danny dancing on top of the title card. His WebGL canvas is a tall
+     portrait with a lot of headroom above the standing figure (the flips and
+     jumps need it), so the container is only as tall as Danny standing and
+     the canvas hangs out of the top of it; the overflow is transparent
+     pixels except mid-jump, when he rises over the backdrop. pointer-events
+     off so the invisible headroom never eats a tap meant for the panel. */
+  .gscreen-danny { display: none; }
+  .gscreen-danny.on {
+    display: block; position: relative; z-index: 2;
+    height: 200px; margin: -8px auto 4px;
+    pointer-events: none;
+  }
+  .gscreen-danny canvas {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    height: 540px; width: auto; pointer-events: none;
+  }
+  @media (max-height: 560px) { .gscreen-danny.on { display: none; } }
+
   /* The EM spectrum wave teaser, kept from the old title overlay and now
      living inside the title panel. The full bar and readouts have their own
      page (spectrum.html); this is just the moving doorway to it. */
@@ -166,6 +184,10 @@
 <section class="gscreen" id="gs-title">
   <div class="gscreen-panel">
     <span class="holodialog-rim"></span>
+    <!-- Danny's own render canvas is mounted in here by the game once his
+         model loads; hidden until then, so a machine with no WebGL just sees
+         the panel it always saw. -->
+    <div class="gscreen-danny" id="gs-danny" aria-hidden="true"></div>
     <img class="gscreen-art" src="theme.jpg" alt="Dust Off. Aim crossing lasers to knock particles loose." width="1600" height="533">
     <p class="holodialog-eyebrow">US 9,134,205 B2 &middot; Removing surface particles from an object</p>
     <p class="holodialog-desc">
@@ -696,6 +718,11 @@ const pointer = { x: 0, y: 0, down: false, inside: false };
 // never disagree about where they are going. Smoothed, so they sweep.
 const emAim = { x: 0, y: 0, set: false, idle: 1 };
 
+// the title-screen dance loop: mount-once flag, breather timer, which move is
+// next, and whether this viewer asked for reduced motion (checked once)
+const dannyStage = { mounted: false, rest: 0, idx: 0,
+  still: window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches };
+
 function layout() {
   const rect = canvas.getBoundingClientRect();
   dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -991,6 +1018,10 @@ window.addEventListener('resize', () => { layout(); });
 // ---------------------------------------------------------------- run
 
 function startRun() {
+  // a title-screen dance may still be mid-flight; if it is left playing,
+  // playingOnce stays true and the first between-round celebrate() would
+  // return 0 and skip
+  if (window.Danny && window.Danny.ok) window.Danny.cutCelebration();
   layout();
   round = 1; score = 0; misses = 0; captured = 0; released = 0; year = 2026;
   banner = null;
@@ -1105,8 +1136,30 @@ function update(dt) {
 
   if (state !== 'play') {
     if (window.Danny && window.Danny.ok) {
-      window.Danny.setMotion('idle');
-      window.Danny.update(dt, 0);
+      // Danny dances on the title card. His render canvas is mounted into
+      // the panel the first time he is ready (danny.js is a module and loads
+      // after this IIFE runs, so the mount has to be lazy), and while the
+      // title is up the celebrations play on a loop with a short breather
+      // between, cycling the whole list. turn = null squares him to camera.
+      // Under prefers-reduced-motion he stands instead of dancing.
+      if (!dannyStage.mounted) {
+        const slot = document.getElementById('gs-danny');
+        if (slot) { slot.appendChild(window.Danny.canvas); slot.classList.add('on'); dannyStage.mounted = true; }
+      }
+      if (state === 'title' && !dannyStage.still) {
+        if (!window.Danny.playingOnce) {
+          dannyStage.rest -= dt;
+          if (dannyStage.rest <= 0) {
+            dannyStage.idx = dannyStage.idx % 7 + 1;
+            if (window.Danny.celebrate(dannyStage.idx) > 0) dannyStage.rest = 0.9;
+          }
+        }
+        window.Danny.setMotion('idle');
+        window.Danny.update(dt, null);
+      } else {
+        window.Danny.setMotion('idle');
+        window.Danny.update(dt, 0);
+      }
     }
     updateLoose(dt, 0.4);
     return;
