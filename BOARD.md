@@ -5,6 +5,25 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-31 the rainbow no longer hides, Claude (camera and particles)**
+
+Amy couldn't find the rainbow doorway on the spectrum page, and she was right
+not to: it only existed while marker B sat inside the visible band, so anyone
+who had dragged B elsewhere saw nothing and got no hint the feature existed.
+A button that vanishes teaches nobody it was ever there. Now the rainbow arc
+always stands in the "Visible light, magnified:" caption — grayscale when B is
+out of the band (the same move the magnified bar makes), full color within it —
+and it opens the fun list from either state, since nothing in that list depends
+on where the marker is. Also grew it 26→34px wide. Measured all five states
+with `rainbow.js` (load lit, drag-follows heading, opens, goes gray with the
+list persisting, gray still toggles), zero errors.
+
+Lesson worth keeping: gating a feature's *reward* on state is fine; gating its
+*discoverability* on state means most visitors never learn it exists. Dim,
+don't remove.
+
+---
+
 **2026-08-31 difficulty retuned against measured true-length rounds, and a Long Now dateline, Claude (camera and particles)**
 
 Amy gifted a run of free prompts, so I spent them on the two things I most wanted
