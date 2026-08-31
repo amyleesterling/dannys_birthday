@@ -96,12 +96,28 @@
   }
   .sentence b { color: #fff; }
   .relratio { font-size: 30px; font-weight: 650; color: #fff; letter-spacing: .01em; }
+  .relratio.long { font-size: 21px; }
   .relratio .x { color: #a07cff; font-weight: 400; }
   .reldir { margin: 5px 0 9px; font-size: 15px; color: #cfe6e6; }
   .reldir b.a { color: #7ee0ff; } .reldir b.b { color: #e8a93a; }
-  .reldir .relarrow { color: #a07cff; padding: 0 6px; }
+  .reldir .relarrow { color: #a07cff; padding: 0 8px; font-size: 30px; line-height: 0; vertical-align: -5px; }
   .relnote { font-size: 13.5px; color: #9aa2b1; line-height: 1.55; }
   .relnote b { color: #cfe6e6; font-weight: 600; }
+
+  /* the lockstep explorer: drag between A and B and watch all four quantities
+     move by the same factor */
+  .lockstep { margin-top: 14px; border-top: 1px solid rgba(160,124,255,.2); padding-top: 12px; }
+  .lockstep input[type=range] { width: 100%; accent-color: #a07cff; height: 30px; margin: 0 0 4px; cursor: ew-resize; }
+  #lockSvg { display: block; width: 100%; height: 54px; }
+  .lockchips { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+  .lockchip { border: 1px solid rgba(196,228,255,.14); padding: 7px 10px; font-size: 12px;
+              display: flex; flex-direction: column; gap: 2px; }
+  .lockchip .lcn { color: #8b98a8; letter-spacing: .04em; }
+  .lockchip.up .lcn { color: #cfe6e6; }
+  .lockchip .lcv { color: #eff4fb; font-size: 14.5px; }
+  .lockchip .lcf { color: #a07cff; }
+  .locknote { font-size: 11.5px; color: #5c6b7a; margin-top: 9px; line-height: 1.5; }
+  .locknote b.a { color: #7ee0ff; } .locknote b.b { color: #e8a93a; }
   .insight { font-size: 13.5px; color: #9aa2b1; line-height: 1.55; margin: 0 0 26px; padding: 0 2px; }
   .insight::before { content: "✦ "; color: #a07cff; }
 
@@ -394,6 +410,11 @@ beam power      P = photons per second × energy per photon</pre>
   const BIG = [[1e15,'quadrillion'],[1e12,'trillion'],[1e9,'billion'],[1e6,'million'],[1e3,'thousand']];
   function ratioWord(r) {
     if (r < 1000) return r < 10 ? r.toFixed(2) : String(Math.round(r));
+    if (r < 1e15) {
+      // written out the way humans write numbers: 168,000, not 168 thousand
+      const e = Math.floor(log(r)) - 2;              // keep 3 significant figures
+      return (Math.round(r / Math.pow(10, e)) * Math.pow(10, e)).toLocaleString('en-US');
+    }
     for (const [d, w] of BIG) if (r >= d) { const v = r / d; return (v < 10 ? v.toFixed(2) : v < 100 ? v.toFixed(1) : String(Math.round(v))) + ' ' + w; }
     return r.toExponential(2);
   }
@@ -517,10 +538,19 @@ beam power      P = photons per second × energy per photon</pre>
     // soft band edges: each band fades in/out over a few px
     BANDS.forEach((b, i) => {
       const g = el('linearGradient', { id: 'bg' + i, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
-      const a = b.name === 'visible' ? .55 : .22;
+      if (b.name === 'visible') {
+        // the visible sliver is the actual rainbow, even at this tiny width
+        el('stop', { offset: '0%', 'stop-color': '#ff2d2d', 'stop-opacity': 0 }, g);
+        VIS_COLORS.forEach(([nmv, c]) => {
+          const p = clamp((log(C / (nmv * 1e-9)) - log(VIS_LO)) / (log(VIS_HI) - log(VIS_LO)), 0, 1);
+          el('stop', { offset: (4 + p * 92) + '%', 'stop-color': c, 'stop-opacity': .85 }, g);
+        });
+        el('stop', { offset: '100%', 'stop-color': '#7a2bff', 'stop-opacity': 0 }, g);
+        return;
+      }
       el('stop', { offset: '0%',  'stop-color': `rgb(${b.col})`, 'stop-opacity': 0 }, g);
-      el('stop', { offset: '6%',  'stop-color': `rgb(${b.col})`, 'stop-opacity': a }, g);
-      el('stop', { offset: '94%', 'stop-color': `rgb(${b.col})`, 'stop-opacity': a }, g);
+      el('stop', { offset: '6%',  'stop-color': `rgb(${b.col})`, 'stop-opacity': .22 }, g);
+      el('stop', { offset: '94%', 'stop-color': `rgb(${b.col})`, 'stop-opacity': .22 }, g);
       el('stop', { offset: '100%','stop-color': `rgb(${b.col})`, 'stop-opacity': 0 }, g);
     });
     const bandsG = el('g', {}, ovSvg);
@@ -686,6 +716,9 @@ beam power      P = photons per second × energy per photon</pre>
         if (l.x < 0 || l.x > OW) continue;
         el('line', { x1: l.x, x2: l.x, y1: 36, y2: 44, stroke: '#8b98a8', 'stroke-width': 1 }, g);
         el('circle', { cx: l.x, cy: 33, r: 2.4, fill: l.type === 'line' ? '#eff4fb' : '#8b98a8',
+                       'pointer-events': 'none' }, g);
+        // the dot people actually hit: an invisible finger-sized target
+        el('circle', { cx: l.x, cy: 33, r: 16, fill: 'transparent',
                        'data-lm': l.id, style: 'cursor:pointer' }, g);
         const wpx = l.name.length * 5.6;
         let row = -1;
@@ -698,8 +731,11 @@ beam power      P = photons per second × energy per photon</pre>
         }
       }
     } else {
-      for (const l of visLm) if (l.x >= 0 && l.x <= OW)
-        el('circle', { cx: l.x, cy: 40, r: 2, fill: '#5c6b7a', 'data-lm': l.id, style: 'cursor:pointer' }, g);
+      for (const l of visLm) if (l.x >= 0 && l.x <= OW) {
+        el('circle', { cx: l.x, cy: 40, r: 2, fill: '#5c6b7a', 'pointer-events': 'none' }, g);
+        el('circle', { cx: l.x, cy: 40, r: 14, fill: 'transparent',
+                       'data-lm': l.id, style: 'cursor:pointer' }, g);
+      }
     }
 
     // A and B handles — both live here, named, with 44px-wide hit targets
@@ -763,10 +799,19 @@ beam power      P = photons per second × energy per photon</pre>
       const w = ratioWord(r);
       const tag = m => '<b class="' + m + '">' + nameOf(m) + ' (' + m.toUpperCase() + ')</b>';
       $('sentence').innerHTML =
-        '<div class="relratio num"><span class="x">×</span>' + w + '</div>' +
+        '<div class="relratio num' + (w.length > 12 ? ' long' : '') + '"><span class="x">×</span>' + w + '</div>' +
         '<div class="reldir">' + tag(loM) + '<span class="relarrow">⟶</span>' + tag(hiM) + '</div>' +
         '<div class="relnote">Along the arrow, <b>frequency</b> and <b>energy per photon</b> climb by ' +
-        'exactly this factor — <b>wavelength</b> and <b>period</b> shrink by it.</div>';
+        'exactly this factor — <b>wavelength</b> and <b>period</b> shrink by it. Try it:</div>' +
+        '<div class="lockstep">' +
+          '<input type="range" id="lockRange" min="0" max="1000" value="0" ' +
+            'aria-label="Slide from ' + nameOf(loM) + ' to ' + nameOf(hiM) + '">' +
+          '<svg id="lockSvg" viewBox="0 0 600 64" preserveAspectRatio="none" aria-hidden="true"></svg>' +
+          '<div class="lockchips" id="lockChips" aria-live="off"></div>' +
+          '<div class="locknote">Drag from ' + tag(loM) + ' toward ' + tag(hiM) +
+          '. The wave is compressed for display; the numbers are exact.</div>' +
+        '</div>';
+      initLockstep(loM, hiM);
     }
     // pair-specific insight, else a generic but true one
     const pair = [S.aId, S.bId];
@@ -779,6 +824,35 @@ beam power      P = photons per second × energy per photon</pre>
         : 'These sit ' + oom.toFixed(2) + ' orders of magnitude — ' + (oom / Math.LOG10E / Math.LN2).toFixed(1) +
           ' doublings — apart, on a view that spans 53 octaves. Human vision occupies roughly one of them.';
     }
+  }
+
+  function initLockstep(loM, hiM) {
+    const range = $('lockRange'); if (!range) return;
+    const fLo = hzOf(loM), R = hzOf(hiM) / fLo;
+    const colLo = loM === 'a' ? [126,224,255] : [232,169,58];
+    const colHi = hiM === 'a' ? [126,224,255] : [232,169,58];
+    const svg = $('lockSvg'), chips = $('lockChips');
+    function upd() {
+      const t = range.value / 1000;
+      const f = fLo * Math.pow(R, t);
+      const k = ratioWord(f / fLo);
+      const cyc = 2.5 * Math.pow(28 / 2.5, t);   // visual only; numbers are exact
+      let d = '';
+      for (let x = 0; x <= 600; x += 2)
+        d += (x ? 'L' : 'M') + x + ' ' + (32 - Math.sin(x / 600 * cyc * TAU) * 24).toFixed(1);
+      const col = colLo.map((v, i) => Math.round(v + (colHi[i] - v) * t));
+      svg.innerHTML = '<path d="' + d + '" fill="none" stroke="rgb(' + col.join(',') + ')" stroke-width="2"/>';
+      chips.innerHTML = [
+        ['Frequency', freq(f, true), '×' + k, 1],
+        ['Energy per photon', energy(f, true), '×' + k, 1],
+        ['Wavelength', wave(f, true), '÷' + k, 0],
+        ['Period', period(f, true), '÷' + k, 0],
+      ].map(([n, v, kk, up]) =>
+        '<div class="lockchip ' + (up ? 'up' : 'dn') + '"><span class="lcn">' + (up ? '↑ ' : '↓ ') + n +
+        '</span><span class="lcv num">' + v + '</span><span class="lcf num">' + kk + '</span></div>').join('');
+    }
+    range.addEventListener('input', upd);
+    upd();
   }
 
   function renderTable() {
@@ -1153,7 +1227,7 @@ beam power      P = photons per second × energy per photon</pre>
     const close = (x, y, tol) => Math.abs(x / y - 1) < (tol || 1e-6);
     ok('532 nm -> 563.52 THz', close(C / 532e-9, 563.5197e12, 1e-4));
     ok('default ratio ~5.635 million', close((C / 532e-9) / 100e6, 5.6352e6, 1e-3));
-    ok('ratioWord default', ratioWord((C / 532e-9) / 100e6) === '5.64 million');
+    ok('ratioWord default', ratioWord((C / 532e-9) / 100e6) === '5,640,000');
     ok('full window ratio 1e16', close(FMAX / FMIN, 1e16));
     ok('wavelength inverse', close(C / (C / 532e-9), 532e-9));
     ok('period inverse', close(1 / 100e6, 10e-9));
