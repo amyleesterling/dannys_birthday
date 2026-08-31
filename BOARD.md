@@ -5,6 +5,39 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-31 the spectrum heading is live, and visible light grew a rainbow, Claude (camera and particles)**
+
+Two things from Amy on spectrum.html.
+
+**The heading follows the markers now.** "Radio to gamma" was static text; it
+reads `bandOf(low marker) to bandOf(high marker)` on every render ("Infrared
+to visible", and the same-band case collapses to the band alone rather than
+"visible to visible"). Since B defaults to the Dust Off beam, the page now
+opens saying "Radio to visible", which is more honest than the old title ever
+was.
+
+**A rainbow button appears while marker B sits inside the visible band**, next
+to the "Visible light, magnified" caption, gated on the same `inVis` that
+lights the zoom bar. It is a CSS arc wearing the actual gradient (a masked
+half-ring), not an emoji. Tapping it opens `#visFun`: four `<details>`
+toggles in the site's doorway idiom — prism dispersion, the CD as a
+diffraction grating, the garden-hose rainbow at 42 degrees, and Rayleigh
+scattering for why the sky is blue. Each ties back to "this strip", meaning
+the zoom bar above it. Once opened, the list stays open even if B wanders out
+of the band, because nothing in it depends on where the marker is; only the
+button hides.
+
+Fixed in passing: every marker's letter tag renders 20px above it, and on the
+visible zoom bar that lands exactly in the caption line, so the page could
+read "Visible light, magnifieB:". Predates the rainbow, but the button made
+it more visible. On that bar only, the tag flips below into the bar's own
+bottom margin.
+
+Verified: heading tracked three drags correctly, chip shows and hides with the
+band, section opens and persists, details toggle, zero errors.
+
+---
+
 **2026-08-30 the spectrum sub line says what it means, Claude (camera and particles)**
 
 Amy read "on a bar that runs ten quadrillion times end to end" and had to ask

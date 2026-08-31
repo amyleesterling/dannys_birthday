@@ -86,6 +86,11 @@
     top: -20px; font-size: 12px; white-space: nowrap; color: inherit;
   }
   .specmark:focus-visible { outline: 2px solid #7ee0ff; outline-offset: 3px; }
+  /* On the visible zoom the tag flips below the bar: above it lands exactly in
+     the caption line ("Visible light, magnifieB:"), a collision that predates
+     the rainbow button but got more visible next to it. The bar's own 24px
+     bottom margin has room for the letter. */
+  .specvisbar .specmark::after { top: auto; bottom: -20px; }
   .specmark.a { background: #7ee0ff; color: #7ee0ff; }
   .specmark.b { background: #e8a93a; color: #e8a93a; }
 
@@ -124,6 +129,44 @@
 
   /* for scale: an apple sitting in the beam for a minute, band by band */
   .specmark.apple { background: #ff6b5e; color: #ff6b5e; }
+
+  /* The rainbow button: a small arc of the actual band, tappable. It only
+     exists while marker B sits inside visible light, so finding it is part of
+     the toy. The arc is a top-half ring wearing the spectrum as a gradient. */
+  .rainbow {
+    display: inline-block; vertical-align: middle; margin-left: 10px;
+    padding: 3px 9px 1px; cursor: pointer;
+    background: none; border: 1px solid rgb(126 224 255 / .3); border-radius: 3px;
+    transition: border-color .2s ease;
+  }
+  .rainbow:hover, .rainbow:focus-visible { border-color: rgb(126 224 255 / .8); }
+  .rainbow[aria-expanded="true"] { border-color: rgb(126 224 255 / .8); background: rgb(126 224 255 / .08); }
+  .rainbow-arc {
+    display: block; width: 26px; height: 13px;
+    border-radius: 13px 13px 0 0;
+    background: linear-gradient(90deg, #ff3b30, #ff9500, #ffe600, #35e05a, #35c8e0, #4a6ee0, #9b4ae0);
+    -webkit-mask: radial-gradient(13px 13px at 50% 100%, transparent 6px, #000 7px);
+            mask: radial-gradient(13px 13px at 50% 100%, transparent 6px, #000 7px);
+  }
+
+  /* the fun list: same doorway idiom as the rest of the site's link rows */
+  .visfun { margin: 14px 0 4px; display: grid; gap: 7px; }
+  .visfun details {
+    border: 1px solid rgb(196 228 255 / .16);
+  }
+  .visfun summary {
+    cursor: pointer; list-style: none; padding: 10px 12px;
+    font-size: 13px; letter-spacing: .08em; text-transform: uppercase;
+    color: #9aa2b1; transition: color .2s ease;
+  }
+  .visfun summary::-webkit-details-marker { display: none; }
+  .visfun summary::after { content: ' +'; color: rgb(126 224 255 / .6); }
+  .visfun details[open] summary { color: #7ee0ff; }
+  .visfun details[open] summary::after { content: ' \2212'; }
+  .visfun details p {
+    margin: 0; padding: 0 12px 12px;
+    font-size: 14px; line-height: 1.6; color: #9aa2b1; max-width: 70ch;
+  }
   /* locator: the full spectrum in miniature, with the zoomed window marked */
   .specmini { position: relative; height: 10px; margin: 0 0 8px;
               border: 1px solid rgba(196,228,255,.14); background: #05070c; }
@@ -151,7 +194,7 @@
   <a class="gamebar-back" href="observatory.html">OBSERVATORY →</a>
 </header>
 <div class="wrap">
-  <h1>Radio to gamma</h1>
+  <h1 id="specHead">Radio to gamma</h1>
   <p class="sub">A to B: <b id="specRatio">5.6 million</b>&times; apart. End to end, the whole bar covers a ten-quadrillion-fold range. Drag a marker.</p>
 
   <div class="specwavebox">
@@ -169,9 +212,53 @@
     <div class="specticks" id="specTicks"></div>
   </div>
 
-  <p class="cap">Visible light, magnified:</p>
+  <p class="cap">Visible light, magnified:
+    <button class="rainbow" id="rainbowBtn" aria-expanded="false"
+            aria-controls="visFun" aria-label="Things to try with visible light" hidden>
+      <span class="rainbow-arc" aria-hidden="true"></span>
+    </button>
+  </p>
   <div class="specvisbar" id="specVis">
     <div class="specmark b" id="markV" tabindex="0" role="slider" aria-label="Marker B within visible light"></div>
+  </div>
+
+  <!-- Opens from the rainbow button, which itself only appears while marker B
+       is inside the visible band: park yourself in the light you can see, and
+       the page offers things to do with it. -->
+  <div class="visfun" id="visFun" hidden>
+    <details>
+      <summary>Split it with a prism</summary>
+      <p>Glass slows every frequency on this strip by a slightly different
+      amount, so each one bends through a slightly different angle, and white
+      light fans out into exactly the band drawn above. Newton did it with a
+      prism in 1666 and named seven colours, but seven was taste: the band is
+      a continuum, one colour per frequency, no seams.</p>
+    </details>
+    <details>
+      <summary>You already own a prism. It plays music</summary>
+      <p>The data track on a CD or DVD is a spiral of pits about a micrometre
+      apart, which is the same size as these wavelengths. Reflections off
+      neighbouring turns interfere, and each frequency survives at its own
+      angle. Tilt a disc under a lamp and you are running a diffraction
+      grating experiment.</p>
+    </details>
+    <details>
+      <summary>Make a rainbow with a garden hose</summary>
+      <p>Each droplet refracts sunlight on the way in, reflects it off the
+      back, and refracts it again on the way out. Red exits at about 42
+      degrees from the antisolar point and violet nearer 40, which is why the
+      bow is a band and red is on the outside. Sun behind you, mist in front,
+      look at your shadow's head height.</p>
+    </details>
+    <details>
+      <summary>Why the sky is blue, and sunsets are not</summary>
+      <p>Air molecules scatter light in proportion to the fourth power of its
+      frequency, so the blue end of this strip scatters roughly ten times as
+      strongly as the red end. Look anywhere but at the sun and scattered
+      blue is what reaches you. At sunset the light crosses so much air that
+      the blue has been scattered away en route, and what survives the trip
+      is the red.</p>
+    </details>
   </div>
 
   <div class="specread">
@@ -307,7 +394,18 @@
   paintBands(bar);
   paintTicks(document.getElementById('specTicks'));
 
+  // The heading names the bands the two markers are actually sitting in, low
+  // to high, so it rides along as you drag. Amy caught it stuck on "Radio to
+  // gamma" whatever the markers did. Same band twice reads oddly ("visible to
+  // visible"), so that case collapses to the band alone.
+  function headline() {
+    const lo = bandOf(Math.min(fA, fB)), hi = bandOf(Math.max(fA, fB));
+    const cap = (w) => w === 'UV' ? 'UV' : w.charAt(0).toUpperCase() + w.slice(1);
+    return lo === hi ? cap(lo) : cap(lo) + ' to ' + hi;
+  }
+
   function render() {
+    document.getElementById('specHead').textContent = headline();
     mA.style.left = (toX(fA) * 100) + '%'; mA.dataset.tag = 'A';
     mB.style.left = (toX(fB) * 100) + '%'; mB.dataset.tag = 'B';
     valA.innerHTML = freq(fA); valB.innerHTML = freq(fB);
@@ -318,6 +416,10 @@
     metaR.textContent = fB >= fA ? 'B over A, in frequency' : 'A over B, in frequency';
     const inVis = fB >= VIS_LO && fB <= VIS_HI;
     vis.classList.toggle('off', !inVis);
+    // The rainbow only offers itself while you are actually in the band; the
+    // fun list, once opened, stays open even if you then wander out, since
+    // nothing in it depends on where the marker is.
+    rainbowBtn.hidden = !inVis;
     mV.style.display = inVis ? '' : 'none';
     if (inVis) { mV.style.left = (vX(fB) * 100) + '%'; mV.dataset.tag = 'B'; }
     for (const [m, f] of [[mA, fA], [mB, fB]]) {
@@ -441,6 +543,14 @@
       paint();
     });
   }
+  const rainbowBtn = document.getElementById('rainbowBtn');
+  const visFun = document.getElementById('visFun');
+  rainbowBtn.addEventListener('click', () => {
+    const open = visFun.hidden;
+    visFun.hidden = !open;
+    rainbowBtn.setAttribute('aria-expanded', String(open));
+  });
+
   grab(mA, bar, (x, f) => { fA = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fA);
   grab(mB, bar, (x, f) => { fB = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fB);
   grab(mV, vis, (x, f) => { fB = clamp(f != null ? f : vF(x), VIS_LO, VIS_HI); }, () => fB);
