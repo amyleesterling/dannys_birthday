@@ -217,7 +217,19 @@
     border: 1px solid rgba(196,228,255,.14); padding: 9px 12px; width: 100%; }
   .stories button:hover { color: #7ee0ff; border-color: rgba(126,224,255,.5); }
 
+  .stepladder { display: grid; grid-template-columns: max-content max-content 1fr; gap: 7px 18px;
+                margin: 14px 0; font-size: 13px; }
+  .stepladder span:nth-child(3n+1) { color: #a07cff; text-align: right; }
+  .stepladder span:nth-child(3n+2) { color: #eff4fb; }
+  .stepladder span:nth-child(3n)   { color: #8b98a8; font-family: "Segoe UI", system-ui, sans-serif; }
+
   .foot { font-size: 12px; color: #5c6b7a; line-height: 1.6; margin-top: 8px; max-width: 70ch; }
+  .coda { margin-top: 34px; font-size: 13px; color: #6c7c8c; line-height: 1.7; max-width: 66ch; }
+  .coda .stride {
+    font-weight: 700;
+    background: linear-gradient(90deg, #ff2d2d, #ff7b00, #ffd400, #7bff2d, #00e5ff, #2b5cff, #7a2bff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
 
   @media (max-width: 700px) {
     .gamebar { flex-wrap: wrap; gap: 10px; }
@@ -366,8 +378,31 @@ beam power      P = photons per second × energy per photon</pre>
     <button class="ctl" id="surprise" type="button">Surprise me</button>
   </div>
 
+  <div class="power steps">
+    <h2>✦ HOW FAR IS 53 OCTAVES?</h2>
+    <p>This view spans 53 doublings of frequency. To feel what that means, take one walking
+       step — <b>0.75 m</b> — and double it once for every octave:</p>
+    <div class="stepladder num">
+      <span>0</span><span>0.75 m</span><span>one step</span>
+      <span>10</span><span>768 m</span><span>the corner store</span>
+      <span>20</span><span>786 km</span><span>San Francisco to San Diego</span>
+      <span>30</span><span>805,000 km</span><span>past the Moon, twice over</span>
+      <span>40</span><span>5.5 AU</span><span>past Jupiter</span>
+      <span>46</span><span>353 AU</span><span>past Voyager 1, out of the heliosphere</span>
+      <span>53</span><span>0.7 light-years</span><span>deep in the Oort cloud</span>
+    </div>
+    <p>One step becomes seven-tenths of a light-year — most of the way through the comet halo at
+       the solar system's edge, a sixth of the distance to the nearest star. Radio to gamma is the
+       gap between a footstep and the Oort cloud, and the entire visible rainbow is
+       <b>a single stride</b> somewhere along the way.</p>
+  </div>
+
   <p class="foot" id="shareNote">The address bar tracks this comparison — copy the URL to share exactly this view.
      Band boundaries are drawn softly on purpose: the named regions are human conventions laid over one continuous spectrum.</p>
+
+  <p class="coda">You are reading this page by catching a hail of half-quadrillion-hertz photons that left
+     a glowing rectangle nanoseconds ago — light your eyes were built for. Of the fifty-three octaves
+     above, you were issued <span class="stride">one</span>. Spend it well.</p>
 </div>
 
 <script src="spectrum-data.js"></script>
