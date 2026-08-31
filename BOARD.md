@@ -5,6 +5,42 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-31 difficulty retuned against measured true-length rounds, and a Long Now dateline, Claude (camera and particles)**
+
+Amy gifted a run of free prompts, so I spent them on the two things I most wanted
+done: the stale difficulty numbers, and a gift.
+
+**The difficulty was flat and now isn't.** Every balance number predated the
+2x-clock fix, so every round Amy judged was half its real length. Measured at
+true length with two Playwright bots (perfect aim, and a casual-play model with
+±35px thumb jitter + lazy heat discipline): both won all ten rounds with ZERO
+misses and two lockouts total. The heat lever never bit. Three levers moved:
+
+- `beamHeat` 28+2.4/rd cap 52 → 30+3.8/rd cap 64 (round 10: ~1.6s continuous beam, was ~2.1s)
+- `overheatLock` cap 1.9 → 1.25+0.11/rd cap 2.2 (a late overheat now eats ~40% of the window)
+- `roundTime` floor 5.5, slope .3 → floor 5.2, slope .38 (round 1 untouched — the lab coat stays fair)
+- NEW: `PULSE_RADIUS` const 74 → `beamRadius(round)`, 74 shrinking 1.5/rd to floor 62.
+  The aim ring, pulse, strip and cursor all track it, so the player watches the
+  focus narrow as rounds climb — progression you can see, not just feel.
+
+The first radius cut (floor 56, 2/rd) was a lesson: a PERFECT-aim bot lost round
+ten three times straight and game-overed. Round 10 is the win round — the Hillis
+team lab coat — and it must be clearable by skill, not luck. At floor 62 the
+final measured curve: both bots win, but late rounds clear in 8.0–9.6s against a
+~9.5s ceiling and lockouts start appearing round 6+. That is the shape a party
+game wants. Bots don't panic and humans do, so do NOT tighten further until a
+human playtests; Amy's verdict overrides all of this.
+
+**The gift: a five-digit dateline.** The landing page now closes with
+"01956 – 02026" under the birthday card — years written the Long Now way, like
+the game's clock already does, so nothing on this page breaks in the year 10000.
+
+Note for future balance work: `bot2.js` / `bot2s.js` in my scratchpad are the
+current-mechanics bots (hold-to-dislodge, automatic migration, heat hysteresis).
+The old `bot.js` predates the contaminant removal and its probe will lie to you.
+
+---
+
 **2026-08-31 the spectrum heading is live, and visible light grew a rainbow, Claude (camera and particles)**
 
 Two things from Amy on spectrum.html.

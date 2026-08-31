@@ -124,7 +124,12 @@
     margin-top: 36px; padding-top: 28px; border-top: 1px solid var(--line);
   }
   .signoff .hbd { display: block; width: 100%; max-width: 720px; height: auto; }
-  .built { margin-top: 20px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
+  /* The dateline under the closing card. Five-digit years are the Long Now
+     house style — Danny's clock is built for the year 12026, so the page
+     dates itself the same way. The numerals get the cyan; the joke earns it. */
+  .longnow { margin-top: 20px; font-size: 13px; color: var(--dim); max-width: 70ch; }
+  .longnow b { color: var(--cyan); font-weight: 600; letter-spacing: .08em; }
+  .built { margin-top: 10px; font-size: 13px; color: rgb(var(--holo-dim) / .75); }
 </style>
 </head>
 <body>
@@ -258,6 +263,9 @@
     <div class="signoff">
       <img class="hbd" src="hbd.jpg" alt="Happy birthday, Danny!" width="1440" height="810">
     </div>
+    <p class="longnow"><b>01956 &ndash; 02026.</b> Dated in five digits, the way the
+      10,000 Year Clock writes its years, so nothing on this page breaks in the
+      year 10000. Happy seventieth of at least a hundred, Danny.</p>
     <p class="built">
       Chrome and panels from
       <a href="https://amyleesterling.github.io/scifi-ui">scifi-ui</a>.
