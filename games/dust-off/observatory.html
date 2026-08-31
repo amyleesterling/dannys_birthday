@@ -156,6 +156,8 @@
   .scalecard.a .who b { color: #7ee0ff; } .scalecard.b .who b { color: #e8a93a; }
   .scalecard .what { font-size: 14px; color: #eff4fb; line-height: 1.5; }
   .scalecard .what .num { color: #cfe6e6; }
+  .scalecard .desc { font-size: 12.5px; color: #8b98a8; line-height: 1.55; margin-top: 7px; }
+  .scalecard .desc[hidden] { display: none; }
 
   /* ---- same power ------------------------------------------------------- */
   .power { border: 1px solid rgba(196,228,255,.14); padding: 16px 18px; margin: 0 0 26px; }
@@ -224,7 +226,10 @@
 </header>
 <div class="wrap">
   <h1>One phenomenon. <span class="mono">Sixteen orders of magnitude.</span></h1>
-  <p class="sub">Radio, microwaves, infrared, light, UV, x-rays and gamma rays are one continuous thing.
+  <p class="sub">The electromagnetic spectrum is one family of waves — electric and magnetic fields
+     rippling through space, carrying energy. Radio, microwaves, infrared, light, UV, x-rays and
+     gamma rays are all the same phenomenon; this view spans sixteen orders of magnitude of it, from
+     radio waves that pass through you unfelt to gamma rays whose every photon can snap molecules apart.
      Choose two signals. Compare their frequency, wavelength, photon energy — and how matter responds.</p>
 
   <div class="composer">
@@ -244,9 +249,11 @@
   <p class="scalecap">Wavelength, for scale</p>
   <div class="scalerow">
     <div class="scalecard a"><img id="scaleImgA" alt=""><div>
-      <div class="who" id="scaleWhoA"></div><div class="what" id="scaleWhatA"></div></div></div>
+      <div class="who" id="scaleWhoA"></div><div class="what" id="scaleWhatA"></div>
+      <div class="desc" id="scaleDescA"></div></div></div>
     <div class="scalecard b"><img id="scaleImgB" alt=""><div>
-      <div class="who" id="scaleWhoB"></div><div class="what" id="scaleWhatB"></div></div></div>
+      <div class="who" id="scaleWhoB"></div><div class="what" id="scaleWhatB"></div>
+      <div class="desc" id="scaleDescB"></div></div></div>
   </div>
 
   <p class="sentence" id="sentence" aria-live="polite"></p>
@@ -805,6 +812,10 @@ beam power      P = photons per second × energy per photon</pre>
       else phrase = 'about <b>1/' + ratioWord(1 / r) + '</b> the size of <b>' + best.name + '</b>';
       $('scaleWho' + M).innerHTML = '<b>' + M + '</b> · ' + nameOf(m).toUpperCase();
       $('scaleWhat' + M).innerHTML = 'One wavelength — <span class="num">' + wave(hzOf(m), true) + '</span> — is ' + phrase + '.';
+      const lm = byId[m === 'a' ? S.aId : S.bId];
+      const desc = $('scaleDesc' + M);
+      desc.textContent = lm ? (lm.how || lm.why) : '';
+      desc.hidden = !lm;
       const img = $('scaleImg' + M);
       img.src = best.img;
       img.alt = best.name;
