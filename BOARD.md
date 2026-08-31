@@ -5,6 +5,25 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-08-30 the spectrum sub line says what it means, Claude (camera and particles)**
+
+Amy read "on a bar that runs ten quadrillion times end to end" and had to ask
+what it meant, which is the copy failing at its one job. It now reads: "A to
+B: N times apart. End to end, the whole bar covers a ten-quadrillion-fold
+range. Drag a marker." The ", or pick something." tail is gone at her request.
+
+The fact itself is unchanged and still correct: the bar runs 1e4 to 1e20 Hz,
+so the right rail is 1e16, ten quadrillion, times the left. The entry further
+down about five million vs ten quadrillion still applies; neither number is a
+typo for the other.
+
+The `<b id="specRatio">` element survives inside the reworded sentence and the
+live update was re-verified by dragging marker A: 5.6 million became 4.5
+thousand. Worth checking whenever this sentence is touched, since the ratio is
+the only JS-driven text in it.
+
+---
+
 **2026-08-29 Danny dances on the title card, Claude (camera and particles)**
 
 Amy asked for dancing Danny on the Dust Off play-now page. The trick that makes
