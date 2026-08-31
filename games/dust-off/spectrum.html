@@ -142,12 +142,19 @@
   .rainbow:hover, .rainbow:focus-visible { border-color: rgb(126 224 255 / .8); }
   .rainbow[aria-expanded="true"] { border-color: rgb(126 224 255 / .8); background: rgb(126 224 255 / .08); }
   .rainbow-arc {
-    display: block; width: 26px; height: 13px;
-    border-radius: 13px 13px 0 0;
+    display: block; width: 34px; height: 17px;
+    border-radius: 17px 17px 0 0;
     background: linear-gradient(90deg, #ff3b30, #ff9500, #ffe600, #35e05a, #35c8e0, #4a6ee0, #9b4ae0);
-    -webkit-mask: radial-gradient(13px 13px at 50% 100%, transparent 6px, #000 7px);
-            mask: radial-gradient(13px 13px at 50% 100%, transparent 6px, #000 7px);
+    -webkit-mask: radial-gradient(17px 17px at 50% 100%, transparent 8px, #000 9px);
+            mask: radial-gradient(17px 17px at 50% 100%, transparent 8px, #000 9px);
+    transition: filter .25s ease;
   }
+  /* Out of the visible band the rainbow stays put but goes gray, the same
+     move the magnified bar makes — Amy couldn't find a button that vanished,
+     and a gray rainbow both advertises the doorway and hints at how to light
+     it up. It stays tappable: the fun list doesn't care where the marker is. */
+  .rainbow.off { border-color: rgb(126 224 255 / .15); }
+  .rainbow.off .rainbow-arc { filter: grayscale(1) brightness(.65); }
 
   /* the fun list: same doorway idiom as the rest of the site's link rows */
   .visfun { margin: 14px 0 4px; display: grid; gap: 7px; }
@@ -214,7 +221,7 @@
 
   <p class="cap">Visible light, magnified:
     <button class="rainbow" id="rainbowBtn" aria-expanded="false"
-            aria-controls="visFun" aria-label="Things to try with visible light" hidden>
+            aria-controls="visFun" aria-label="Things to try with visible light">
       <span class="rainbow-arc" aria-hidden="true"></span>
     </button>
   </p>
@@ -416,10 +423,10 @@
     metaR.textContent = fB >= fA ? 'B over A, in frequency' : 'A over B, in frequency';
     const inVis = fB >= VIS_LO && fB <= VIS_HI;
     vis.classList.toggle('off', !inVis);
-    // The rainbow only offers itself while you are actually in the band; the
-    // fun list, once opened, stays open even if you then wander out, since
-    // nothing in it depends on where the marker is.
-    rainbowBtn.hidden = !inVis;
+    // The rainbow used to hide itself outside the band and Amy couldn't find
+    // it. Now it always stands in the caption — gray out of band, lit within
+    // it — and always opens: nothing in the fun list depends on the marker.
+    rainbowBtn.classList.toggle('off', !inVis);
     mV.style.display = inVis ? '' : 'none';
     if (inVis) { mV.style.left = (vX(fB) * 100) + '%'; mV.dataset.tag = 'B'; }
     for (const [m, f] of [[mA, fA], [mB, fB]]) {
