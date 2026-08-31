@@ -477,20 +477,28 @@ const REDS_PER_ROUND = n => Math.max(3, Math.round(n * 0.42));
 // Cheap taps, expensive holds: the choice you are making under heat is how
 // long to keep pushing a cloud, not whether you can afford to aim.
 const PULSE_HEAT   = 6;
-// Per second of held beam. Measured, the emitter already saturates by round
-// three: peak heat 99 to 100 and 10 to 18% of the round spent locked out. So
-// this is a lever with real headroom, which is why it climbs with the round
-// rather than sitting flat. Round one still gets ~3.5s of continuous beam,
-// which is most of its window; round ten gets ~2.1s, so late rounds are about
-// choosing which reds to spend the beam on rather than sweeping everything.
-const beamHeat = n => Math.min(52, 28 + (n - 1) * 2.4);
+// Per second of held beam. Re-measured after the double-speed round clock was
+// fixed: at true round length the old slope never bit — a bot with sloppy
+// ±35px thumb aim won all ten rounds with zero misses and two lockouts total.
+// The steeper slope brings the budget back: round one still gets ~3.3s of
+// continuous beam (most of its window), round ten gets ~1.6s, so late rounds
+// are about choosing which reds to spend the beam on, not sweeping everything.
+const beamHeat = n => Math.min(64, 30 + (n - 1) * 3.8);
 const COOL_RATE    = 30;   // per second
-// The lockout grows a little too, so an overheat late costs more of a shorter
-// round than one early costs of a longer one.
-const overheatLock = n => Math.min(1.9, 1.25 + (n - 1) * 0.07);
+// The lockout grows too, so an overheat late costs more of a shorter round
+// than one early costs of a longer one — by round ten it eats ~2.2s of a
+// 5.2s window, which is what makes riding the gauge to 100 an actual mistake.
+const overheatLock = n => Math.min(2.2, 1.25 + (n - 1) * 0.11);
 // Widened from 62 with the same reasoning: a tap is now the only way to get
 // anything off the body, so it has to be worth taking.
-const PULSE_RADIUS = 74;   // screen px
+// The focus narrows as the rounds climb — the third difficulty lever, and the
+// one the player can watch happen: the aim ring shrinks, each sweep covers
+// fewer specks, and late rounds ask for aim where early ones asked for area.
+// Floor 62: the first cut went to 56 and a perfect-aim bot lost round ten
+// three times running — halving the sweep area on the win round turned skill
+// into a coin flip. 62 costs ~30% of the area by round nine, which reads as
+// pressure without breaking the round the whole game builds toward.
+const beamRadius = n => Math.max(62, 74 - (Math.max(n, 1) - 1) * 1.5);   // screen px
 
 // How long a knocked-loose particle stays in the air before it drifts back
 // down and re-attaches. Without this, the buoyant drift is so heavily damped
@@ -838,7 +846,10 @@ const roundCount = n => Math.min(90, Math.round(7 + (n - 1) * 4));
 // 6.8s was set when a held sweep both dislodged and delivered. The beam now
 // only dislodges and the trip to the intake takes its own time, so the early
 // rounds need room to cover a big object like the lab coat.
-const roundTime  = n => Math.max(5.5, 8.5 - (n - 1) * 0.3);
+// The floor dropped from 5.5 after the true-length remeasure: with the old
+// clock even sloppy play cleared round ten with seconds to spare, so the late
+// window tightens faster. Round one is untouched — the lab coat stays fair.
+const roundTime  = n => Math.max(5.2, 8.5 - (n - 1) * 0.38);
 
 function newSubject() {
   const def = pickSubjectDef();
@@ -970,10 +981,10 @@ function fire() {
   laser.heat += PULSE_HEAT;
   laser.beamT = 1;
   audio.pulse();
-  fx.push({ k: 'ring', x, y, t: 0, dur: 0.3, r: PULSE_RADIUS });
+  fx.push({ k: 'ring', x, y, t: 0, dur: 0.3, r: beamRadius(round) });
   kick(2);
 
-  const n = subject ? dislodge(x, y, PULSE_RADIUS) : 0;
+  const n = subject ? dislodge(x, y, beamRadius(round)) : 0;
   released += n;
   if (n) kick(n * 1.4);
 
@@ -1241,7 +1252,7 @@ function update(dt) {
 
   // held, the beams strip whatever they pass over
   if (beamOn && BEAM_STRIP > 0) {
-    const n = dislodge(pointer.x, pointer.y, PULSE_RADIUS * BEAM_STRIP);
+    const n = dislodge(pointer.x, pointer.y, beamRadius(round) * BEAM_STRIP);
     released += n;
     if (n) kick(n * 1.1);
   }
@@ -1745,7 +1756,7 @@ function drawLaser(time) {
 
   // the focus, kept small and dim enough that it does not wash the chamber out
   const focus = beamOn ? 0.30 : flash * 0.7;
-  const fr = beamOn ? PULSE_RADIUS * 0.9 : PULSE_RADIUS * (0.5 + flash * 0.5);
+  const fr = beamOn ? beamRadius(round) * 0.9 : beamRadius(round) * (0.5 + flash * 0.5);
   const gr = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, fr);
   gr.addColorStop(0, 'rgba(180,235,255,' + 0.26 * focus + ')');
   gr.addColorStop(0.4, 'rgba(126,224,255,' + 0.12 * focus + ')');
@@ -1912,7 +1923,7 @@ function drawCursor() {
   const locked = laser.lock > 0;
   ctx.strokeStyle = locked ? COL.red : (laser.onBody ? COL.cyan : COL.tealDim);
   ctx.lineWidth = 1;
-  const r = PULSE_RADIUS;
+  const r = beamRadius(round);
   ctx.globalAlpha = locked ? 0.5 : 0.75;
   ctx.beginPath(); ctx.arc(pointer.x, pointer.y, r, 0, TAU); ctx.stroke();
   ctx.globalAlpha = 1;
