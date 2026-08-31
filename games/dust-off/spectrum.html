@@ -297,6 +297,7 @@
   <p class="applecaveat">
     Illustrative, not a dose calculation: real damage is about total energy absorbed, not
     just the photon's frequency. The ranking, harmless to harmful as you go right, is real.
+    Please do not eat any irradiated apples!
   </p>
 </div>
 <script>
@@ -311,7 +312,8 @@
     { lo: 1e4, hi: 3e8, name: 'radio', col: 'rgba(74,150,224,.22)' },
     { lo: 3e8, hi: 3e11, name: 'microwave', short: 'MW', col: 'rgba(74,200,224,.20)' },
     { lo: 3e11, hi: VIS_LO, name: 'infrared', col: 'rgba(196,96,64,.20)' },
-    { lo: VIS_LO, hi: VIS_HI, name: 'visible', col: 'rgba(255,255,255,.6)' },
+    { lo: VIS_LO, hi: VIS_HI, name: 'visible',
+      col: 'linear-gradient(90deg, #ff2d2d, #ff7b00, #ffd400, #7bff2d, #00e5ff, #2b5cff, #7a2bff)' },
     { lo: VIS_HI, hi: 3e16, name: 'UV', col: 'rgba(138,96,230,.24)' },
     { lo: 3e16, hi: 3e19, name: 'x-ray', col: 'rgba(126,224,255,.16)' },
     { lo: 3e19, hi: 1e20, name: 'gamma', col: 'rgba(226,120,180,.20)' },
@@ -372,6 +374,7 @@
       if (hi - lo <= 0.001) continue;
       const el = document.createElement('div');
       el.className = 'specband';
+      el.dataset.band = b.name;
       el.style.left = (lo * 100) + '%';
       el.style.width = ((hi - lo) * 100) + '%';
       el.style.background = b.col;
@@ -557,6 +560,22 @@
     visFun.hidden = !open;
     rainbowBtn.setAttribute('aria-expanded', String(open));
   });
+
+  // the rainbow sliver on the main bar is a doorway too: clicking it opens
+  // the play zone instead of moving a marker
+  const visBand = Array.from(bar.querySelectorAll('.specband')).find(e => e.dataset.band === 'visible');
+  if (visBand) {
+    visBand.style.pointerEvents = 'auto';
+    visBand.style.cursor = 'pointer';
+    visBand.title = 'Open the color play zone';
+    visBand.addEventListener('pointerdown', e => e.stopPropagation());
+    visBand.addEventListener('click', e => {
+      e.stopPropagation();
+      visFun.hidden = false;
+      rainbowBtn.setAttribute('aria-expanded', 'true');
+      visFun.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+    });
+  }
 
   grab(mA, bar, (x, f) => { fA = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fA);
   grab(mB, bar, (x, f) => { fB = clamp(f != null ? f : toF(x), 1e4, 1e20); }, () => fB);
