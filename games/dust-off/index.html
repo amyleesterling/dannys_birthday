@@ -721,8 +721,8 @@ let frags = [];
 // of heat, free of consequence, purely a toy for the interstitial.
 let bubbles = [];
 let bubbleAcc = 0;
-const BUBBLE_RATE = 24;   // per second of held beam
-const BUBBLE_MAX  = 140;
+const BUBBLE_RATE = 15;   // volleys per second of held beam, one bubble per emitter each
+const BUBBLE_MAX  = 170;
 
 function spawnBubble(x, y) {
   if (bubbles.length >= BUBBLE_MAX) bubbles.shift();
@@ -733,6 +733,7 @@ function spawnBubble(x, y) {
     r: big ? 12 + Math.random() * 5 : 3.5 + Math.random() * 7,
     vx: (Math.random() - 0.5) * 90,
     vy: -20 - Math.random() * 70,
+    ray: 0,
     t: 0, life: 2.2 + Math.random() * 1.8,
     hue: Math.random() * 360,
     wob: Math.random() * TAU,
@@ -742,19 +743,44 @@ function spawnBubble(x, y) {
 
 function burstBubbles(x, y, n) { for (let i = 0; i < n; i++) spawnBubble(x, y); }
 
+// The rays themselves are bubbles too: while the beam is held during the
+// dance, each emitter fires a stream of small bubbles that ride the ray to
+// the focus (drawLaser suppresses the solid beam lines in the result phase,
+// so this stream is the ray), then shed their speed and join the plume.
+function spawnRayBubble(ex, ey, tx, ty) {
+  if (bubbles.length >= BUBBLE_MAX) bubbles.shift();
+  const dx = tx - ex, dy = ty - ey; const len = Math.hypot(dx, dy) || 1;
+  const sp = 420 + Math.random() * 160;
+  bubbles.push({
+    x: ex, y: ey, r: 2.6 + Math.random() * 4.2,
+    vx: dx / len * sp, vy: dy / len * sp,
+    ux: -dy / len, uy: dx / len,              // perpendicular, for the wobble
+    ray: len / sp,                            // seconds left riding the rail
+    t: 0, life: len / sp + 0.7 + Math.random() * 1.1,
+    hue: Math.random() * 360, wob: Math.random() * TAU, wf: 7 + Math.random() * 5,
+  });
+}
+
 function updateBubbles(dt) {
   for (let i = bubbles.length - 1; i >= 0; i--) {
     const b = bubbles[i];
     b.t += dt;
-    b.vy -= 55 * dt;                       // buoyancy: soap rises
-    b.vx *= Math.pow(0.35, dt);            // air drag
-    b.vy *= Math.pow(0.5, dt);
-    b.x += (b.vx + Math.sin(b.t * b.wf + b.wob) * 26) * dt;
-    b.y += b.vy * dt;
-    // soft walls: drift back into the chamber rather than sticking
-    if (b.x < L.ch.x + b.r) b.vx += 120 * dt * 3;
-    if (b.x > L.ch.x + L.ch.w - b.r) b.vx -= 120 * dt * 3;
-    if (b.t >= b.life || b.y < L.topH + b.r + 6) {
+    if (b.ray > 0) {
+      // on the rail: straight flight, no buoyancy until arrival
+      b.ray -= dt;
+      b.x += b.vx * dt; b.y += b.vy * dt;
+      if (b.ray <= 0) { b.vx *= 0.12; b.vy *= 0.12; }
+    } else {
+      b.vy -= 55 * dt;                       // buoyancy: soap rises
+      b.vx *= Math.pow(0.35, dt);            // air drag
+      b.vy *= Math.pow(0.5, dt);
+      b.x += (b.vx + Math.sin(b.t * b.wf + b.wob) * 26) * dt;
+      b.y += b.vy * dt;
+      // soft walls: drift back into the chamber rather than sticking
+      if (b.x < L.ch.x + b.r) b.vx += 120 * dt * 3;
+      if (b.x > L.ch.x + L.ch.w - b.r) b.vx -= 120 * dt * 3;
+    }
+    if (b.t >= b.life || (b.ray <= 0 && b.y < L.topH + b.r + 6)) {
       fx.push({ k: 'ring', x: b.x, y: b.y, t: 0, dur: 0.22, r: b.r + 4 });
       bubbles.splice(i, 1);
     }
@@ -768,21 +794,27 @@ function drawBubbles(time) {
     const born = clamp(b.t / 0.15, 0, 1);            // inflate on arrival
     const r = b.r * (0.4 + 0.6 * easeOut(born));
     const hue = (b.hue + time * 40) % 360;           // slow iridescent drift
-    const g = ctx.createRadialGradient(b.x, b.y, r * 0.2, b.x, b.y, r);
-    g.addColorStop(0, 'rgba(255,255,255,0.02)');
-    g.addColorStop(0.8, 'hsla(' + hue + ',80%,80%,0.05)');
-    g.addColorStop(1, 'hsla(' + hue + ',85%,75%,0.16)');
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.fill();
+    // rail bubbles wobble across the ray, not the x axis
+    const w = b.ray > 0 ? Math.sin(b.t * b.wf + b.wob) * 3.5 : 0;
+    const bx = b.x + (b.ux || 0) * w, by = b.y + (b.uy || 0) * w;
+    if (r > 6) {
+      // only the big ones pay for a gradient; the rail swarm is rims only
+      const g = ctx.createRadialGradient(bx, by, r * 0.2, bx, by, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.02)');
+      g.addColorStop(0.8, 'hsla(' + hue + ',80%,80%,0.05)');
+      g.addColorStop(1, 'hsla(' + hue + ',85%,75%,0.16)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(bx, by, r, 0, TAU); ctx.fill();
+    }
     ctx.strokeStyle = 'hsla(' + hue + ',85%,78%,0.45)';
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, by, r, 0, TAU); ctx.stroke();
     // the film catches the light twice, on opposite shoulders
     ctx.strokeStyle = 'hsla(' + ((hue + 140) % 360) + ',90%,80%,0.5)';
     ctx.lineWidth = 1.4;
-    ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.99, -2.4, -1.3); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, by, r * 0.99, -2.4, -1.3); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.65)';
-    ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.7, -2.2, -1.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(bx, by, r * 0.7, -2.2, -1.8); ctx.stroke();
   }
   ctx.restore();
 }
@@ -1053,7 +1085,8 @@ function fire() {
   if (subject && subject.phase === 'result') {
     laser.beamT = 1;
     audio.pulse();
-    burstBubbles(x, y, 12);
+    burstBubbles(x, y, 8);
+    for (const e of L.emitters) for (let i = 0; i < 3; i++) spawnRayBubble(e.x, e.y, x, y);
     return;
   }
 
@@ -1336,7 +1369,10 @@ function update(dt) {
   // stage, stream bubbles from the focus instead
   if (s.phase === 'result' && beamOn) {
     bubbleAcc += dt * BUBBLE_RATE;
-    while (bubbleAcc >= 1) { bubbleAcc--; spawnBubble(pointer.x, pointer.y); }
+    while (bubbleAcc >= 1) {
+      bubbleAcc--;
+      for (const e of L.emitters) spawnRayBubble(e.x, e.y, pointer.x, pointer.y);
+    }
   } else if (beamOn && BEAM_STRIP > 0) {
     const n = dislodge(pointer.x, pointer.y, beamRadius(round) * BEAM_STRIP);
     released += n;
@@ -1799,6 +1835,11 @@ function drawLaser(time) {
   const flash = laser.beamT;
   if (!beamOn && flash <= 0) return;
 
+  // During the dance the rays ARE the bubble streams — the solid lines stay
+  // off and only the soft focus glow below survives, so what leaves the four
+  // emitters is soap, not light.
+  const celebrating = subject && subject.phase === 'result';
+
   // scifi-ui .holosweep: a 14px band of --holo-beam at .55, glowing, carried
   // across on a 820ms cubic-bezier(.16, 1, .3, 1). Same band, same period,
   // running along the beam instead of down a panel.
@@ -1807,7 +1848,7 @@ function drawLaser(time) {
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  for (const e of L.emitters) {
+  for (const e of celebrating ? [] : L.emitters) {
     const dx = pointer.x - e.x, dy = pointer.y - e.y;
     const len = Math.hypot(dx, dy) || 1;
 
@@ -1853,7 +1894,7 @@ function drawLaser(time) {
   ctx.beginPath(); ctx.arc(pointer.x, pointer.y, fr, 0, TAU); ctx.fill();
   ctx.restore();
 
-  if (beamOn) {
+  if (beamOn && !celebrating) {
     ctx.strokeStyle = 'rgba(126,224,255,0.22)';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.arc(pointer.x, pointer.y, BEAM_RADIUS, 0, TAU); ctx.stroke();
