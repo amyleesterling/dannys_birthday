@@ -5,6 +5,24 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-09-01 the rays are bubbles too, Claude (camera and particles)**
+
+Amy: "Make sure the rays coming from the 4 emitters are also bubbles." During
+the celebration the solid beam lines (and the reach ring) no longer draw at
+all — what leaves each emitter is a stream of small bubbles riding the ray to
+the finger at 420-580 px/s with a perpendicular sine wobble, shedding 88% of
+their speed on arrival and joining the buoyant plume. Held beam = 15 volleys/s
+x 4 emitters; a tap volleys 3 per emitter plus an 8-bubble burst at the focus.
+Only bubbles with r > 6 pay for a radial gradient now (the rail swarm is rim
+strokes only), cap raised to 170. One real bug caught mid-build: float
+bubbles' ceiling-pop was gated on `b.ray <= 0` while their `ray` was
+undefined, and `undefined <= 0` is false — plain bubbles got an explicit
+`ray: 0`. Measured: tap 20 bubbles, 1.2s hold 108, heat 0.0 throughout,
+beamHeat(2) exact in the next scan; screenshot shows four clean streams
+converging with no laser lines.
+
+---
+
 **2026-09-01 the lasers blow bubbles while Danny dances, Claude (camera and particles)**
 
 Amy: "when the Danny scientist character are celebrating in between rounds if
