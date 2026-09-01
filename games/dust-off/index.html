@@ -716,6 +716,76 @@ let fx = [];
 let feed = [];
 let shake = 0;
 let frags = [];
+// The celebration bubble gun. While Danny dances between rounds the lasers
+// have nothing to ablate, so firing them streams soap bubbles instead: free
+// of heat, free of consequence, purely a toy for the interstitial.
+let bubbles = [];
+let bubbleAcc = 0;
+const BUBBLE_RATE = 24;   // per second of held beam
+const BUBBLE_MAX  = 140;
+
+function spawnBubble(x, y) {
+  if (bubbles.length >= BUBBLE_MAX) bubbles.shift();
+  const big = Math.random() < 0.08;
+  bubbles.push({
+    x: x + (Math.random() - 0.5) * 14,
+    y: y + (Math.random() - 0.5) * 14,
+    r: big ? 12 + Math.random() * 5 : 3.5 + Math.random() * 7,
+    vx: (Math.random() - 0.5) * 90,
+    vy: -20 - Math.random() * 70,
+    t: 0, life: 2.2 + Math.random() * 1.8,
+    hue: Math.random() * 360,
+    wob: Math.random() * TAU,
+    wf: 2.5 + Math.random() * 3,
+  });
+}
+
+function burstBubbles(x, y, n) { for (let i = 0; i < n; i++) spawnBubble(x, y); }
+
+function updateBubbles(dt) {
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.t += dt;
+    b.vy -= 55 * dt;                       // buoyancy: soap rises
+    b.vx *= Math.pow(0.35, dt);            // air drag
+    b.vy *= Math.pow(0.5, dt);
+    b.x += (b.vx + Math.sin(b.t * b.wf + b.wob) * 26) * dt;
+    b.y += b.vy * dt;
+    // soft walls: drift back into the chamber rather than sticking
+    if (b.x < L.ch.x + b.r) b.vx += 120 * dt * 3;
+    if (b.x > L.ch.x + L.ch.w - b.r) b.vx -= 120 * dt * 3;
+    if (b.t >= b.life || b.y < L.topH + b.r + 6) {
+      fx.push({ k: 'ring', x: b.x, y: b.y, t: 0, dur: 0.22, r: b.r + 4 });
+      bubbles.splice(i, 1);
+    }
+  }
+}
+
+function drawBubbles(time) {
+  if (!bubbles.length) return;
+  ctx.save();
+  for (const b of bubbles) {
+    const born = clamp(b.t / 0.15, 0, 1);            // inflate on arrival
+    const r = b.r * (0.4 + 0.6 * easeOut(born));
+    const hue = (b.hue + time * 40) % 360;           // slow iridescent drift
+    const g = ctx.createRadialGradient(b.x, b.y, r * 0.2, b.x, b.y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.02)');
+    g.addColorStop(0.8, 'hsla(' + hue + ',80%,80%,0.05)');
+    g.addColorStop(1, 'hsla(' + hue + ',85%,75%,0.16)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = 'hsla(' + hue + ',85%,78%,0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.stroke();
+    // the film catches the light twice, on opposite shoulders
+    ctx.strokeStyle = 'hsla(' + ((hue + 140) % 360) + ',90%,80%,0.5)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.99, -2.4, -1.3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, r * 0.7, -2.2, -1.8); ctx.stroke();
+  }
+  ctx.restore();
+}
 
 const laser = { heat: 0, lock: 0, firing: false, x: 0, y: 0, onBody: false, beamT: 0 };
 const pointer = { x: 0, y: 0, down: false, inside: false };
@@ -978,6 +1048,15 @@ function fire() {
   const { x, y } = pointer;
   if (x < L.ch.x || x > L.ch.x + L.ch.w) return;
 
+  // Between rounds the lasers are a bubble gun: Danny is dancing, there is
+  // nothing to ablate, and the trigger should cost nothing while he does.
+  if (subject && subject.phase === 'result') {
+    laser.beamT = 1;
+    audio.pulse();
+    burstBubbles(x, y, 12);
+    return;
+  }
+
   laser.heat += PULSE_HEAT;
   laser.beamT = 1;
   audio.pulse();
@@ -1036,7 +1115,7 @@ function startRun() {
   layout();
   round = 1; score = 0; misses = 0; captured = 0; released = 0; year = 2026;
   banner = null;
-  loose = []; fx = []; feed = []; frags = [];
+  loose = []; fx = []; feed = []; frags = []; bubbles = []; bubbleAcc = 0;
   laser.heat = 0; laser.lock = 0; laser.beamT = 0;
   subject = newSubject();
   audio.arrive();
@@ -1173,14 +1252,17 @@ function update(dt) {
       }
     }
     updateLoose(dt, 0.4);
+    updateBubbles(dt);   // leftovers from a final celebration drift on and pop
     return;
   }
 
-  // heat
+  // heat — the bubble-gun interstitial is exempt: a held beam during the
+  // celebration accrues nothing and the gauge cools as if idle
+  const celebrating = subject && subject.phase === 'result';
   if (laser.lock > 0) {
     laser.lock -= dt;
     laser.heat = Math.max(0, laser.heat - dt * (100 / overheatLock(round)));
-  } else if (pointer.down && pointer.inside) {
+  } else if (pointer.down && pointer.inside && !celebrating) {
     laser.heat += beamHeat(round) * dt;
     if (laser.heat >= 100) { laser.heat = 100; laser.lock = overheatLock(round); audio.overheat(); kick(10); }
   } else {
@@ -1250,14 +1332,19 @@ function update(dt) {
     laser.onBody = hitsSubjectArt(s.def, lp.x, lp.y);
   }
 
-  // held, the beams strip whatever they pass over
-  if (beamOn && BEAM_STRIP > 0) {
+  // held, the beams strip whatever they pass over — or, while Danny has the
+  // stage, stream bubbles from the focus instead
+  if (s.phase === 'result' && beamOn) {
+    bubbleAcc += dt * BUBBLE_RATE;
+    while (bubbleAcc >= 1) { bubbleAcc--; spawnBubble(pointer.x, pointer.y); }
+  } else if (beamOn && BEAM_STRIP > 0) {
     const n = dislodge(pointer.x, pointer.y, beamRadius(round) * BEAM_STRIP);
     released += n;
     if (n) kick(n * 1.1);
   }
 
   updateLoose(dt, s.turb, beamOn);
+  updateBubbles(dt);
 }
 
 function updateLoose(dt, turb, beamOn) {
@@ -1364,6 +1451,7 @@ function draw(time) {
   drawLoose(time);
   drawFrags();
   drawFx();
+  drawBubbles(time);
   if (state === 'play') drawLaser(time);
   ctx.restore();
 
