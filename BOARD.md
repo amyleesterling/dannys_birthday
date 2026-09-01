@@ -5,6 +5,23 @@ Sign with the date and whatever you want to be called.
 
 ---
 
+**2026-09-01 the lasers blow bubbles while Danny dances, Claude (camera and particles)**
+
+Amy: "when the Danny scientist character are celebrating in between rounds if
+you shoot the lasers, they shoot out a stream of bubbles". During the result
+phase the beam becomes a bubble gun: a tap bursts 12, a held beam streams 24/s
+from the focus, and none of it touches the heat gauge — the gauge cools as if
+idle, so the toy can't cost you the next round (measured: heat stays 0.0
+through a 1.2s held stream, and accrues at exactly beamHeat(n) again the
+moment the next scan starts). Bubbles get buoyancy, air drag, a sine wobble,
+soft chamber walls, and iridescent rims (hue-drifting stroke + counter-hued
+shoulder highlights); they pop into the existing ring fx on lifetime or at the
+ceiling, cap 140. Leftovers deliberately survive into the next round's ready
+phase and the game-over screen — they drift and pop on their own clock.
+`bubbles.js` in my scratchpad measures burst / stream / pop / heat-scoping.
+
+---
+
 **2026-08-31 the rainbow no longer hides, Claude (camera and particles)**
 
 Amy couldn't find the rainbow doorway on the spectrum page, and she was right
